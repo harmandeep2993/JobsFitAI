@@ -36,7 +36,7 @@ def parse_pdf(file_path):
         raise FileNotFoundError(f"File not found: {file_path}")
     
     except ValueError:
-        raise ValueError()                                       # allow validation error to pass through
+        raise                                       # allow validation error to pass through
     
     except Exception as e:
         raise RuntimeError(f"Error extracting text from PDF: {e}")
@@ -48,7 +48,7 @@ def parse_pdf(file_path):
     return text.strip()
 
 
-def parser_doc(file_path):
+def parser_docx_direct(file_path):
     """
     Extract text content from a DOCX file using python-docx.
     Extracts from both paragraphs and tables to capture
@@ -112,7 +112,7 @@ def parser_doc(file_path):
 
         if len(text.strip()) < 100:
             raise ValueError(
-                "DOCX appears to be empty or contains insufficient content"
+                "DOCX appears to be empty or contains insufficient content. Upload proper file again"
             )
 
         return text.strip()
@@ -133,11 +133,16 @@ def parser_docx(file_path):
     
     path = Path(file_path)
 
-    # Convert DOC/DOCX → PDF
+    # Convert DOC/DOCX to PDF
     if path.suffix.lower() in (".docx", ".doc"):
         pdf_path = path.with_suffix(".pdf")
-        convert(str(path), str(pdf_path))
-        return parse_pdf(pdf_path)
+        try: 
+            convert(str(path), str(pdf_path))
+            return parse_pdf(str(pdf_path))
+
+        finally:     
+            if pdf_path.exists():
+                pdf_path.unlink()
 
     # If already PDF
     if path.suffix.lower() == ".pdf":
@@ -145,8 +150,6 @@ def parser_docx(file_path):
 
     # TXT fallback
     if path.suffix.lower() == ".txt":
-        return Path(path).read_text()
+        return Path(path).read_text(encoding="utf-8")
 
     raise ValueError("Unsupported file format")
-
-
