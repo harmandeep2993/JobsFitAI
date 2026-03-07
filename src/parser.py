@@ -1,3 +1,4 @@
+import os
 import pdfplumber
 from docx import Document
 from pathlib import Path
@@ -35,9 +36,6 @@ def parse_pdf(file_path):
     except FileNotFoundError:
         raise FileNotFoundError(f"File not found: {file_path}")
     
-    except ValueError:
-        raise                                       # allow validation error to pass through
-    
     except Exception as e:
         raise RuntimeError(f"Error extracting text from PDF: {e}")
     
@@ -47,87 +45,10 @@ def parse_pdf(file_path):
     
     return text.strip()
 
-
-def parser_docx_direct(file_path):
-    """
-    Extract text content from a DOCX file using python-docx.
-    Extracts from both paragraphs and tables to capture
-    all resume content including structured skill tables.
-    
-    Args:
-        file_path (str): Path to the DOCX file
-        
-    Returns:
-        str: Extracted and cleaned text content
-        
-    Raises:
-        FileNotFoundError : If file does not exist
-        ValueError        : If document is empty
-        RuntimeError      : If extraction fails
-    """
-    try:
-        doc = Document(file_path)
-
-        lines = []
-
-        # Paragraphs
-        for para in doc.paragraphs:
-            text = para.text.strip()
-            if text:
-                lines.append(text)
-
-        # Tables
-        for table in doc.tables:
-            for row in table.rows:
-                cells = []
-                for cell in row.cells:
-                    cell_text = cell.text.strip()
-                    if cell_text:
-                        cells.append(cell_text)
-                if cells:
-                    lines.append(" | ".join(cells))
-
-        # Headers and Footers
-        for section in doc.sections:
-
-            for para in section.header.paragraphs:
-                text = para.text.strip()
-                if text:
-                    lines.append(text)
-
-            for para in section.footer.paragraphs:
-                text = para.text.strip()
-                if text:
-                    lines.append(text)
-
-        # Remove duplicates while preserving order
-        seen = set()
-        clean_lines = []
-        for line in lines:
-            if line not in seen:
-                seen.add(line)
-                clean_lines.append(line)
-
-        text = "\n".join(clean_lines)
-
-        if len(text.strip()) < 100:
-            raise ValueError(
-                "DOCX appears to be empty or contains insufficient content. Upload proper file again"
-            )
-
-        return text.strip()
-
-    except FileNotFoundError:
-        raise FileNotFoundError(f"File not found: {file_path}")
-
-    except ValueError as e:
-        raise ValueError(str(e))
-
-    except Exception as e:
-        raise RuntimeError(f"Error extracting text from DOCX: {e}")
-
-# In testing, the direct content parsing from docx file was not reliable.
-# Implement the docx to pdf converiosn and used pdfplumber to parse the content.
+# Direct text parsing from DOCX files was found to be unreliable during testing.
+# To improve consistency, DOCX files are first converted to PDF format.
+# The PDF is then parsed using pdfplumber to extract the text content.
+# This approach provides more reliable and stable text extraction.
 
 def parser_docx(file_path):
     
@@ -144,12 +65,27 @@ def parser_docx(file_path):
             if pdf_path.exists():
                 pdf_path.unlink()
 
-    # If already PDF
-    if path.suffix.lower() == ".pdf":
+def extract_resume_text(file_path):
+    """
+    Detect file type and extract text from resume.
+    Supported formats: PDF, DOCX, TXT
+    """
+
+    path = Path(file_path)
+
+    if not path.exists():
+        raise FileNotFoundError(f"File not found: {path}")
+
+    suffix = path.suffix.lower()
+
+    if suffix == ".pdf":
         return parse_pdf(path)
 
-    # TXT fallback
-    if path.suffix.lower() == ".txt":
-        return Path(path).read_text(encoding="utf-8")
+    elif suffix in [".docx", ".doc"]:
+        return parser_docx(path)
 
-    raise ValueError("Unsupported file format")
+    elif suffix == ".txt":
+        return path.read_text(encoding="utf-8")
+
+    else:
+        raise ValueError("Unsupported file format. Only PDF, DOCX, and TXT are supported.")
