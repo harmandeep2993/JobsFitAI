@@ -1,6 +1,6 @@
-import os
+# main.py
+
 import pdfplumber
-from docx import Document
 from pathlib import Path
 from docx2pdf import convert
 
@@ -79,13 +79,13 @@ def extract_resume_text(file_path):
     suffix = path.suffix.lower()
 
     if suffix == ".pdf":
-        return parse_pdf(path)
+        return parse_pdf(str(path))
 
     elif suffix in [".docx", ".doc"]:
-        return parser_docx(path)
+        return parser_docx(str(path))
 
     elif suffix == ".txt":
-        return path.read_text(encoding="utf-8")
+        return path.read_text(encoding="utf-8").strip()
 
     else:
         raise ValueError("Unsupported file format. Only PDF, DOCX, and TXT are supported.")
