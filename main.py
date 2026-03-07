@@ -1,23 +1,10 @@
-from src.parser import parse_pdf, parser_doc, parser_docx
+from pathlib import Path
+from src.parser import extract_resume_text
 
 
 def main():
-
-    file_path = r"data\resume\sample_resume.docx"
-
-    # choose parser based on file type
-    if file_path.endswith(".pdf"):
-        resume_text = parse_pdf(file_path)
-
-    elif file_path.endswith(".doc"):
-        resume_text = parser_doc(file_path)
-
-    elif file_path.endswith(".docx"):
-        resume_text = parser_docx(file_path)
-
-    else:
-        raise ValueError("Unsupported file format")
-
+    file_path = Path(r"data\pdf_resume\harmandeep_singh_resume.pdf")
+    resume_text = extract_resume_text(file_path)
     print(resume_text)
 
 
