@@ -6,6 +6,7 @@ from utils.ollama_utils import call_ollama, parse_json_response
 from utils.config import RESUME_MAX_CHARS
 from src.extractor.sections import extract_section
 
+
 # FACTUAL POST PROCESSING HELPERS
 #
 # These are factual corrections — NOT content hardcoding:
@@ -107,14 +108,12 @@ def detect_languages(text):
     return found
 
 
-# ══════════════════════════════════════════════════════════
 # RESUME EXTRACTORS
 # Each extractor:
 #   1. Finds relevant section using extract_section()
 #   2. Falls back to full text if section not found
 #   3. Sends focused content to LLM
 #   4. LLM reads only what is relevant
-# ══════════════════════════════════════════════════════════
 
 def extract_skills(resume_text):
     """
