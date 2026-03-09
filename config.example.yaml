@@ -1,0 +1,28 @@
+# Config.yaml
+# config.yaml
+
+ollama:
+  url:         "http://localhost:11434/api/generate"
+  health_url:  "http://localhost:11434"
+  model:       "qwen2.5:3b"
+  timeout:     300
+  temperature: 0.2
+  max_tokens:  2000
+
+extractor:
+  resume_max_chars: 4000
+  jd_max_chars:     4000
+
+matcher:
+  weights:
+    required_skills:   0.35
+    responsibilities:  0.25
+    experience:        0.15
+    education:         0.15
+    preferred_skills:  0.05
+    languages:         0.05
+
+  thresholds:
+    excellent:  80
+    good:       60
+    partial:    40
