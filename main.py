@@ -1,7 +1,7 @@
 # main.py
 
 from pathlib import Path
-from src.parser import extract_resume_text
+from src.parser.parser import extract_resume_text
 
 
 def main():
