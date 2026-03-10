@@ -2,8 +2,8 @@
 
 import re
 
-from utils.ollama_utils import check_ollama, call_ollama, parse_json_response
-from utils.config import JD_MAX_CHARS
+from src.utils.ollama import check_ollama, call_ollama, parse_json_response
+from src.utils.config import JD_MAX_CHARS
 
 
 def extract_jd(jd_text):
