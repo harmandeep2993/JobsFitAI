@@ -1,0 +1,81 @@
+/* assets/css/theme.css */
+/* CSS custom properties — light and dark theme variables */
+
+:root {
+  /* Accent */
+  --accent:   #e8471a;
+  --accent-s: rgba(232, 71, 26, 0.08);
+  --accent-h: #d13c14;
+
+  /* Backgrounds */
+  --bg:   #eeede9;
+  --bg-r: #ffffff;
+  --bg-c: #ffffff;
+
+  /* Borders */
+  --bd:   #e0ded8;
+  --bd-s: #eae9e4;
+
+  /* Text */
+  --t1: #18181f;
+  --t2: #68667a;
+  --t3: #aeacbe;
+
+  /* Semantic colours */
+  --green:    #18994e;
+  --green-bg: #edf8f2;
+  --green-bd: #b4e4cc;
+
+  --red:    #d42c1c;
+  --red-bg: #fdf0ee;
+  --red-bd: #f4bab4;
+
+  --amber:    #b87010;
+  --amber-bg: #fdf4e6;
+  --amber-bd: #eecca0;
+
+  --blue:    #1868c8;
+  --blue-bg: #ecf3fd;
+  --blue-bd: #a4c4ee;
+
+  /* Shadows */
+  --sha:   0 1px 3px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.05);
+  --sha-s: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+:root.dark {
+  /* Backgrounds */
+  --bg:   #0c0c0e;
+  --bg-r: #131316;
+  --bg-c: #1a1a1f;
+
+  /* Borders */
+  --bd:   #252530;
+  --bd-s: #1e1e28;
+
+  /* Text */
+  --t1: #f0f0f5;
+  --t2: #7070a0;
+  --t3: #38385a;
+
+  /* Semantic colours */
+  --green:    #32d474;
+  --green-bg: #0a2018;
+  --green-bd: #183c28;
+
+  --red:    #f5564a;
+  --red-bg: #200c0a;
+  --red-bd: #4a1812;
+
+  --amber:    #f0a832;
+  --amber-bg: #201408;
+  --amber-bd: #503810;
+
+  --blue:    #58b4f5;
+  --blue-bg: #081428;
+  --blue-bd: #183858;
+
+  /* Shadows */
+  --sha:   0 2px 8px rgba(0,0,0,0.45);
+  --sha-s: 0 1px 3px rgba(0,0,0,0.3);
+}
