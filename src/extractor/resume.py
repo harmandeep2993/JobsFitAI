@@ -2,8 +2,8 @@
 
 import re
 
-from utils.ollama_utils import call_ollama, parse_json_response
-from utils.config import RESUME_MAX_CHARS
+from src.utils.ollama import call_ollama, parse_json_response
+from src.utils.config import RESUME_MAX_CHARS
 from src.extractor.sections import extract_section
 
 
