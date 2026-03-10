@@ -1,4 +1,4 @@
-# main.py
+# src/parsers/parser.py
 
 import pdfplumber
 from pathlib import Path
