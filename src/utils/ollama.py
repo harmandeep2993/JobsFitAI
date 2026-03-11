@@ -5,11 +5,6 @@ import json
 import requests
 
 from src.utils.config import (
-<<<<<<< Updated upstream:utils/ollama_utils.py
-from utils.config import (
-=======
-from utils.core.config import (
->>>>>>> Stashed changes:src/utils/ollama.py
     OLLAMA_URL,
     OLLAMA_HEALTH_URL,
     OLLAMA_MODEL,
