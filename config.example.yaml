@@ -1,28 +1,31 @@
-# Config.yaml
-# config.yaml
+# config.example.yaml
+# Copy this to config.yaml and fill in your values
+
+llm:
+  provider:    "ollama"       # ollama | openai | groq
+  model:       "qwen2.5:3b"  # see provider options above
+  api_key:     ""             # or set LLM_API_KEY in .env
+  timeout:     60
+  temperature: 0.2
+  max_tokens:  500
 
 ollama:
-  url:         "http://localhost:11434/api/generate"
-  health_url:  "http://localhost:11434"
-  model:       "qwen2.5:3b"
-  timeout:     300
-  temperature: 0.2
-  max_tokens:  2000
+  url:        "http://localhost:11434/api/generate"
+  health_url: "http://localhost:11434"
 
 extractor:
-  resume_max_chars: 4000
-  jd_max_chars:     4000
+  resume_max_chars: 10000
+  jd_max_chars:     5000
 
 matcher:
   weights:
-    required_skills:   0.35
-    responsibilities:  0.25
-    experience:        0.15
-    education:         0.15
+    required_skills:   0.50
+    responsibilities:  0.20
+    experience:        0.10
+    education:         0.10
     preferred_skills:  0.05
     languages:         0.05
-
   thresholds:
-    excellent:  80
-    good:       60
-    partial:    40
+    excellent: 80
+    good:      60
+    partial:   40
