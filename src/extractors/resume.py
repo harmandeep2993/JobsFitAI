@@ -1,23 +1,31 @@
-# src/extractor/resume.py
+# src/extractors/resume.py
+
+"""
+Resume extraction module. Uses LLM prompts to extract structured information from resume text.
+Includes factual post-processing helpers to improve reliability.
+"""
 
 import re
 
-from src.utils.ollama import call_ollama, parse_json_response
+from src.utils.router import call_llm, parse_json_response
 from src.utils.config import RESUME_MAX_CHARS
-from src.extractor.sections import extract_section
+from src.extractors.sections import extract_section
+
+from src.extractors.prompts import (
+    skills_prompt,
+    experience_prompt,
+    education_prompt,
+    languages_prompt,
+    title_prompt,
+)
 
 
-# FACTUAL POST PROCESSING HELPERS
-#
-# These are factual corrections — NOT content hardcoding:
-#   calculate_years  -> math, always correct
-#   normalise_degree -> degree names are standardised globally
-#   detect_languages -> language names never change
+# Factual post-processing helpers
 
 def calculate_years(experience_list):
     """
     Calculate total work experience years in Python.
-    Never trust LLM for date arithmetic.
+    Handles overlapping job dates - only counts unique periods.
     Caps single job at 20 years to prevent hallucination.
 
     Args:
@@ -27,10 +35,13 @@ def calculate_years(experience_list):
         float: Total years of work experience
     """
     total = 0
+
     for exp in experience_list:
         years = exp.get("duration_years", 0)
+
         if isinstance(years, (int, float)) and 0 < years <= 20:
             total += years
+
     return round(total, 1)
 
 
@@ -38,8 +49,7 @@ def normalise_degree(degree_str):
     """
     Normalise degree string to standard format.
     MSc/M.Sc/Master of Science all mean the same thing.
-    Degree names are internationally standardised —
-    this is factual mapping not content hardcoding.
+    Degree names are internationally standardised. This is factual mapping not content hardcoding.
 
     Args:
         degree_str (str): Raw degree string from LLM
@@ -99,30 +109,23 @@ def detect_languages(text):
     text_lower = text.lower()
 
     for lang, keywords in lang_map.items():
-        if any(
-            re.search(r"\b" + re.escape(kw) + r"\b", text_lower)
-            for kw in keywords
-        ):
+        if any(re.search(r"\b" + re.escape(kw) + r"\b", text_lower) for kw in keywords):
             found.append(lang)
 
     return found
 
 
-# RESUME EXTRACTORS
+# Resume Extraction Functions
 # Each extractor:
-#   1. Finds relevant section using extract_section()
-#   2. Falls back to full text if section not found
-#   3. Sends focused content to LLM
-#   4. LLM reads only what is relevant
+#  - Finds relevant section using extract_section()
+#  - Falls back to full text if section not found
+#  - Sends focused content to LLM via hardened prompt
+#  - LLM reads only what is relevant
+
 
 def extract_skills(resume_text):
     """
     Extract and categorise skills from resume.
-
-    Strategy:
-      Find SKILLS section -> send to LLM
-      LLM categorises whatever skills are there
-      No hardcoded skill list
 
     Args:
         resume_text (str): Full resume text
@@ -130,68 +133,34 @@ def extract_skills(resume_text):
     Returns:
         dict: Skills by category
     """
-    default = {
-        "programming_languages": [],
-        "frameworks":            [],
-        "databases":             [],
-        "cloud":                 [],
-        "tools":                 [],
-        "soft_skills":           [],
-    }
 
     skills_section = extract_section(resume_text, "skills")
-    content        = skills_section or resume_text[:RESUME_MAX_CHARS]
+    content = skills_section or resume_text[:RESUME_MAX_CHARS]
+    print("---- SKILLS CONTENT ----")
+    print(content[:400])
 
-    prompt = f"""
-Read this text and extract all skills. Do not miss anything. Do not fabricate if not mentioned in text.
-Categorise each skill correctly.
-Return ONLY valid JSON. Nothing else.
+    if not content:
+        return []
 
-{{
-  "programming_languages": [],
-  "frameworks":            [],
-  "databases":             [],
-  "cloud":                 [],
-  "tools":                 [],
-  "soft_skills":           []
-}}
+    response = call_llm(skills_prompt(content))
+    result = parse_json_response(response)
 
-Category rules:
-- programming_languages: Python, SQL, R, Java, C++ etc
-- frameworks: ML/data libraries such as Pandas, NumPy, Scikit-learn, TensorFlow, PyTorch, XGBoost, FastAPI, Django, Flask, LangChain etc
-- databases: PostgreSQL, MySQL, MongoDB, Redis, Elasticsearch, SQLite etc
-- cloud: AWS, Azure, GCP, cloud platforms etc
-- tools: Docker, Git, Jupyter, Power BI, Tableau, VS Code, Databricks, Airflow etc
-- soft_skills: communication, teamwork, problem solving, leadership etc
+    if isinstance(result, list):
 
-IMPORTANT:
-- Pandas and NumPy are frameworks NOT databases
-- Git and Docker are tools NOT frameworks
-- Extract every skill you see — miss nothing
+        skills = [
+            s.lower().strip()
+            for s in result
+            if isinstance(s, str) and s.strip()
+        ]
 
-Text:
-{content}
-"""
+        # remove duplicates
+        return list(dict.fromkeys(skills))
 
-    response = call_ollama(prompt)
-    result   = parse_json_response(response)
-
-    if result and isinstance(result, dict):
-        for key in default:
-            if key not in result:
-                result[key] = []
-        return result
-
-    return default
-
+    return []
 
 def extract_experience(resume_text):
     """
     Extract work experience from resume.
-
-    Strategy:
-      Find EXPERIENCE section -> send to LLM
-      LLM extracts jobs from focused text
 
     Args:
         resume_text (str): Full resume text
@@ -200,54 +169,26 @@ def extract_experience(resume_text):
         list: Work experience entries
     """
     exp_section = extract_section(resume_text, "experience")
-    content     = exp_section or resume_text[:RESUME_MAX_CHARS]
+    content = exp_section or resume_text[:RESUME_MAX_CHARS]
+    print("---- EXPERIENCE CONTENT ----")
+    print(content[:400])
 
-    prompt = f"""
-Extract all work experience from this text.
-Usually date format is month-YYYY / MM/YYYY.
-Calculate the duration properly for each job. e.g. 02-2025 to 07-2025 is 5 months or 0.5 year.
-Return ONLY a valid JSON array. Nothing else.
-
-[
-  {{
-    "title": "exact job title",
-    "company": "company name",
-    "duration_years": 1.5,
-    "responsibilities": [
-      "what they did — copy bullet points exactly"
-    ]
-  }}
-]
-
-IMPORTANT:
-- duration_years: number or float value only
-- List ALL jobs most recent first
-- Copy responsibility bullet points exactly
-- Do not include education here
-
-Text:
-{content}
-"""
-
-    response = call_ollama(prompt)
+    response = call_llm(experience_prompt(content))
 
     try:
         result = parse_json_response(response)
+
         if isinstance(result, list):
             return result
+        
     except Exception:
         pass
 
     return []
 
-
 def extract_education(resume_text):
     """
     Extract education from resume.
-
-    Strategy:
-      Find EDUCATION section -> send to LLM
-      Normalise degree names after extraction
 
     Args:
         resume_text (str): Full resume text
@@ -258,28 +199,7 @@ def extract_education(resume_text):
     edu_section = extract_section(resume_text, "education")
     content     = edu_section or resume_text[:RESUME_MAX_CHARS]
 
-    prompt = f"""
-Extract all education and degrees from this text.
-Return ONLY a valid JSON array. Nothing else.
-
-[
-  {{
-    "degree": "MSc or BSc or PhD or Diploma",
-    "field": "full field of study",
-    "university": "university name"
-  }}
-]
-
-IMPORTANT:
-- List ALL degrees
-- Use full field name e.g. "Data Analytics, Mathematics, Computer Science" not just "Data"
-- degree should be MSc, BSc, PhD, Diploma, MBA, BEng, MEng etc
-
-Text:
-{content}
-"""
-
-    response = call_ollama(prompt)
+    response = call_llm(education_prompt(content))
 
     try:
         result = parse_json_response(response)
@@ -297,11 +217,7 @@ Text:
 def extract_languages(resume_text):
     """
     Extract languages from resume.
-
-    Strategy:
-      Find LANGUAGES section -> send to LLM
-      If section not found -> regex fallback
-      Regex fallback is always reliable
+    Falls back to regex if LLM misses languages section.
 
     Args:
         resume_text (str): Full resume text
@@ -312,16 +228,7 @@ def extract_languages(resume_text):
     lang_section = extract_section(resume_text, "languages")
 
     if lang_section:
-        prompt = f"""
-Extract all languages from this text.
-Return ONLY a valid JSON array of language names. Nothing else.
-
-["English", "German"]
-
-Text:
-{lang_section}
-"""
-        response = call_ollama(prompt)
+        response = call_llm(languages_prompt(lang_section))
 
         try:
             result = parse_json_response(response)
@@ -329,10 +236,11 @@ Text:
                 langs = [l.lower().strip() for l in result]
                 if langs:
                     return langs
+                
         except Exception:
             pass
 
-    # Fallback — regex on full text
+    # Fallback - regex on full text
     return detect_languages(resume_text)
 
 
@@ -340,7 +248,7 @@ def extract_current_title(experience_list, resume_text):
     """
     Get most recent job title.
     Uses first experience entry — most recent.
-    Falls back to LLM on short resume text if needed.
+    Falls back to LLM if experience list is empty.
 
     Args:
         experience_list (list): Extracted experience
@@ -351,19 +259,29 @@ def extract_current_title(experience_list, resume_text):
     """
     if experience_list:
         title = experience_list[0].get("title", "")
+
         if title:
             return title
 
-    # Fallback — ask LLM directly
-    prompt = f"""
-What is the most recent job title in this resume?
-Return ONLY the job title. No explanation.
+    response = call_llm(title_prompt(resume_text[:500]))
 
-Resume (first 500 chars):
-{resume_text[:500]}
-"""
-    response = call_ollama(prompt)
     return (response or "").strip()
+
+def is_weak_result(resume_content):
+    """
+    Determine if extraction result is weak or incomplete.
+    """
+
+    if not resume_content:
+        return True
+
+    if not resume_content.get("skills"):
+        return True
+
+    if not resume_content.get("experience"):
+        return True
+
+    return False
 
 
 def extract_resume(resume_text):
@@ -376,28 +294,43 @@ def extract_resume(resume_text):
     Returns:
         dict: Structured resume data
     """
-    print("Extracting skills...")
     skills = extract_skills(resume_text)
-
-    print("Extracting experience...")
     experience = extract_experience(resume_text)
-
-    print("Extracting education...")
     education = extract_education(resume_text)
-
-    print("Extracting languages...")
     languages = extract_languages(resume_text)
 
-    print("Extracting current title...")
     current_title = extract_current_title(experience, resume_text)
-
     total_years = calculate_years(experience)
 
-    return {
-        "current_title":          current_title,
+    result =  {
+        "current_title": current_title,
         "total_years_experience": total_years,
-        "skills":                 skills,
-        "experience":             experience,
-        "education":              education,
-        "languages":              languages,
+        "skills": skills,
+        "experience": experience,
+        "education": education,
+        "languages": languages,
     }
+    
+    # pass 2 — fallback extraction if weak
+    if is_weak_result(result):
+
+        fallback_text = resume_text[:RESUME_MAX_CHARS]
+
+        skills = extract_skills(fallback_text)
+        experience = extract_experience(fallback_text)
+        education = extract_education(fallback_text)
+        languages = extract_languages(fallback_text)
+
+        current_title = extract_current_title(experience, fallback_text)
+        total_years = calculate_years(experience)
+
+        result = {
+            "current_title": current_title,
+            "total_years_experience": total_years,
+            "skills": skills,
+            "experience": experience,
+            "education": education,
+            "languages": languages,
+        }
+
+    return result
