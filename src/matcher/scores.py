@@ -1,10 +1,9 @@
 # src/matcher/scores.py
 
 from sentence_transformers import util
-from src.utils.config import WEIGHTS
 
-from .model import load_model
 from .utils import get_all_skills
+from .embedding_model import load_model
 
 # SCORE 1 — REQUIRED SKILLS MATCH (35%)
 # Most important signal
@@ -13,39 +12,54 @@ from .utils import get_all_skills
 def score_required_skills(resume_json, jd_json):
     """
     Compare resume skills against JD required skills.
-    Uses flattened skill list to handle LLM
-    categorisation errors.
-
-    Args:
-        resume_json (dict): Extracted resume data
-        jd_json     (dict): Extracted JD data
-
-    Returns:
-        tuple: (score, matched_skills, missing_skills)
+    Uses rule matching first, then embedding similarity fallback.
     """
-    required = [
-        s.lower().strip()
-        for s in jd_json.get("required_skills", [])
-        if s
-    ]
+
+    required = [s.lower().strip() for s in jd_json.get("required_skills", []) if s]
 
     if not required:
         return 0, [], []
 
-    # Flatten all resume skill categories
-    candidate = get_all_skills(
-        resume_json.get("skills", {})
-    )
+    candidate = get_all_skills(resume_json.get("skills", []))
 
-    matched = [s for s in required if s in candidate]
-    missing = [s for s in required if s not in candidate]
+    matched = []
+    missing = []
+
+    model = load_model()
+
+    candidate_vecs = None
+    # Pre-encode candidate skills once
+    if candidate:
+        candidate_vecs = model.encode(candidate, convert_to_tensor=True)
+
+    for r in required:
+
+        # Rule-based match
+        rule_match = any(r in c or c in r for c in candidate)
+
+        if rule_match:
+            matched.append(r)
+            continue
+
+        # Embedding fallback
+        if candidate_vecs is not None:
+            
+            r_vec = model.encode(r, convert_to_tensor=True)
+
+            sims = util.cos_sim(r_vec, candidate_vecs)[0]
+
+            if sims.max() >= 0.75:
+                matched.append(r)
+                continue
+
+        missing.append(r)
 
     score = round(len(matched) / len(required) * 100, 1)
 
     return score, matched, missing
 
 
-# SCORE 2 — RESPONSIBILITIES SEMANTIC MATCH (25%)
+# SCORE 2 — RESPONSIBILITIES SEMANTIC MATCH (20%)
 # What did candidate actually do vs what JD needs?
 # Sentence level comparison — most accurate semantic method
 
