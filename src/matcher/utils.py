@@ -1,32 +1,32 @@
-# src.matcher/utils.py
+# src/matcher/utils.py
 
 from src.utils.config import THRESHOLDS
 
 
-def get_all_skills(skills_dict):
+def get_all_skills(skills):
     """
-    Flatten categorised skills dict into one list.
-    Combines all categories for comparison.
-    Handles categorisation errors from LLM
-    e.g. Pandas in tools instead of frameworks.
+    Normalize and deduplicate skill list.
 
     Args:
-        skills_dict (dict): Skills by category
+        skills (list): Skills extracted from resume
 
     Returns:
-        list: All skills in lowercase
+        list: Cleaned skill list
     """
-    all_skills = []
 
-    for category in skills_dict.values():
-        if isinstance(category, list):
-            all_skills.extend([
-                s.lower().strip()
-                for s in category
-                if s
-            ])
+    if not skills:
+        return []
 
-    return list(set(all_skills))
+    cleaned = []
+
+    for skill in skills:
+        if isinstance(skill, str):
+            s = skill.lower().strip()
+            if s:
+                cleaned.append(s)
+
+    # remove duplicates while preserving order
+    return list(dict.fromkeys(cleaned))
 
 
 def get_score_label(score):
@@ -34,15 +34,19 @@ def get_score_label(score):
     Convert numeric score to human readable label.
 
     Args:
-        score (float): Match score 0-100
+        score (float): Match score 0–100
 
     Returns:
-        str: Label with emoji
+        str
     """
+
     if score >= THRESHOLDS["excellent"]:
         return "Excellent Match 🟢"
+
     if score >= THRESHOLDS["good"]:
         return "Good Match 🟡"
+
     if score >= THRESHOLDS["partial"]:
         return "Partial Match 🟠"
+
     return "Poor Match 🔴"

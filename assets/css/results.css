@@ -152,3 +152,45 @@
   padding-top:  18px;
   border-top:   1px solid var(--bd);
 }
+
+/* ── Tab panels ── */
+.jf-panel { display: block; }
+
+/* ── Recommendation cards ── */
+.reco-card {
+  display:       flex;
+  gap:           14px;
+  padding:       16px 18px;
+  border-radius: 12px;
+  border:        1px solid var(--bd);
+  margin-bottom: 12px;
+  background:    var(--bg-c);
+  transition:    background .25s, border-color .25s;
+}
+
+.reco-icon {
+  font-size:   22px;
+  flex-shrink: 0;
+  margin-top:  2px;
+}
+
+.reco-body   { flex: 1; min-width: 0; }
+
+.reco-title {
+  font-size:     13px;
+  font-weight:   600;
+  color:         var(--t1);
+  margin-bottom: 5px;
+}
+
+.reco-text {
+  font-size:   13px;
+  color:       var(--t2);
+  line-height: 1.6;
+}
+
+.reco-high { border-left: 3px solid var(--red);   background: var(--red-bg);   }
+.reco-med  { border-left: 3px solid var(--amber);  background: var(--amber-bg); }
+.reco-low  { border-left: 3px solid var(--blue);   background: var(--blue-bg);  }
+.reco-good { border-left: 3px solid var(--green);  background: var(--green-bg); }
+.reco-info { border-left: 3px solid var(--bd);     background: var(--bg-c);     }
