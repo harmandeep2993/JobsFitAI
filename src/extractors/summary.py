@@ -84,12 +84,16 @@ SUMMARY:"""
 
 
 def _flatten_skills(skills_dict):
-    """Flatten skills dict into a single list."""
-    all_skills = []
-    for category_skills in skills_dict.values():
-        if isinstance(category_skills, list):
-            all_skills.extend(category_skills)
-    return all_skills[:15]  # cap to avoid token waste
+    """Flatten skills — handles both dict and list format."""
+    if isinstance(skills_dict, list):
+        return skills_dict[:15]
+    if isinstance(skills_dict, dict):
+        all_skills = []
+        for category_skills in skills_dict.values():
+            if isinstance(category_skills, list):
+                all_skills.extend(category_skills)
+        return all_skills[:15]
+    return []
 
 
 def _fallback_summary(ctx):
