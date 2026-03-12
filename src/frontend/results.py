@@ -366,8 +366,7 @@ def build_results_html(results, resume_json, jd_json, summary=''):
     r_edu        = jd_json.get("required_education", {})
 
     return (
-        TAB_JS
-        + render_metrics(score, matched_req, missing_req, c_yrs, r_yrs)
+        render_metrics(score, matched_req, missing_req, c_yrs, r_yrs)
         + render_breakdown(scores)
         + render_summary(summary)
         + render_skills_gap(matched_req, missing_req, matched_pref, missing_pref)
