@@ -188,6 +188,12 @@ def register_page():
             safe_js('document.getElementById("spin-text").innerText="Calculating match score...";')
             results = get_match_score(resume_json, jd_json)
 
+            safe_js('document.getElementById("spin-text").innerText="Generating summary...";')
+            from src.extractors.summary import generate_summary
+            summary = await asyncio.get_event_loop().run_in_executor(
+                None, lambda: generate_summary(resume_json, jd_json, results)
+            )
+
             safe_js(f"""
             var s = document.querySelector('.steps');
             if(s) s.outerHTML = `{make_steps(4)}`;
@@ -195,7 +201,7 @@ def register_page():
 
             # Build results HTML and inject via JS
             from src.frontend.results import build_results_html
-            html = build_results_html(results, resume_json, jd_json)
+            html = build_results_html(results, resume_json, jd_json, summary)
 
             # Escape for JS template literal
             html_escaped = html.replace('\\', '\\\\').replace('`', '\\`').replace('$', '\\$')

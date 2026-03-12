@@ -194,3 +194,27 @@
 .reco-low  { border-left: 3px solid var(--blue);   background: var(--blue-bg);  }
 .reco-good { border-left: 3px solid var(--green);  background: var(--green-bg); }
 .reco-info { border-left: 3px solid var(--bd);     background: var(--bg-c);     }
+
+/* ── Summary card ── */
+.summary-card {
+  display:       flex;
+  gap:           16px;
+  padding:       20px 24px;
+  background:    var(--bg-c);
+  border:        1px solid var(--bd);
+  border-radius: 12px;
+  border-left:   3px solid var(--accent);
+}
+
+.summary-icon {
+  font-size:   24px;
+  flex-shrink: 0;
+  margin-top:  2px;
+}
+
+.summary-text {
+  font-size:   14px;
+  color:       var(--t1);
+  line-height: 1.8;
+  font-weight: 400;
+}
