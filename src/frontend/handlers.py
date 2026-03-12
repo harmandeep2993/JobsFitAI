@@ -213,6 +213,21 @@ def register_page():
             }}
             """)
 
+            # Inject tab switching function AFTER innerHTML — scripts in innerHTML don't execute
+            safe_js("""
+            window.jfTab = function(el, panelId) {
+                document.querySelectorAll('#jf-tab-row .tab-item').forEach(function(t) {{
+                    t.classList.remove('active');
+                }});
+                document.querySelectorAll('.jf-panel').forEach(function(p) {{
+                    p.style.display = 'none';
+                }});
+                el.classList.add('active');
+                var panel = document.getElementById(panelId);
+                if (panel) panel.style.display = 'block';
+            };
+            """)
+
         except Exception as exc:
             print(f"[ERROR] {exc}")
             import traceback
