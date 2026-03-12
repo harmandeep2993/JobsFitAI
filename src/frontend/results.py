@@ -60,6 +60,26 @@ def render_metrics(score, matched_req, missing_req, c_yrs, r_yrs):
     """
 
 
+
+def render_summary(summary_text):
+    """
+    Build summary tab panel HTML.
+
+    Args:
+        summary_text (str): LLM generated summary
+
+    Returns:
+        str: Summary panel HTML
+    """
+    text = safe_html(summary_text) if summary_text else "Summary not available."
+    return f'''<div id="jf-summary" class="jf-panel fade-in">
+      <div class="summary-card">
+        <div class="summary-icon">🤖</div>
+        <div class="summary-text">{text}</div>
+      </div>
+    </div>'''
+
+
 def render_breakdown(scores):
     progs = "".join(
         make_prog(PROG_LABELS[k], v)
@@ -69,12 +89,13 @@ def render_breakdown(scores):
 
     return f"""
     <div class="tab-row" id="jf-tab-row">
-      <div class="tab-item active" onclick="jfTab(this,'jf-breakdown')">Match Breakdown</div>
+      <div class="tab-item active" onclick="jfTab(this,'jf-summary')">📋 Summary</div>
+      <div class="tab-item"        onclick="jfTab(this,'jf-breakdown')">Match Breakdown</div>
       <div class="tab-item"        onclick="jfTab(this,'jf-skills')">Skills Gap</div>
       <div class="tab-item"        onclick="jfTab(this,'jf-languages')">Languages</div>
       <div class="tab-item"        onclick="jfTab(this,'jf-reco')">💡 Recommendations</div>
     </div>
-    <div id="jf-breakdown" class="jf-panel fade-in">{progs}</div>
+    <div id="jf-breakdown" class="jf-panel" style="display:none;">{progs}</div>
     """
 
 
@@ -323,7 +344,7 @@ def render_results(container, results, resume_json, jd_json):
         ui.html(f'<div class="foot-note">{score}% · {label} · {LLM_MODEL} · all-MiniLM-L6-v2</div>')
 
 
-def build_results_html(results, resume_json, jd_json):
+def build_results_html(results, resume_json, jd_json, summary=''):
     """
     Build full results HTML string — no NiceGUI elements.
     Used when injecting results via JS innerHTML.
@@ -348,6 +369,7 @@ def build_results_html(results, resume_json, jd_json):
         TAB_JS
         + render_metrics(score, matched_req, missing_req, c_yrs, r_yrs)
         + render_breakdown(scores)
+        + render_summary(summary)
         + render_skills_gap(matched_req, missing_req, matched_pref, missing_pref)
         + render_languages(c_langs, r_langs)
         + render_recommendations(score, missing_req, missing_pref, c_yrs, r_yrs, c_edu, r_edu, scores)
