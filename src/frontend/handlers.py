@@ -62,18 +62,18 @@ def register_page():
       <div class="content-card">
         <input type="file" id="file-input" accept=".pdf,.docx,.doc" style="display:none;"/>
         <div class="two-col">
+
+          <!-- Resume upload — left, narrow (1fr) -->
           <div>
-            <div class="sec-lbl">Job Description</div>
-            <textarea id="jd-input" class="jd-box"
-              placeholder="Paste the full job description here..."></textarea>
-          </div>
-          <div>
-            <div class="sec-lbl">Resume File</div>
+            <div class="sec-lbl-row">
+              <div class="sec-lbl">Resume File</div>
+              <button class="clear-btn" onclick="clearResume()" title="Clear resume">✕</button>
+            </div>
             <div class="up-zone" id="up-zone"
                 ondragover="event.preventDefault();this.classList.add('drag')"
                 ondragleave="this.classList.remove('drag')"
                 ondrop="event.preventDefault();this.classList.remove('drag');handleFileSelect(event.dataTransfer.files[0])">
-              <svg width="36" height="44" viewBox="0 0 36 44" fill="none" style="opacity:0.3;">
+              <svg width="30" height="36" viewBox="0 0 36 44" fill="none" style="opacity:0.3;">
                 <rect x="1" y="1" width="26" height="34" rx="3" stroke="currentColor" stroke-width="2" fill="none"/>
                 <path d="M27 1l8 8h-8V1z" stroke="currentColor" stroke-width="2" fill="none"/>
                 <line x1="6" y1="13" x2="22" y2="13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
@@ -84,6 +84,20 @@ def register_page():
               <div class="up-hint">PDF &nbsp;&middot;&nbsp; DOCX &nbsp;&middot;&nbsp; DOC</div>
             </div>
           </div>
+
+          <!-- JD textarea — right, wide (2fr) -->
+          <div>
+            <div class="sec-lbl-row">
+              <div class="sec-lbl">Job Description</div>
+              <button class="clear-btn" onclick="clearJD()" title="Clear job description">✕</button>
+            </div>
+            <div class="jd-wrap">
+              <textarea id="jd-input" class="jd-box"
+                placeholder="Paste the full job description here..."></textarea>
+              <div class="jd-counter" id="jd-counter">0 / 5000</div>
+            </div>
+          </div>
+
         </div>
         <div style="margin-top:24px;">
           <button class="btn-primary" id="analyse-btn">&rarr; Analyse Match</button>
