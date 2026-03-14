@@ -25,69 +25,72 @@ import logging
 import logging.handlers
 from pathlib import Path
 
-
-# Config
 LOG_DIR      = Path("logs")
 LOG_FILE     = LOG_DIR / "jobfitai.log"
-MAX_BYTES    = 5 * 1024 * 1024   # 5 MB per file
-BACKUP_COUNT = 3                  # keep last 3 rotated files
+MAX_BYTES    = 5 * 1024 * 1024
+BACKUP_COUNT = 3
 
-
-# Formatters 
 FILE_FORMAT = "%(asctime)s | %(levelname)-8s | %(name)-30s | %(message)s"
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
+# Module-level flag — survives re-imports in same process
+_INITIALISED = False
+
 
 class _ColourFormatter(logging.Formatter):
-    
-    """ Coloured console formatter. pplies ANSI colour codes per log level for readability.
-    Falls back to plain text on terminals that don't support colour.
+    """
+    Coloured console formatter.
+    Applies ANSI colour codes per log level for readability.
     """
 
     COLOURS = {
-        logging.DEBUG:    "\033[36m",    # cyan
-        logging.INFO:     "\033[32m",    # green
-        logging.WARNING:  "\033[33m",    # amber
-        logging.ERROR:    "\033[31m",    # red
-        logging.CRITICAL: "\033[35m",    # magenta
+        logging.DEBUG:    "\033[36m",
+        logging.INFO:     "\033[32m",
+        logging.WARNING:  "\033[33m",
+        logging.ERROR:    "\033[31m",
+        logging.CRITICAL: "\033[35m",
     }
     RESET = "\033[0m"
 
-    CONSOLE_FORMAT = "%(asctime)s | {colour}%(levelname)-8s%(reset)s | %(name)-30s | %(message)s"
-
     def format(self, record):
         colour = self.COLOURS.get(record.levelno, "")
-        fmt = self.CONSOLE_FORMAT.format(colour=colour, reset=self.RESET)
+        reset  = self.RESET
+        fmt = (
+            f"%(asctime)s | {colour}%(levelname)-8s{reset}"
+            " | %(name)-30s | %(message)s"
+        )
         formatter = logging.Formatter(fmt, datefmt=DATE_FORMAT)
         return formatter.format(record)
 
 
-# Setup
-
 def _setup_logging(level: str = "DEBUG") -> None:
     """
     Configure root logger with console + rotating file handlers.
-    Called once at startup. Subsequent calls are no-ops.
+    Guarded by _INITIALISED flag — safe to call multiple times.
 
     Args:
         level (str): Log level — DEBUG | INFO | WARNING | ERROR
     """
-    root = logging.getLogger()
+    global _INITIALISED
 
-    # Avoid duplicate handlers if called multiple times
-    if root.handlers:
+    if _INITIALISED:
         return
 
-    numeric_level = getattr(logging, level.upper(), logging.DEBUG)
-    root.setLevel(logging.DEBUG)  # root captures everything — handlers filter
+    root = logging.getLogger()
 
-    #  Console handler
+    # Remove any handlers added by other libraries before us
+    root.handlers.clear()
+
+    numeric_level = getattr(logging, level.upper(), logging.DEBUG)
+    root.setLevel(numeric_level)  # root level matches config — filters debug when INFO set
+
+    # Console handler
     console = logging.StreamHandler()
     console.setLevel(numeric_level)
     console.setFormatter(_ColourFormatter())
     root.addHandler(console)
 
-    #  File handler (rotating)
+    # Rotating file handler
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     file_handler = logging.handlers.RotatingFileHandler(
         LOG_FILE,
@@ -95,17 +98,34 @@ def _setup_logging(level: str = "DEBUG") -> None:
         backupCount = BACKUP_COUNT,
         encoding    = "utf-8",
     )
-    file_handler.setLevel(logging.DEBUG)   # always log everything to file
+    file_handler.setLevel(logging.DEBUG)
     file_handler.setFormatter(logging.Formatter(FILE_FORMAT, datefmt=DATE_FORMAT))
     root.addHandler(file_handler)
 
+    # Silence noisy third party loggers
+    noisy_loggers = [
+        "nicegui", "uvicorn", "uvicorn.access", "uvicorn.error",
+        "fastapi", "httpx", "httpcore", "multipart",
+        "sentence_transformers", "transformers", "torch",
+        "PIL", "pdfplumber",
+        "pdfminer", "pdfminer.pdfpage", "pdfminer.pdfinterp",
+        "pdfminer.pdfdocument", "pdfminer.pdfparser",
+        "pdfminer.cmapdb", "pdfminer.encodingdb", "pdfminer.converter",
+    ]
+    for noisy in noisy_loggers:
+        logging.getLogger(noisy).setLevel(logging.WARNING)
 
-# Public API
+    # Catch any remaining third party loggers not listed above
+    # by setting propagate=False on our own loggers only
+    logging.getLogger("src").setLevel(logging.DEBUG)
+
+    _INITIALISED = True
+
 
 def get_logger(name: str) -> logging.Logger:
     """
     Get a named logger for a module.
-    Initialises logging on first call using config.yaml level if available.
+    Initialises logging on first call — subsequent calls are instant.
 
     Args:
         name (str): Module name — pass __name__
@@ -117,16 +137,15 @@ def get_logger(name: str) -> logging.Logger:
         logger = get_logger(__name__)
         logger.info("Starting extraction")
     """
-    # Lazy init — read level from config if available
-    if not logging.getLogger().handlers:
+    if not _INITIALISED:
         level = "DEBUG"
         try:
             from src.utils.config import LOG_LEVEL
             level = LOG_LEVEL
         except Exception:
-            pass  # config not yet loaded — use DEBUG default
+            pass
         _setup_logging(level)
 
-    # Shorten name for readability: src.parsers.pdf_parser → pdf_parser
+    # Shorten name: src.parsers.pdf_parser → pdf_parser
     short_name = name.split(".")[-1] if "." in name else name
     return logging.getLogger(short_name)
