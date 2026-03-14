@@ -80,6 +80,10 @@ LLM_MAX_TOKENS  = config["llm"]["max_tokens"]
 OLLAMA_URL        = config["ollama"]["url"]
 OLLAMA_HEALTH_URL = config["ollama"]["health_url"]
 
+# Parser Limit
+# Check if the text is extracted from pdf
+MIN_TEXT_LIMIT = config["parser"]["min_text_parser_limit"]
+
 # Extractor Limits
 RESUME_MAX_CHARS = config["extractor"]["resume_max_chars"]
 JD_MAX_CHARS     = config["extractor"]["jd_max_chars"]
@@ -87,3 +91,8 @@ JD_MAX_CHARS     = config["extractor"]["jd_max_chars"]
 # Matcher Configuration
 WEIGHTS    = config["matcher"]["weights"]
 THRESHOLDS = config["matcher"]["thresholds"]
+
+# Logging
+# Controls console log level — DEBUG | INFO | WARNING | ERROR
+# File handler always logs DEBUG and above regardless of this setting
+LOG_LEVEL = config.get("logging", {}).get("level", "DEBUG")
