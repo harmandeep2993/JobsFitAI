@@ -95,4 +95,4 @@ THRESHOLDS = config["matcher"]["thresholds"]
 # Logging
 # Controls console log level — DEBUG | INFO | WARNING | ERROR
 # File handler always logs DEBUG and above regardless of this setting
-LOG_LEVEL = config.get("logging", {}).get("level", "DEBUG")
+LOG_LEVEL = config.get("logging", {}).get("level")
