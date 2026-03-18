@@ -1,0 +1,101 @@
+{
+  "candidate_profile": {
+    "full_name": "John Doe",
+    "professional_title": "Software Engineer",
+    "email": "[john@example.com](mailto:john@example.com)",
+    "phone": "+1-555-0100",
+    "location": {
+      "city": "San Francisco",
+      "country": "USA"
+    },
+    "portfolio_url": "https://johndoe.dev",
+    "linkedin_url": "https://linkedin.com/in/johndoe",
+    "github_url": "https://github.com/johndoe"
+  },
+
+  "professional_summary": "Experienced software engineer with 5+ years of experience in backend systems and cloud infrastructure.",
+
+  "skills": {
+    "technical_skills": ["python", "javascript", "aws", "docker"],
+    "tools_and_platforms": ["git", "kubernetes", "terraform"],
+    "methodologies": ["agile", "scrum", "test-driven development"],
+    "domain_knowledge": ["fintech", "distributed systems"],
+    "soft_skills": ["leadership", "communication", "problem solving"]
+  },
+
+  "work_experience": [
+    {
+      "experience_id": 1,
+      "job_title": "Senior Software Engineer",
+      "company_name": "Tech Corp",
+      "location": "San Francisco, CA",
+      "employment_type": "full-time",
+      "work_mode": "hybrid",
+      "start_date": "2020-01",
+      "end_date": "present",
+      "technologies_used": ["python", "aws", "docker"],
+      "key_responsibilities": [
+        "Led development of microservices architecture",
+        "Improved system performance by 40%"
+      ],
+      "key_achievements": ["Reduced deployment time by 50%"]
+    }
+  ],
+
+  "education": [
+    {
+      "education_id": 1,
+      "institution_name": "University of California",
+      "degree": "Bachelor of Science",
+      "field_of_study": "Computer Science",
+      "start_year": "2014",
+      "end_year": "2018",
+      "additional_details": "Graduated with honors"
+    }
+  ],
+
+  "projects": [
+    {
+      "project_id": 1,
+      "project_name": "Open Source CLI Tool",
+      "role": "Creator and Maintainer",
+      "start_date": "2021-03",
+      "end_date": "present",
+      "description": [
+        "Developed a command-line tool used by 50+ companies",
+        "Reached 1000+ stars on GitHub"
+      ],
+      "technologies_used": ["python", "docker"],
+      "repository_url": "https://github.com/johndoe/project"
+    }
+  ],
+
+  "certifications": [
+    {
+      "certification_name": "AWS Certified Solutions Architect",
+      "issuing_organization": "Amazon Web Services",
+      "issue_year": "2023"
+    }
+  ],
+
+  "languages": [
+    {
+      "language": "english",
+      "proficiency_level": "native"
+    },
+    {
+      "language": "spanish",
+      "proficiency_level": "conversational"
+    }
+  ],
+
+  "awards": [
+    {
+      "award_title": "Employee of the Year",
+      "awarding_organization": "Tech Corp",
+      "year_received": "2022"
+    }
+  ],
+
+  "total_professional_experience_years": 5
+}
