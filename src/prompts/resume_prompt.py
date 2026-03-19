@@ -2,6 +2,9 @@
 
 import json
 from pathlib import Path
+from src.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 def _get_resume_schema(schema_type):
@@ -27,6 +30,11 @@ def _get_resume_schema(schema_type):
         schema_json = json.load(f)
     schema_text = json.dumps(schema_json, indent=4)
 
+    schema_text_length = len(schema_text)
+    
+    logger.info(f"Loaded {schema_type} resume schema from {file_path}")
+    logger.info(f"Resume schema text length: {schema_text_length} characters")
+    
     return schema_text
 
 # Resume Prompt Function
@@ -45,7 +53,10 @@ def get_resume_prompt(schema_type, resume_text):
 
 
     resume_prompt = f"""
-    Extract structured information from the JD.
+
+    Important: Do not infer or add any information that is not explicitly stated in the resume.
+
+    Extract structured information from the resume.
 
     Return JSON matching this format exactly.
 
@@ -57,4 +68,10 @@ def get_resume_prompt(schema_type, resume_text):
 
     JSON:
     """
+    resume_prompt_length = len(resume_prompt)
+
+    logger.info(f"Resume text length: {len(resume_text)} characters")
+    logger.info(f"Total resume prompt length: {resume_prompt_length} characters")
+    logger.info("Resume prompt ready with schema and resume text!")
+
     return resume_prompt
