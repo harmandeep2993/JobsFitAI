@@ -1,99 +1,93 @@
 {
   "candidate_profile": {
-    "full_name": "John Doe",
-    "professional_title": "Software Engineer",
-    "email": "[john@example.com](mailto:john@example.com)",
-    "phone": "+1-555-0100",
+    "full_name": "",
+    "professional_title": "",
+    "email": "",
+    "phone": "",
     "location": {
-      "city": "San Francisco",
-      "country": "USA"
+      "city": "",
+      "country": ""
     },
-    "portfolio_url": "https://johndoe.dev",
-    "linkedin_url": "https://linkedin.com/in/johndoe",
-    "github_url": "https://github.com/johndoe"
+    "portfolio_url": "",
+    "linkedin_url": "",
+    "github_url": ""
   },
 
-  "professional_summary": "Experienced software engineer with 5+ years of experience in backend systems and cloud infrastructure.",
+  "professional_summary": "",
 
   "skills": {
-    "technical_skills": ["python", "javascript", "aws", "docker"],
-    "tools_and_platforms": ["git", "kubernetes", "terraform"],
-    "methodologies": ["agile", "scrum", "test-driven development"],
-    "domain_knowledge": ["fintech", "distributed systems"],
-    "soft_skills": ["leadership", "communication", "problem solving"]
+    "technical_skills": [],
+    "tools_and_platforms": [],
+    "methodologies": [],
+    "domain_knowledge": [],
+    "soft_skills": []
   },
 
   "work_experience": [
     {
       "experience_id": 1,
-      "job_title": "Senior Software Engineer",
-      "company_name": "Tech Corp",
-      "location": "San Francisco, CA",
-      "employment_type": "full-time",
-      "work_mode": "hybrid",
-      "start_date": "2020-01",
-      "end_date": "present",
-      "technologies_used": ["python", "aws", "docker"],
-      "key_responsibilities": [
-        "Led development of microservices architecture",
-        "Improved system performance by 40%"
-      ],
-      "key_achievements": ["Reduced deployment time by 50%"]
+      "job_title": "",
+      "company_name": "",
+      "location": "",
+      "employment_type": "",
+      "work_mode": "",
+      "start_date": "",
+      "end_date": "",
+      "technologies_used": [],
+      "key_responsibilities": [],
+      "key_achievements": []
     }
   ],
 
   "education": [
     {
       "education_id": 1,
-      "institution_name": "University of California",
-      "degree": "Bachelor of Science",
-      "field_of_study": "Computer Science",
-      "start_year": "2014",
-      "end_year": "2018",
-      "additional_details": "Graduated with honors"
+      "institution_name": "",
+      "degree": "",
+      "field_of_study": "",
+      "start_year": "",
+      "end_year": "",
+      "additional_details": ""
     }
   ],
 
   "projects": [
     {
       "project_id": 1,
-      "project_name": "Open Source CLI Tool",
-      "role": "Creator and Maintainer",
-      "start_date": "2021-03",
-      "end_date": "present",
-      "description": [
-        "Developed a command-line tool used by 50+ companies",
-        "Reached 1000+ stars on GitHub"
-      ],
-      "technologies_used": ["python", "docker"],
-      "repository_url": "https://github.com/johndoe/project"
+      "project_name": "",
+      "role": "",
+      "start_date": "",
+      "end_date": "",
+      "description": [],
+      "technologies_used": [],
+      "repository_url": ""
     }
   ],
 
   "certifications": [
     {
-      "certification_name": "AWS Certified Solutions Architect",
-      "issuing_organization": "Amazon Web Services",
-      "issue_year": "2023"
+      "certification_name": "",
+      "issuing_organization": "",
+      "issue_year": ""
     }
   ],
 
   "languages": [
     {
-      "language": "english",
-      "proficiency_level": "native"
+      "language": "",
+      "proficiency_level": ""
     },
     {
-      "language": "spanish",
-      "proficiency_level": "conversational"
+      "language": "",
+      "proficiency_level": ""
     }
   ],
 
   "awards": [
     {
-      "award_title": "Employee of the Year",
-      "awarding_organization": "Tech Corp",
-      "year_received": "2022"
+      "award_title": "",
+      "awarding_organization": "",
+      "year_received": ""
     }
   ],
 

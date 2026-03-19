@@ -2,6 +2,9 @@
 
 import json
 from pathlib import Path
+from src.utils.logger import get_logger
+    
+logger = get_logger(__name__)
 
 JD_SCHEMA_PATH = Path("schemas/jd_schema.json")
 
@@ -18,7 +21,12 @@ def _get_jd_schema(path: Path) -> str:
         jd_schema = json.load(f)
 
         jd_schema_text = json.dumps(jd_schema, indent=2)
+    
+    jd_schema_length = len(jd_schema_text)
 
+    logger.info("Loaded JD schema from %s", path)
+    logger.info("JD schema length: %d characters", jd_schema_length)
+    
     return jd_schema_text
 
 def get_jd_prompt(jd_text: str) -> str:
@@ -34,9 +42,10 @@ def get_jd_prompt(jd_text: str) -> str:
     jd_schema_text = _get_jd_schema(JD_SCHEMA_PATH)
 
     jd_prompt = f"""
-    Extract structured information from the JD.
+    Important: Do not infer or add any information that is not explicitly stated in the JD.
 
-    Return JSON matching this format exactly.
+    Extract structured information from the JD. Return JSON matching this format exactly. 
+    Do not deviate from the schema. If information is missing, use empty strings, empty lists, or 0 as appropriate.
 
     Schema Example:
     {jd_schema_text}
@@ -46,4 +55,12 @@ def get_jd_prompt(jd_text: str) -> str:
 
     JSON:
     """
+
+    jd_text_length = len(jd_text)
+    jd_prompt_length = len(jd_prompt)
+
+    logger.info("JD text length: %d characters", jd_text_length)
+    logger.info("Generated JD prompt length: %d characters", jd_prompt_length)
+    logger.info("JD prompt Ready with schema and JD text!")
+
     return jd_prompt
