@@ -6,80 +6,79 @@ Includes light post-processing to normalize skills and languages.
 """
 
 import re
+from unittest import result
 from src.utils.router import call_llm, parse_json_response
 from src.utils.config import JD_MAX_CHARS
-from src.extractors.prompts import jd_prompt
+from src.prompts import get_jd_prompt
+
+from src.utils.logger import get_logger
+
+logger = get_logger(__name__)
+
+
+def _lowercase_all(data):
+    """
+    Recursively convert all string values to lowercase.
+    
+    Args:
+        data: A nested structure (dict, list, or string
+
+    Returns:     
+        The same structure with all string values lowercased
+    """
+
+    if isinstance(data, str):
+        return data.lower().strip()
+
+    if isinstance(data, list):
+        return [_lowercase_all(v) for v in data]
+
+    if isinstance(data, dict):
+        return {k: _lowercase_all(v) for k, v in data.items()}
+
+    logger.warning(f"Unexpected data type in _lowercase_all: {type(data)}")
+    return data
+
+
+def _is_empty(value):
+    return value in ("", None, [], {}, [""]) or value == [None]
 
 
 def extract_jd(jd_text: str) -> dict:
     """
-    Extract structured requirements from job description.
+    Extract structured JD data and normalize all values to lowercase.
 
     Args:
-        jd_text (str): Raw job description text
-
+        jd_text (str): Raw job description
+        
     Returns:
-        dict: Structured JD Data
+        dict: Structured JD data with all values in lowercase
     """
-    default = {
-        "job_title": "",
-        "required_skills": [],
-        "preferred_skills": [],
-        "required_years_experience": 0,
-        "required_education": {"degree": "","field":  "",},
-        "required_languages": [],
-        "responsibilities": [],
-        "nice_to_have": [],
-    }
 
-    if not jd_text:
-        return default
+    # If JD text is empty or only whitespace, return an empty dict
+    if not jd_text or not jd_text.strip():
+        return {}
     
-    # limit text length
-    content = jd_text[:JD_MAX_CHARS]
+    # Truncate JD text to max allowed characters for LLM input i.e 2000 characters. This is a safeguard to prevent excessively long inputs.
+    jd_text = jd_text[:JD_MAX_CHARS]
 
-    response = call_llm(jd_prompt(content))
+    prompt = get_jd_prompt(jd_text)
+    response = call_llm(prompt)
     result = parse_json_response(response)
-    
+
+    # Validate that the result is a dictionary (JSON object)
     if not isinstance(result, dict):
-        return default
+        raise ValueError("Invalid LLM response format")
 
-    # Ensure missing keys are filled
-    for key, value in default.items():
-        result.setdefault(key, value)
- 
-    # Normalize required skills
-    result["required_skills"] = [ s.lower().strip() for s in result.get("required_skills", []) if s]
+    # Normalize everything to lowercase
+    result = _lowercase_all(result)
 
-    # Expand compound preferred skills
-    # e.g. "actuarial (reserving, pricing)" → ["actuarial", "reserving", "pricing"]
+    keys_to_check = [k for k, v in result.items() if _is_empty(v)]
 
-    expanded = []
+    if keys_to_check:
+        logger.warning(f"Empty values for keys: {keys_to_check}")
+    else:
+        logger.info(f"JD completed successfully without empty keys")
 
-    for skill in result.get("preferred_skills", []):
-        clean = re.sub(r"\(.*?\)", "", skill).strip()
-
-        if clean:
-            expanded.append(clean.lower())
-
-        for item in re.findall(r"\((.*?)\)", skill):
-            for s in item.split(","):
-                s = s.strip().lower()
-                if s and len(s) > 2:
-                    expanded.append(s)
-
-    # Remove duplicates while preserving order
-    seen = set()
-    normalized = []
-
-    for s in expanded:
-        if s not in seen:
-            normalized.append(s)
-            seen.add(s)
-
-    result["preferred_skills"] = normalized
-
-    # Normalize languages
-    result["required_languages"] = [ s.lower().strip() for s in result.get("required_languages", []) if s]
-
+    logger.info("JD extraction completed successfully")
     return result
