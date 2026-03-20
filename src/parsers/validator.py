@@ -13,18 +13,15 @@ Validates before any parsing attempt:
 
 from pathlib import Path
 
-from src.utils.config import MIN_TEXT_LIMIT
+from src.utils.config import MAX_FILE_SIZE_MB, SUPPORTED_EXTENSIONS
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
 
 # Validation constants
-
-MAX_FILE_SIZE_MB = 10
 MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
 
-SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".doc", ".txt"}
 
 ALLOWED_MIME_TYPES = {
     ".pdf":  ["application/pdf"],
@@ -32,7 +29,6 @@ ALLOWED_MIME_TYPES = {
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         "application/zip",  # DOCX files are ZIP archives
     ],
-    ".doc":  ["application/msword"],
     ".txt":  ["text/plain"],
 }
 
@@ -40,7 +36,7 @@ ALLOWED_MIME_TYPES = {
 FILE_SIGNATURES = {
     ".pdf":  b"%PDF",
     ".docx": b"PK\x03\x04",  # ZIP header — DOCX is a ZIP archive
-    ".doc":  b"\xd0\xcf\x11\xe0",  # Microsoft Compound Document
+    # ".doc":  b"\xd0\xcf\x11\xe0",  # Microsoft Compound Document
 }
 
 
@@ -100,6 +96,11 @@ def _check_extension(path: Path) -> None:
     """
     ext = path.suffix.lower()
 
+    # check .doc extension after the supported check
+    # because .doc is not supported by python-docx and we want to allow it with a warning
+    if ext == ".doc":
+        logger.warning(".doc format has limited support — convert to .docx for best results.")
+
     if ext not in SUPPORTED_EXTENSIONS:
         raise ValueError(
             f"Unsupported file format: {ext}. "
@@ -128,22 +129,20 @@ def _check_mime_type(path: Path) -> None:
         allowed = ALLOWED_MIME_TYPES.get(ext, [])
 
         if mime not in allowed:
-            logger.warning(
-                "MIME type mismatch — extension: %s, detected: %s", ext, mime
-            )
+            logger.warning("MIME type mismatch — extension: %s, detected: %s", ext, mime)
             raise ValueError(
                 f"File content does not match extension. "
                 f"Expected {ext} file but detected: {mime}"
             )
 
         logger.info("MIME type verified: %s", mime)
-
-    except (ImportError, Exception) as e:
-        if "libmagic" in str(e) or isinstance(e, ImportError):
-            logger.warning("python-magic not available — skipping MIME type check")
-        else:
-            raise
-
+    
+    except ValueError:
+        raise
+    except ImportError:
+        logger.warning("python-magic not installed — skipping MIME type check")
+    except Exception as e:
+        logger.warning("MIME check failed unexpectedly: %s — skipping", e)
 
 def _check_signature(path: Path) -> None:
     """
