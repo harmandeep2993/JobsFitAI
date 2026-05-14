@@ -1,0 +1,59 @@
+{
+  "candidate": {
+    "name": "",
+    "title": "",
+    "location": ""
+  },
+
+  "experience_entries": [
+    {
+      "title": "Data Scientist",
+      "company": "ABC Corp",
+      "location": "Berlin",
+      "start_date": "2020-01-01",
+      "end_date": "2022-06-30",
+      "duration_years": 2.5,
+      "text": "built machine learning models and processed large datasets"
+    }
+  ],
+
+  "responsibilities": [
+    "built machine learning models",
+    "processed large datasets"
+  ],
+
+  "projects": [
+    {
+      "title": "Recommendation System",
+      "description": "developed recommendation system using collaborative filtering",
+      "technologies": ["python", "pandas"]
+    }
+  ],
+
+  "education": [
+    {
+      "description": "MSc in Data Science from TU Berlin"
+    }
+  ],
+
+  "languages": [
+    "english",
+    "german"
+  ],
+
+  "certifications": [
+    "aws certified machine learning"
+  ],
+
+    "skills": [
+    "python",
+    "machine learning",
+    "sql",
+    "fast learner",
+    "team player"
+  ],
+
+  "meta": {
+    "total_experience_years": 5
+  }
+}

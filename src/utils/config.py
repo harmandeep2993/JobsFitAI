@@ -84,6 +84,10 @@ OLLAMA_HEALTH_URL = config["ollama"]["health_url"]
 # Check if the text is extracted from pdf
 MIN_TEXT_LIMIT = config["parser"]["min_text_parser_limit"]
 
+# Validator constants
+MAX_FILE_SIZE_MB = config["validator"]["max_file_size_mb"]
+SUPPORTED_EXTENSIONS = set(config["validator"]["supported_extensions"])
+
 # Extractor Limits
 RESUME_MAX_CHARS = config["extractor"]["resume_max_chars"]
 JD_MAX_CHARS     = config["extractor"]["jd_max_chars"]
