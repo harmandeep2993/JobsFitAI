@@ -1,60 +1,72 @@
 # src/prompts/resume_prompt.py
+"""
+Prompt builder for resume extraction.
+
+Loads the resume schema and builds a structured extraction prompt
+for the LLM to return a JSON object matching the schema.
+"""
 
 import json
 from pathlib import Path
 
+from src.utils.logger import get_logger
 
-def _get_resume_schema(schema_type):
+logger = get_logger(__name__)
+
+# Module-level constant — schema path
+RESUME_SCHEMA_PATH = Path("schemas/resume_schema.json")
+
+
+def _get_resume_schema() -> str:
     """
-    Helper function to read and return JSON schema text from a file.
-    
-    Args:
-        schema_type (str): "Detailed" or "Summary" to determine which schema to use
-        Returns: str: JSON schema as a formatted string 
+    Load and return the resume schema as a formatted JSON string.
+
+    Returns:
+        str: Resume schema as indented JSON string
+
+    Raises:
+        FileNotFoundError: If schema file does not exist
     """
-    schema_type= schema_type.lower().strip()
+    with open(RESUME_SCHEMA_PATH, "r") as f:
+        schema = json.load(f)
 
-    if schema_type == "detailed":
-        file_path = Path("schemas/resume_schema_detailed.json")
+    schema_text = json.dumps(schema, indent=2)
 
-    elif schema_type ==  "quick":
-        file_path = Path("schemas/resume_schema_small.json")
-
-    else:
-        raise ValueError("Invalid schema type. Use 'Detailed' or 'Quick'.")
-    
-    with open(file_path, "r") as f:
-        schema_json = json.load(f)
-    schema_text = json.dumps(schema_json, indent=4)
+    logger.info("Loaded resume schema from %s", RESUME_SCHEMA_PATH)
+    logger.info("Resume schema length: %d characters", len(schema_text))
 
     return schema_text
 
-# Resume Prompt Function
-def get_resume_prompt(schema_type, resume_text):
+
+def get_resume_prompt(resume_text: str) -> str:
     """
-    Generate prompt for extracting structured resume information based on schema type.
-    
-    args:
-        schema_type (str): "Detailed" or "Quick" to determine which schema to use
-        resume_text (str): The text of the resume to be processed
-    returns:
-        str: Final prompt string
+    Build extraction prompt for a resume.
+
+    Args:
+        resume_text (str): Raw resume text
+
+    Returns:
+        str: Final prompt string ready for LLM
     """
-    
-    schema_text = _get_resume_schema(schema_type)
+    schema_text = _get_resume_schema()
 
+    prompt = f"""Extract structured information from the resume below.
+Return JSON matching the schema exactly.
+Do not infer missing information.
+Extract ALL skill keywords explicitly mentioned regardless of which section they appear in.
+If a section is missing return empty list or null for that field.
+Calculate total experience from the experience section only. If missing use 0.
 
-    resume_prompt = f"""
-    Extract structured information from the JD.
+Schema:
+{schema_text}
 
-    Return JSON matching this format exactly.
+Resume:
+{resume_text}
 
-    Schema Example:
-    {schema_text}
+JSON:"""
 
-    Resume:
-    {resume_text}
+    logger.info("Resume length: %d characters", len(resume_text))
+    logger.info("Resume prompt length: %d characters", len(prompt))
+    logger.info("Resume prompt ready")
 
-    JSON:
-    """
-    return resume_prompt
+    return prompt
