@@ -1,25 +1,23 @@
 {
   "job": {
-    "title": "Data Scientist",
-    "company": "Tech Solutions Inc.",
-    "location": "Berlin",
-    "work_mode": "hybrid",
-    "employment_type": "full-time",
-    "job_level": "mid-level"
+    "title": "",
+    "company": "",
+    "location": "",
+    "work_mode": "",
+    "employment_type": "",
+    "job_level": ""
   },
 
-  "required_skills": ["python", "machine learning", "sql"],
-  "preferred_skills": ["docker", "kubernetes"],
+  "required_skills": [],
+  "preferred_skills": [],
 
-  "responsibilities": [" built machine learning models", "processed large datasets"],
+  "responsibilities": [],
 
-  "experience_requirements": ["1-3 years of experience in data science or related field"],
+  "experience_requirements": [],
+  "education_requirements": [],
 
-  "education_requirements": ["Bachelor's degree in Computer Science, Data Science, or related field"],
+  "languages": [],
+  "certifications": [],
 
-  "languages": ["english", "german"],
-
-  "certifications": ["aws certified machine learning"],
-
-  "job_summary": " We are looking for a Data Scientist to join our team. The ideal candidate will have experience in building machine learning models and processing large datasets. You will work closely with cross-functional teams to develop data-driven solutions that drive business decisions."
+  "job_summary": ""
 }
