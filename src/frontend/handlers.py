@@ -9,9 +9,9 @@ from nicegui import ui
 from src.parsers import extract_all_text
 from src.extractors import extract_all
 from src.utils.router import check_llm
-from src.matcher import get_match_score
+from src.matcher.matcher import match
 from src.frontend.components import make_steps
-from src.frontend.results import render_results
+from src.frontend.results import build_results_html
 
 
 def safe_js(code: str):
@@ -32,7 +32,6 @@ def register_page():
     from src.frontend.layout import render_shell, TELEPORT_JS
 
     llm_ok = check_llm()
-    assets = Path("assets")
 
     # CSS
     for css in ["theme", "layout", "components", "results"]:
@@ -48,7 +47,7 @@ def register_page():
     # Shell
     ui.add_body_html(render_shell(llm_ok))
 
-    # Inject ALL main content directly into body — bypasses NiceGUI sanitizer
+    # Main content
     steps_html = make_steps(1)
     ui.add_body_html(f"""
     <div id="ng-main-content">
@@ -63,7 +62,6 @@ def register_page():
         <input type="file" id="file-input" accept=".pdf,.docx,.doc" style="display:none;"/>
         <div class="two-col">
 
-          <!-- Resume upload — left, narrow (1fr) -->
           <div>
             <div class="sec-lbl-row">
               <div class="sec-lbl">Resume File</div>
@@ -85,7 +83,6 @@ def register_page():
             </div>
           </div>
 
-          <!-- JD textarea — right, wide (2fr) -->
           <div>
             <div class="sec-lbl-row">
               <div class="sec-lbl">Job Description</div>
@@ -124,10 +121,8 @@ def register_page():
             f'<script src="/assets/js/{js}.js"></script>'
         )
 
-    # Teleport last
     ui.add_body_html(TELEPORT_JS)
 
-    # Results rendered via JS injection — no NiceGUI element needed
     def on_file_uploaded():
         safe_js(f"""
         var s = document.querySelector('.steps');
@@ -186,10 +181,10 @@ def register_page():
                 return
 
             safe_js('document.getElementById("spin-text").innerText="Calculating match score...";')
-            results = get_match_score(resume_json, jd_json)
+            results = match(resume_json, jd_json)
 
             safe_js('document.getElementById("spin-text").innerText="Generating summary...";')
-            from src.extractors.summary import generate_summary
+            from src.services.summary import generate_summary
             summary = await asyncio.get_event_loop().run_in_executor(
                 None, lambda: generate_summary(resume_json, jd_json, results)
             )
@@ -199,12 +194,9 @@ def register_page():
             if(s) s.outerHTML = `{make_steps(4)}`;
             """)
 
-            # Build results HTML and inject via JS
-            from src.frontend.results import build_results_html
             html = build_results_html(results, resume_json, jd_json, summary)
-
-            # Escape for JS template literal
             html_escaped = html.replace('\\', '\\\\').replace('`', '\\`').replace('$', '\\$')
+
             safe_js(f"""
             var r = document.getElementById('jf-results');
             if(r) {{
@@ -213,15 +205,14 @@ def register_page():
             }}
             """)
 
-            # Inject tab switching function AFTER innerHTML — scripts in innerHTML don't execute
             safe_js("""
             window.jfTab = function(el, panelId) {
-                document.querySelectorAll('#jf-tab-row .tab-item').forEach(function(t) {{
+                document.querySelectorAll('#jf-tab-row .tab-item').forEach(function(t) {
                     t.classList.remove('active');
-                }});
-                document.querySelectorAll('.jf-panel').forEach(function(p) {{
+                });
+                document.querySelectorAll('.jf-panel').forEach(function(p) {
                     p.style.display = 'none';
-                }});
+                });
                 el.classList.add('active');
                 var panel = document.getElementById(panelId);
                 if (panel) panel.style.display = 'block';

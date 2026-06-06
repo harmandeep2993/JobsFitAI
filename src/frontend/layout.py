@@ -1,13 +1,17 @@
 # src/frontend/layout.py
 # HTML shell — page, shell card, topbar, sidebar, main area
 
-from src.utils.config import LLM_PROVIDER, LLM_MODEL
+from src.utils.router import ACTIVE_PROVIDER
+from src.utils.config import PROVIDER_CONFIGS
+
+# Get model name for active provider
+_MODEL = PROVIDER_CONFIGS.get(ACTIVE_PROVIDER, {}).get("model", "")
 
 
 def render_topbar(llm_ok):
-    bc     = "bon"     if llm_ok else "boff"
-    status = "online"  if llm_ok else "offline"
-    blb    = f"{LLM_PROVIDER} {status}"
+    bc     = "bon"    if llm_ok else "boff"
+    status = "online" if llm_ok else "offline"
+    blb    = f"{ACTIVE_PROVIDER} {status}"
 
     return f"""
     <div class="jfai-topbar">
@@ -17,7 +21,7 @@ def render_topbar(llm_ok):
         <div class="t-chip">
           <span class="t-bead {bc}"></span>{blb}
         </div>
-        <div class="t-chip">{LLM_MODEL}</div>
+        <div class="t-chip">{_MODEL}</div>
         <button class="theme-btn" id="themechange">☀️</button>
       </div>
     </div>
@@ -55,8 +59,6 @@ def render_shell(llm_ok):
     """
 
 
-# Retry loop — more reliable than window.addEventListener("load")
-# "load" may already have fired by the time add_body_html injects this script
 TELEPORT_JS = """
 <script>
 (function move() {
