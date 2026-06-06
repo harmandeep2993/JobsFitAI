@@ -22,6 +22,10 @@ logger = get_logger(__name__)
 REQUIRED_THRESHOLD  = 0.75
 PREFERRED_THRESHOLD = 0.70
 
+# Neutral score when the JD lists no preferred skills — a missing
+# requirement must not penalize the candidate (mirrors score_languages).
+NO_REQUIREMENT_SCORE = 60.0
+
 
 def score_required_skills(resume: dict, jd: dict) -> tuple[float, list, list]:
     """
@@ -111,7 +115,11 @@ def score_preferred_skills(resume: dict, jd: dict) -> tuple[float, list, list]:
 
     # Edge cases
     if not preferred:
-        return 0.0, [], []
+        logger.info(
+            "No preferred skills in JD — returning neutral %.1f",
+            NO_REQUIREMENT_SCORE
+        )
+        return NO_REQUIREMENT_SCORE, [], []
 
     if not candidate:
         return 0.0, [], preferred
