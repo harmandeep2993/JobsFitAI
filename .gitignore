@@ -12,3 +12,4 @@ dump
 uv.lock
 logs
 prompts.skillwise_prompt.py
+.claude

@@ -1,5 +1,7 @@
 # src/matcher/__init__.py
 
-from .matcher import get_match_score
+from .matcher import match
 
-__all__ = ["get_match_score"]
+get_match_score = match
+
+__all__ = ["match", "get_match_score"]

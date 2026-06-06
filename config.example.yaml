@@ -7,7 +7,7 @@ llm:
   api_key:     ""             # or set LLM_API_KEY in .env
   timeout:     60
   temperature: 0.2
-  max_tokens:  500
+  max_tokens:  2000
 
 ollama:
   url:        "http://localhost:11434/api/generate"

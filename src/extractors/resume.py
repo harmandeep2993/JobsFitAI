@@ -1,89 +1,106 @@
 # src/extractors/resume.py
-
 """
-Resume extraction module. Uses LLM prompts to extract structured information from resume text.
-Includes factual post-processing helpers to improve reliability.
-"""
+Resume extraction module.
 
-import re
-import datetime as dt
+Uses an LLM to extract structured information from resume text.
+Includes light post-processing to normalize all string values to lowercase.
+"""
 
 from src.utils.router import call_llm, parse_json_response
 from src.utils.config import RESUME_MAX_CHARS
-from src.prompts import get_resume_prompt 
-
+from src.prompts import get_resume_prompt
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-today = dt.date.today()
-
 
 def _lowercase_all(data):
     """
-    Recursively convert all string values to lowercase.
-    
+    Recursively convert all string values in a nested structure to lowercase.
+
     Args:
-        data: A nested structure (dict, list, or string)
+        data: dict, list, or str — any nested combination
 
-    Returns:     
-        The same structure with all string values lowercased
+    Returns:
+        Same structure with all strings lowercased and stripped
     """
-
     if isinstance(data, str):
         return data.lower().strip()
 
-    if isinstance(data, list):
+    elif isinstance(data, list):
         return [_lowercase_all(v) for v in data]
 
-    if isinstance(data, dict):
+    elif isinstance(data, dict):
         return {k: _lowercase_all(v) for k, v in data.items()}
 
-    logger.warning(f"Unexpected data type in _lowercase_all: {type(data)}")
-    return data
+    else:
+        # Preserve numbers, booleans, None — return as-is
+        logger.warning("Unexpected type in _lowercase_all: %s", type(data))
+        return data
 
 
-def _is_empty(value):
+def _is_empty(value) -> bool:
+    """
+    Check if an extracted field value is considered empty.
+
+    Args:
+        value: Any extracted field value
+
+    Returns:
+        bool: True if value is empty, False otherwise
+    """
     return value in ("", None, [], {}, [""]) or value == [None]
 
 
-def extract_resume(schema_type: str, resume_text: str) -> dict:
+def extract_resume(resume_text: str) -> dict:
     """
-    Extract structured resume data using an LLM.
+    Extract structured resume data from raw text using an LLM.
+
+    Pipeline:
+        1. Truncate input to RESUME_MAX_CHARS
+        2. Build prompt
+        3. Call LLM
+        4. Parse JSON response
+        5. Normalize all values to lowercase
 
     Args:
         resume_text (str): Raw resume text
-        
+
     Returns:
-        dict: Structured resume data
+        dict: Structured resume data with all string values lowercased
+
+    Raises:
+        ValueError: If LLM response is not a valid dict
     """
-
-    schema_type = schema_type.lower().strip()
-    if schema_type not in ("quick", "detailed"):
-        logger.error(f"Invalid schema_type: {schema_type}. Must be 'quick' or 'detailed'.")
-        return {}
-
-    # If resume text is empty or only whitespace, return an empty dict
     if not resume_text or not resume_text.strip():
+        logger.warning("Empty resume text received — returning empty dict")
         return {}
-    
-    # Truncate resume text to max allowed characters to avoid LLM overload
-    resume_text = resume_text[:RESUME_MAX_CHARS]
-    
-    prompt = get_resume_prompt(schema_type, resume_text)
+
+    # Truncate to max allowed chars — safeguard for LLM input limits
+    if len(resume_text) > RESUME_MAX_CHARS:
+        logger.warning(
+            "Resume text truncated from %d to %d characters",
+            len(resume_text), RESUME_MAX_CHARS
+        )
+        resume_text = resume_text[:RESUME_MAX_CHARS]
+
+    prompt   = get_resume_prompt(resume_text)
     response = call_llm(prompt)
-    result = parse_json_response(response)
+    result   = parse_json_response(response)
 
-    # Validate that the result is a dict before returning
     if not isinstance(result, dict):
-        logger.error(f"LLM response is not a dict: {result}")
-        return {}
-    
-    # Normalize all string values to lowercase for consistency
+        logger.error("LLM response is not a dict: %s", result)
+        raise ValueError("Invalid LLM response format")
+
     result = _lowercase_all(result)
+    logger.info("Resume lowercasing complete")
 
-    logger.info(f"Extracted resume data!")
+    # Warn about any empty fields in the extracted result
+    empty_keys = [k for k, v in result.items() if _is_empty(v)]
+    if empty_keys:
+        logger.warning("Empty values for keys: %s", empty_keys)
+    else:
+        logger.info("All resume fields extracted successfully")
 
+    logger.info("Resume extraction complete")
     return result
-
-
