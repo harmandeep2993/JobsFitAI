@@ -21,6 +21,8 @@ from starlette.concurrency import run_in_threadpool
 
 from src.frontend.handlers import register_page
 from src.fetchers import fetch_adzuna_jobs
+from src.utils import session
+from src.utils.router import check_llm
 
 
 ngapp.add_static_files('/assets', 'assets')
@@ -146,6 +148,59 @@ async def api_fetch_jobs(request: Request) -> JSONResponse:
     return JSONResponse({"ok": True, "jobs": [asdict(job) for job in jobs]})
 
 
+# LLM Settings API
+@ngapp.get("/api/llm-settings")
+async def api_get_llm_settings() -> JSONResponse:
+    """
+    Return the current LLM selection and the selectable provider catalog.
+
+    Returns
+    -------
+    JSONResponse
+        {"ok": True, "current": {provider, model},
+         "providers": [{name, default_model, models[]}, ...]}
+    """
+    return JSONResponse({
+        "ok":        True,
+        "current":   session.get_settings(),
+        "providers": session.provider_catalog(),
+    })
+
+
+@ngapp.post("/api/llm-settings")
+async def api_set_llm_settings(request: Request) -> JSONResponse:
+    """
+    Set the active provider and model (in-memory, for this session).
+
+    Body
+    ----
+    {"provider": str, "model": str}  — empty model uses the provider default.
+
+    Returns
+    -------
+    JSONResponse
+        {"ok": True, "current": {provider, model}, "online": bool} on success,
+        or {"ok": False, "error": ...} with status 400 for an invalid provider.
+    """
+    body     = await request.json()
+    provider = (body.get("provider") or "").strip()
+    model    = (body.get("model") or "").strip()
+
+    try:
+        session.set_active(provider, model)
+    except ValueError as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=400)
+
+    # Connectivity check against the newly selected provider.
+    online = await run_in_threadpool(check_llm)
+
+    return JSONResponse({
+        "ok":      True,
+        "current": session.get_settings(),
+        "online":  online,
+    })
+
+
 # Main UI Page
 @ui.page("/")
 def index():
@@ -156,12 +211,35 @@ def index():
     """
     register_page()
 
-# Application Entry Point 
+# Application Entry Point
+PORT = 8080
+
+
+def _port_in_use(port: int) -> bool:
+    """Return True if something is already listening on localhost:port."""
+    import socket
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        return s.connect_ex(("127.0.0.1", port)) == 0
+
+
 if __name__ in {"__main__", "__mp_main__"}:
+
+    # Guard against the stale-server trap: if an old instance is still
+    # bound to the port, the new one would silently fail to bind and you'd
+    # keep hitting old code. Fail loudly instead.
+    if _port_in_use(PORT):
+        import sys
+        print(
+            f"\n[JobFitAI] Port {PORT} is already in use — an old server is still running.\n"
+            f"           Stop it first, then re-run:\n"
+            f"           Windows : taskkill /F /IM python.exe\n"
+            f"           macOS/Linux: kill $(lsof -ti tcp:{PORT})\n"
+        )
+        sys.exit(1)
 
     ui.run(
         title="JobFitAI",
-        port=8080,
+        port=PORT,
         reload=False,
         favicon="🎯",
         reconnect_timeout= 300

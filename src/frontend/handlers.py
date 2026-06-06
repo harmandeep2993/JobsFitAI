@@ -14,6 +14,19 @@ from src.frontend.components import make_steps
 from src.frontend.results import build_results_html
 
 
+def _asset_ver(rel_path: str) -> int:
+    """
+    Cache-busting token derived from a file's modified time.
+
+    Appended as ?v=... to asset URLs so the browser refetches CSS/JS as
+    soon as the file changes — no manual hard-refresh needed.
+    """
+    try:
+        return int(os.path.getmtime(rel_path))
+    except OSError:
+        return 0
+
+
 def safe_js(code: str):
     try:
         ui.run_javascript(code)
@@ -36,7 +49,7 @@ def register_page():
     # CSS
     for css in ["theme", "layout", "components", "results"]:
         ui.add_head_html(
-            f'<link rel="stylesheet" href="/assets/css/{css}.css">'
+            f'<link rel="stylesheet" href="/assets/css/{css}.css?v={_asset_ver(f"assets/css/{css}.css")}">'
         )
 
     # Fonts
@@ -51,6 +64,8 @@ def register_page():
     steps_html = make_steps(1)
     ui.add_body_html(f"""
     <div id="ng-main-content">
+
+      <div id="view-analyzer" class="view">
       <div class="pg-title">AI Resume <em>Matcher</em></div>
       <div class="pg-sub">Upload a resume and paste a job description to get a semantic match score</div>
 
@@ -88,19 +103,9 @@ def register_page():
               <div class="sec-lbl">Job Description</div>
               <button class="clear-btn" onclick="clearJD()" title="Clear job description">✕</button>
             </div>
-
-            <div class="jd-fetch">
-              <input id="fetch-query" class="fetch-inp"
-                placeholder="Role e.g. machine learning engineer"/>
-              <input id="fetch-loc" class="fetch-inp fetch-inp-sm"
-                placeholder="Location"/>
-              <button class="btn-ghost fetch-btn" id="fetch-btn" onclick="fetchJobs()">⤓ Fetch</button>
-            </div>
-            <div class="fetch-results" id="fetch-results" style="display:none;"></div>
-
             <div class="jd-wrap">
               <textarea id="jd-input" class="jd-box"
-                placeholder="Paste the full job description here, or fetch one above..."></textarea>
+                placeholder="Paste the full job description here..."></textarea>
               <div class="jd-counter" id="jd-counter">0 / 5000</div>
             </div>
           </div>
@@ -122,13 +127,73 @@ def register_page():
 
       <div class="divider"></div>
       <div id="jf-results" style="display:none;"></div>
+      </div><!-- /view-analyzer -->
+
+      <div id="view-jobsearch" class="view" style="display:none;">
+        <div class="pg-title">Job <em>Search</em></div>
+        <div class="pg-sub">Search live job postings from Adzuna</div>
+
+        <div class="divider"></div>
+
+        <div class="content-card">
+          <div class="jd-fetch">
+            <input id="fetch-query" class="fetch-inp"
+              placeholder="Role e.g. machine learning engineer"/>
+            <input id="fetch-loc" class="fetch-inp fetch-inp-sm"
+              placeholder="Location"/>
+            <button class="btn-primary fetch-btn" id="fetch-btn" onclick="fetchJobs()">&rarr; Fetch Jobs</button>
+          </div>
+        </div>
+
+        <div class="fetch-results" id="fetch-results" style="display:none;"></div>
+      </div><!-- /view-jobsearch -->
+
+      <div id="view-settings" class="view" style="display:none;">
+        <div class="pg-title">LLM <em>Settings</em></div>
+        <div class="pg-sub">Choose the provider and model used for extraction, matching, and summaries</div>
+
+        <div class="divider"></div>
+
+        <div class="content-card">
+          <div class="set-row">
+            <label class="set-lbl">Provider</label>
+            <div class="dd" id="dd-provider">
+              <button class="dd-btn" type="button" onclick="ddToggle(event,'provider')">
+                <span class="dd-val" id="dd-provider-val">—</span>
+                <span class="dd-arrow">▾</span>
+              </button>
+              <div class="dd-menu" id="dd-provider-menu"></div>
+            </div>
+          </div>
+          <div class="set-row">
+            <label class="set-lbl">Model</label>
+            <div class="dd" id="dd-model">
+              <button class="dd-btn" type="button" onclick="ddToggle(event,'model')">
+                <span class="dd-val" id="dd-model-val">—</span>
+                <span class="dd-arrow">▾</span>
+              </button>
+              <div class="dd-menu" id="dd-model-menu"></div>
+            </div>
+          </div>
+          <div class="set-row">
+            <label class="set-lbl">Custom model</label>
+            <input id="set-model-custom" class="fetch-inp"
+              placeholder="Optional — type a model id to override the dropdown"/>
+          </div>
+          <div class="set-actions">
+            <button class="btn-primary" id="set-apply" onclick="applySettings()">Apply</button>
+            <span class="set-status" id="set-status"></span>
+          </div>
+        </div>
+      </div><!-- /view-settings -->
+
     </div>
     """)
 
     # JS assets
-    for js in ["theme", "upload", "analysis", "fetch"]:
+    for js in ["theme", "upload", "analysis", "fetch", "settings"]:
         ui.add_body_html(
-            f'<script src="/assets/js/{js}.js"></script>'
+            f'<script src="/assets/js/{js}.js?v={_asset_ver(f"assets/js/{js}.js")}"></script>'
         )
 
     ui.add_body_html(TELEPORT_JS)

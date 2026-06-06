@@ -4,37 +4,38 @@ Unified LLM router for JobFitAI.
 All extractors call call_llm() and check_llm() only.
 Never import providers directly outside this file.
 
-To switch provider — change ACTIVE_PROVIDER below.
+The active provider and model are runtime state held in
+src/utils/session.py — change them at runtime (e.g. from the Settings
+tab) via session.set_active(). They reset to the config.yaml defaults on
+restart.
 """
 
 import re
 import json
-import os
 
-from src.utils.config import PROVIDER_CONFIGS
+from src.utils import session
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+logger.info("LLM Router initialized with %s provider", session.get_provider())
 
-# change this to switch provider
-ACTIVE_PROVIDER = "groq"  # openai | groq | ollama
-
-logger.info(f"LLM Router initialized with {ACTIVE_PROVIDER} provider")
 
 def _get_provider():
     """
-    Load correct provider module based on ACTIVE_PROVIDER.
+    Load the provider module for the currently active provider.
 
     Returns:
         module: Provider module with check() and call()
     """
-    if ACTIVE_PROVIDER == "openai":
+    name = session.get_provider()
+
+    if name == "openai":
         from src.utils.providers import openai
         logger.info("Using OpenAI provider")
         return openai
 
-    if ACTIVE_PROVIDER == "groq":
+    if name == "groq":
         from src.utils.providers import groq
         logger.info("Using Groq provider")
         return groq
@@ -47,19 +48,19 @@ def _get_provider():
 
 def check_llm() -> bool:
     """
-    Check if configured LLM provider is available.
+    Check if the active LLM provider is available.
 
     Returns:
         bool: True if provider is reachable
     """
     provider = _get_provider()
-    logger.info(f"Checking {ACTIVE_PROVIDER} provider connectivity...")
+    logger.info("Checking %s provider connectivity...", session.get_provider())
     return provider.check()
 
 
 def call_llm(prompt: str) -> str | None:
     """
-    Send prompt to configured LLM provider.
+    Send prompt to the active LLM provider using the active model.
 
     Args:
         prompt (str): Prompt text
@@ -68,8 +69,12 @@ def call_llm(prompt: str) -> str | None:
         str | None: Response text or None if failed
     """
     provider = _get_provider()
-    logger.info(f"Calling {ACTIVE_PROVIDER} provider with prompt: {prompt[:100]}...")
-    return provider.call(prompt)
+    model    = session.get_model()
+    logger.info(
+        "Calling %s (%s) with prompt: %s...",
+        session.get_provider(), model, prompt[:100]
+    )
+    return provider.call(prompt, model)
 
 
 def parse_json_response(response_text: str) -> dict | list | None:

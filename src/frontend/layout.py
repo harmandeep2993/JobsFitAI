@@ -1,17 +1,15 @@
 # src/frontend/layout.py
 # HTML shell — page, shell card, topbar, sidebar, main area
 
-from src.utils.router import ACTIVE_PROVIDER
-from src.utils.config import PROVIDER_CONFIGS
-
-# Get model name for active provider
-_MODEL = PROVIDER_CONFIGS.get(ACTIVE_PROVIDER, {}).get("model", "")
+from src.utils import session
 
 
 def render_topbar(llm_ok):
+    provider = session.get_provider()
+    model    = session.get_model()
+
     bc     = "bon"    if llm_ok else "boff"
     status = "online" if llm_ok else "offline"
-    blb    = f"{ACTIVE_PROVIDER} {status}"
 
     return f"""
     <div class="jfai-topbar">
@@ -19,9 +17,9 @@ def render_topbar(llm_ok):
       <span class="logo-name">Job<em>Fit</em>AI</span>
       <div class="topbar-r">
         <div class="t-chip">
-          <span class="t-bead {bc}"></span>{blb}
+          <span class="t-bead {bc}" id="tb-bead"></span><span id="tb-provider">{provider} {status}</span>
         </div>
-        <div class="t-chip">{_MODEL}</div>
+        <div class="t-chip" id="tb-model">{model}</div>
         <button class="theme-btn" id="themechange">☀️</button>
       </div>
     </div>
@@ -32,9 +30,10 @@ def render_sidebar():
     return """
     <div class="jfai-sidebar">
       <div class="sb-sec">Navigation</div>
-      <div class="sb-item active">🎯 Analyzer</div>
+      <div class="sb-item active" id="nav-analyzer" onclick="showView('analyzer')">🎯 Analyzer</div>
+      <div class="sb-item" id="nav-jobsearch" onclick="showView('jobsearch')">🔎 Job Search</div>
       <div class="sb-item">📊 History</div>
-      <div class="sb-item">⚙️ Settings</div>
+      <div class="sb-item" id="nav-settings" onclick="showView('settings')">⚙️ Settings</div>
       <div class="sb-rule"></div>
       <div class="sb-sec">About</div>
       <div class="sb-meta">
