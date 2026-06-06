@@ -1,102 +1,142 @@
 # src/matcher/matcher.py
+"""
+Main matcher for JOBfitAI.
 
-from .utils import get_score_label
-from src.utils.config import WEIGHTS
+Orchestrates all section scorers and computes a final
+weighted overall score.
 
-from .scores import (
+Flow:
+    1. Run all 7 section scorers independently
+    2. Apply weights from config
+    3. Return structured results dict
+
+Output format:
+    {
+        "overall_score":    74.5,
+        "label":            "Good Match 🟡",
+        "section_scores": {
+            "required_skills":  88.0,
+            "preferred_skills": 60.0,
+            "responsibilities": 72.0,
+            "experience":       65.0,
+            "education":        80.0,
+            "languages":        100.0,
+            "certifications":   60.0,
+        },
+        "matched_required":  ["python", "git"],
+        "missing_required":  ["docker", "pydantic-ai"],
+        "matched_preferred": ["sql"],
+        "missing_preferred": ["kubernetes"],
+    }
+"""
+
+from src.matcher.scores import (
     score_required_skills,
+    score_preferred_skills,
     score_responsibilities,
     score_experience,
     score_education,
-    score_preferred_skills,
-    score_languages
+    score_languages,
+    score_certifications,
 )
+from src.matcher.utils import get_score_label
+from src.utils.config  import WEIGHTS
+from src.utils.logger  import get_logger
 
-def get_match_score(resume_json, jd_json):
+logger = get_logger(__name__)
+
+
+def match(resume: dict, jd: dict) -> dict:
     """
-    Calculate final weighted match score.
-    Combines all 6 signals into one reliable score.
-
-    Weights defined in config.yaml:
-      required_skills:   35%
-      responsibilities:  25%
-      experience:        15%
-      education:         15%
-      preferred_skills:   5%
-      languages:          5%
+    Run all section scorers and compute weighted overall score.
 
     Args:
-        resume_json (dict): Extracted resume data
-        jd_json     (dict): Extracted JD data
+        resume (dict): Extracted resume data
+        jd     (dict): Extracted JD data
 
     Returns:
-        dict: Complete match results
+        dict: Full match results including overall score,
+              label, section scores, and skill details.
+              Returns empty dict if inputs are invalid.
     """
-    results = {}
+    # --- Validate inputs ---
+    if not resume or not jd:
+        logger.error("Invalid inputs — resume or JD is empty")
+        return {}
 
-    # Calculate all scores
-    print("Scoring required skills...")
-    req_score, matched_req, missing_req = (score_required_skills(resume_json, jd_json))
+    logger.info("Starting match scoring")
+    logger.info("=" * 50)
 
-    print("Scoring responsibilities semantically...")
-    resp_score = score_responsibilities(resume_json, jd_json)
+    # --- Run all scorers ---
 
-    print("Scoring experience...")
-    exp_score = score_experience(resume_json, jd_json)
+    # Required skills — returns (score, matched, missing)
+    req_score, matched_required, missing_required = score_required_skills(resume, jd)
+    logger.info("Required skills   : %.1f", req_score)
 
-    print("Scoring education...")
-    edu_score = score_education(resume_json, jd_json)
+    # Preferred skills — returns (score, matched, missing)
+    pref_score, matched_preferred, missing_preferred = score_preferred_skills(resume, jd)
+    logger.info("Preferred skills  : %.1f", pref_score)
 
-    print("Scoring preferred skills...")
-    pref_score, matched_pref, missing_pref = (score_preferred_skills(resume_json, jd_json))
+    # Responsibilities — returns float
+    resp_score = score_responsibilities(resume, jd)
+    logger.info("Responsibilities  : %.1f", resp_score)
 
-    print("Scoring languages...")
-    lang_score = score_languages(resume_json, jd_json)
+    # Experience — returns float
+    exp_score = score_experience(resume, jd)
+    logger.info("Experience        : %.1f", exp_score)
 
-    # Weighted final score
-    final = (
-        (req_score  * WEIGHTS["required_skills"])
-        + (resp_score * WEIGHTS["responsibilities"])
-        + (exp_score  * WEIGHTS["experience"])
-        + (edu_score  * WEIGHTS["education"])
-        + (pref_score * WEIGHTS["preferred_skills"])
-        + (lang_score * WEIGHTS["languages"])
+    # Education — returns float
+    edu_score = score_education(resume, jd)
+    logger.info("Education         : %.1f", edu_score)
+
+    # Languages — returns float
+    lang_score = score_languages(resume, jd)
+    logger.info("Languages         : %.1f", lang_score)
+
+    # Certifications — returns float
+    cert_score = score_certifications(resume, jd)
+    logger.info("Certifications    : %.1f", cert_score)
+
+    logger.info("=" * 50)
+
+    # --- Build section scores dict ---
+    section_scores = {
+        "required_skills":  req_score,
+        "preferred_skills": pref_score,
+        "responsibilities": resp_score,
+        "experience":       exp_score,
+        "education":        edu_score,
+        "languages":        lang_score,
+        "certifications":   cert_score,
+    }
+
+    # --- Compute weighted overall score ---
+    overall_score = round(
+        sum(
+            section_scores[section] * WEIGHTS.get(section, 0)
+            for section in section_scores
+        ),
+        1
     )
 
-    final_score = round(final, 1)
+    # Clamp to 0-100
+    overall_score = max(0.0, min(100.0, overall_score))
 
-    return {
-        # Final score
-        "final_score":   final_score,
-        "label": get_score_label(final_score),
+    label = get_score_label(overall_score)
 
-        # Individual scores
-        "scores": {
-            "required_skills":  req_score,
-            "responsibilities": resp_score,
-            "experience":       exp_score,
-            "education":        edu_score,
-            "preferred_skills": pref_score,
-            "languages":        lang_score,
-        },
+    logger.info("Overall score : %.1f", overall_score)
+    logger.info("Label         : %s",   label)
 
-        # Skills breakdown
-        "matched_required":  matched_req,
-        "missing_required":  missing_req,
-        "matched_preferred": matched_pref,
-        "missing_preferred": missing_pref,
-
-        # Context
-        "candidate_years":  resume_json.get(
-            "total_years_experience", 0
-        ),
-        "required_years":   jd_json.get(
-            "required_years_experience", 0
-        ),
-        "candidate_langs":  resume_json.get(
-            "languages", []
-        ),
-        "required_langs":   jd_json.get(
-            "required_languages", []
-        ),
+    # --- Build results ---
+    results = {
+        "overall_score":    overall_score,
+        "label":            label,
+        "section_scores":   section_scores,
+        "matched_required":  matched_required,
+        "missing_required":  missing_required,
+        "matched_preferred": matched_preferred,
+        "missing_preferred": missing_preferred,
     }
+
+    logger.info("Matching complete")
+    return results
