@@ -88,9 +88,19 @@ def register_page():
               <div class="sec-lbl">Job Description</div>
               <button class="clear-btn" onclick="clearJD()" title="Clear job description">✕</button>
             </div>
+
+            <div class="jd-fetch">
+              <input id="fetch-query" class="fetch-inp"
+                placeholder="Role e.g. machine learning engineer"/>
+              <input id="fetch-loc" class="fetch-inp fetch-inp-sm"
+                placeholder="Location"/>
+              <button class="btn-ghost fetch-btn" id="fetch-btn" onclick="fetchJobs()">⤓ Fetch</button>
+            </div>
+            <div class="fetch-results" id="fetch-results" style="display:none;"></div>
+
             <div class="jd-wrap">
               <textarea id="jd-input" class="jd-box"
-                placeholder="Paste the full job description here..."></textarea>
+                placeholder="Paste the full job description here, or fetch one above..."></textarea>
               <div class="jd-counter" id="jd-counter">0 / 5000</div>
             </div>
           </div>
@@ -116,7 +126,7 @@ def register_page():
     """)
 
     # JS assets
-    for js in ["theme", "upload", "analysis"]:
+    for js in ["theme", "upload", "analysis", "fetch"]:
         ui.add_body_html(
             f'<script src="/assets/js/{js}.js"></script>'
         )

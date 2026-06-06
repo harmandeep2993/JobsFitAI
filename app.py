@@ -12,12 +12,15 @@ Responsibilities:
 import tempfile
 from pathlib import Path
 from typing import Set
+from dataclasses import asdict
 
 from nicegui import ui, app as ngapp
-from starlette.requests  import Request
-from starlette.responses import JSONResponse
+from starlette.requests   import Request
+from starlette.responses  import JSONResponse
+from starlette.concurrency import run_in_threadpool
 
 from src.frontend.handlers import register_page
+from src.fetchers import fetch_adzuna_jobs
 
 
 ngapp.add_static_files('/assets', 'assets')
@@ -96,6 +99,52 @@ async def api_upload(request: Request) -> JSONResponse:
         "ext":  suffix.upper()[1:],
         }
     )
+
+# Job Fetch API
+@ngapp.get("/api/fetch-jobs")
+async def api_fetch_jobs(request: Request) -> JSONResponse:
+    """
+    Fetch job postings from Adzuna for a role/location search.
+
+    Query parameters
+    ----------------
+    query : str
+        Role to search for (required).
+    location : str
+        Location filter (optional).
+    results : int
+        Number of results to return (1-20, default 8).
+
+    Returns
+    -------
+    JSONResponse
+        {"ok": True, "jobs": [Job, ...]} where each Job is the dataclass
+        serialized to a dict (title, company, location, url, description,
+        language), or {"ok": False, "error": ...} on failure.
+    """
+    params   = request.query_params
+    query    = (params.get("query") or "").strip()
+    location = (params.get("location") or "").strip()
+
+    if not query:
+        return JSONResponse(
+            {"ok": False, "error": "query is required"},
+            status_code=400,
+        )
+
+    try:
+        results = int(params.get("results", 8))
+    except ValueError:
+        results = 8
+    results = max(1, min(results, 20))
+
+    # fetch_adzuna_jobs is synchronous (uses requests) — run off the event loop.
+    jobs = await run_in_threadpool(
+        fetch_adzuna_jobs, query, location, results
+    )
+
+    return JSONResponse({"ok": True, "jobs": [asdict(job) for job in jobs]})
+
 
 # Main UI Page
 @ui.page("/")
