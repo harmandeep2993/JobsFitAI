@@ -112,6 +112,217 @@
   background:   var(--red-bg);
 }
 
+/* ── Job Search — fetch controls ── */
+.jd-fetch {
+  display:     flex;
+  gap:         8px;
+  align-items: center;
+}
+
+.fetch-inp {
+  flex:          1;
+  padding:       10px 14px;
+  border-radius: 8px;
+  border:        1.5px solid var(--bd);
+  background:    var(--bg-c);
+  color:         var(--t1);
+  font-family:   'Instrument Sans', sans-serif;
+  font-size:     14px;
+  outline:       none;
+  transition:    border-color .2s, background .25s, color .25s;
+  box-sizing:    border-box;
+}
+
+.fetch-inp::placeholder { color: var(--t3); }
+.fetch-inp:focus        { border-color: var(--accent); }
+.fetch-inp-sm           { flex: 0 0 160px; }
+
+.fetch-btn { flex-shrink: 0; }
+.fetch-btn:disabled { opacity: .55; cursor: not-allowed; }
+
+/* ── Job Search — results list ── */
+.fetch-results {
+  margin-top:     20px;
+  display:        flex;
+  flex-direction: column;
+  gap:            12px;
+}
+
+.fetch-empty {
+  padding:     24px;
+  font-size:   13px;
+  color:       var(--t3);
+  text-align:  center;
+}
+
+.job-card {
+  background:    var(--bg-r);
+  border:        1px solid var(--bd);
+  border-radius: 12px;
+  padding:       16px 18px;
+  box-shadow:    var(--sha-s);
+  transition:    border-color .2s, transform .15s;
+}
+
+.job-card:hover {
+  border-color: var(--accent);
+  transform:    translateY(-1px);
+}
+
+.job-card-head {
+  display:         flex;
+  align-items:     center;
+  justify-content: space-between;
+  gap:             10px;
+}
+
+.job-card-title {
+  font-size:   15px;
+  font-weight: 700;
+  color:       var(--t1);
+}
+
+.job-card-lang {
+  flex-shrink:    0;
+  font-size:      10px;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  font-family:    'DM Mono', monospace;
+  color:          var(--t3);
+  border:         1px solid var(--bd);
+  border-radius:  5px;
+  padding:        2px 6px;
+}
+
+.job-card-meta {
+  font-size:   12px;
+  color:       var(--t2);
+  margin-top:  4px;
+  font-family: 'DM Mono', monospace;
+}
+
+.job-card-desc {
+  font-size:   13px;
+  color:       var(--t2);
+  line-height: 1.6;
+  margin-top:  10px;
+}
+
+.job-card-link {
+  display:         inline-block;
+  margin-top:      12px;
+  font-size:       12px;
+  font-weight:     600;
+  color:           var(--accent);
+  text-decoration: none;
+}
+
+.job-card-link:hover { text-decoration: underline; }
+
+/* ── Settings form ── */
+.set-row {
+  display:       flex;
+  align-items:   center;
+  gap:           16px;
+  margin-bottom: 16px;
+}
+
+.set-lbl {
+  flex:           0 0 120px;
+  font-size:      11px;
+  font-weight:    600;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color:          var(--t3);
+  font-family:    'DM Mono', monospace;
+}
+
+.set-row .fetch-inp { flex: 1; }
+
+/* ── Button dropdown ── */
+.dd {
+  position: relative;
+  flex:     1;
+}
+
+.dd-btn {
+  width:           100%;
+  display:         flex;
+  align-items:     center;
+  justify-content: space-between;
+  gap:             10px;
+  padding:         10px 14px;
+  border-radius:   8px;
+  border:          1.5px solid var(--bd);
+  background:      var(--bg-c);
+  color:           var(--t1);
+  font-family:     'Instrument Sans', sans-serif;
+  font-size:       14px;
+  cursor:          pointer;
+  transition:      border-color .2s, background .25s, color .25s;
+}
+
+.dd-btn:hover      { border-color: var(--accent); }
+.dd.open .dd-btn   { border-color: var(--accent); }
+
+.dd-val { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.dd-arrow {
+  flex-shrink: 0;
+  font-size:   11px;
+  color:       var(--t3);
+  transition:  transform .2s;
+}
+
+.dd.open .dd-arrow { transform: rotate(180deg); }
+
+.dd-menu {
+  position:      absolute;
+  top:           calc(100% + 4px);
+  left:          0;
+  right:         0;
+  z-index:       60;
+  display:       none;
+  background:    var(--bg-r);
+  border:        1px solid var(--bd);
+  border-radius: 8px;
+  box-shadow:    var(--sha-s);
+  overflow:      hidden;
+}
+
+.dd.open .dd-menu { display: block; }
+
+.dd-opt {
+  padding:     10px 14px;
+  font-size:   13px;
+  color:       var(--t1);
+  cursor:      pointer;
+  transition:  background .15s;
+}
+
+.dd-opt:hover { background: var(--accent-s); }
+
+.dd-opt.sel {
+  color:       var(--accent);
+  font-weight: 600;
+}
+
+.set-actions {
+  display:     flex;
+  align-items: center;
+  gap:         14px;
+  margin-top:  20px;
+}
+
+.set-status {
+  font-size:   12px;
+  font-family: 'DM Mono', monospace;
+  color:       var(--t3);
+}
+
+.set-status.ok  { color: var(--green); }
+.set-status.err { color: var(--red); }
+
 /* ── JD textarea wrapper ── */
 .jd-wrap { position: relative; }
 

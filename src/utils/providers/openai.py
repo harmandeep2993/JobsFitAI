@@ -41,12 +41,13 @@ def check() -> bool:
         return False
 
 
-def call(prompt):
+def call(prompt, model: str | None = None):
     """
     Send prompt to OpenAI and return response.
 
     Args:
         prompt (str): Prompt text
+        model (str | None): Model id to use; falls back to the config default.
 
     Returns:
         str: Response text or None if failed
@@ -54,6 +55,8 @@ def call(prompt):
     if not _API_KEY:
         logger.warning("[OpenAI] No API key set found — set OPENAI_API_KEY in .env")
         return None
+
+    use_model = model or _MODEL
 
     try:
         response = requests.post(
@@ -63,7 +66,7 @@ def call(prompt):
                 "Content-Type":  "application/json",
             },
             json={
-                "model":       _MODEL,
+                "model":       use_model,
                 "messages":    [{"role": "user", "content": prompt}],
                 "temperature": LLM_TEMPERATURE,
                 "max_tokens":  LLM_MAX_OUTPUT_TOKENS,

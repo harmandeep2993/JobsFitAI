@@ -6,12 +6,8 @@ Called after match() returns results dict.
 
 from nicegui import ui
 
-from src.utils.router import ACTIVE_PROVIDER
-from src.utils.config import PROVIDER_CONFIGS
+from src.utils import session
 from src.frontend.components import score_col, make_prog, make_tags, safe_html
-
-# Active model name for footer
-_MODEL = PROVIDER_CONFIGS.get(ACTIVE_PROVIDER, {}).get("model", "")
 
 
 def get_direction(score):
@@ -381,7 +377,7 @@ def build_results_html(results: dict, resume_json: dict, jd_json: dict, summary:
         + """<div style="margin-top:24px;">
           <button class="btn-ghost" onclick="location.reload()">↩ Analyse Another</button>
         </div>"""
-        + f'<div class="foot-note">{score}% · {label} · {_MODEL} · paraphrase-multilingual-MiniLM-L12-v2</div>'
+        + f'<div class="foot-note">{score}% · {label} · {session.get_model()} · paraphrase-multilingual-MiniLM-L12-v2</div>'
     )
 
 

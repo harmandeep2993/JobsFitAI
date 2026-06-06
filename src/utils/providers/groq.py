@@ -46,12 +46,13 @@ def check() -> bool:
         return False
 
 
-def call(prompt: str) -> str | None:
+def call(prompt: str, model: str | None = None) -> str | None:
     """
     Send prompt to Groq and return response text.
 
     Args:
         prompt (str): Prompt text
+        model (str | None): Model id to use; falls back to the config default.
 
     Returns:
         str | None: Response text or None if failed
@@ -59,6 +60,8 @@ def call(prompt: str) -> str | None:
     if not _API_KEY:
         logger.warning("[Groq] No API key found — set GROQ_API_KEY in .env")
         return None
+
+    use_model = model or _MODEL
 
     try:
         response = requests.post(
@@ -68,7 +71,7 @@ def call(prompt: str) -> str | None:
                 "Content-Type":  "application/json",
             },
             json={
-                "model":       _MODEL,
+                "model":       use_model,
                 "messages":    [{"role": "user", "content": prompt}],
                 "temperature": LLM_TEMPERATURE,
                 "max_tokens":  LLM_MAX_OUTPUT_TOKENS,
