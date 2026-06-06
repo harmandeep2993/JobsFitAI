@@ -7,13 +7,13 @@ for the LLM to return a JSON object matching the schema.
 """
 
 import json
+import datetime as dt
 from pathlib import Path
 
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-# Module-level constant — schema path
 RESUME_SCHEMA_PATH = Path("schemas/resume_schema.json")
 
 
@@ -39,31 +39,36 @@ def _get_resume_schema() -> str:
 
 
 def get_resume_prompt(resume_text: str) -> str:
-    """
-    Build extraction prompt for a resume.
-
+    """Build the prompt for resume extraction.  
     Args:
-        resume_text (str): Raw resume text
-
+        resume_text (str): The raw text of the resume to be extracted.
     Returns:
-        str: Final prompt string ready for LLM
+        str: The complete prompt to be sent to the LLM for extraction.
     """
     schema_text = _get_resume_schema()
 
-    prompt = f"""Extract structured information from the resume below.
-Return JSON matching the schema exactly.
-Do not infer missing information.
-Extract ALL skill keywords explicitly mentioned regardless of which section they appear in.
-If a section is missing return empty list or null for that field.
-Calculate total experience from the experience section only. If missing use 0.
+    prompt = f"""Extract resume data into this JSON schema. Follow all rules strictly.
 
-Schema:
-{schema_text}
+    RULES:
+    1. Return ONLY valid JSON. No markdown, no explanation, no extra text.
+    2. Resume may be in any language — extract and return ALL values in English.
+    3. skills: extract ALL skills keywords from every section (experience, projects, certifications, summary, skills, publications). Include technical skills, tools, frameworks, soft skills, methodologies, domain knowledge.
+    4. experience_entries: extract ALL roles — full-time, part-time, freelance, internship, trainee, research, academic. For functional resumes with no dates extract roles from any experience section.
+    5. duration_years: calculate difference end_date - start_date and round to 1 decimal. If end_date is present/current/heute/actuellement or equivalent → use today's date ({dt.date.today()}). If only years given → assume Jan for start, Dec for end. Use 0.0 if dates missing.
+    6. meta.total_experience_years: sum of ALL duration_years rounded to 1 decimal. Use 0.0 if no experience.
+    7. projects: extract ALL projects, research, publications, campaigns, or independent work. title and description are mandatory — never leave empty if text exists. technologies[]: extract from title and description text.
+    8. education: extract degree, field, institution. Translate degree names to English (e.g. Diplom → Diploma, Magister → Master, Licence → Bachelor).
+    9. languages: extract as stated. certifications: extract if mentioned.
+    10. candidate.name/title/location: extract from header or contact section.
+    11. Missing fields → empty string, empty list, or 0.
 
-Resume:
-{resume_text}
+    SCHEMA:
+    {schema_text}
 
-JSON:"""
+    RESUME:
+    {resume_text}
+
+    JSON:"""
 
     logger.info("Resume length: %d characters", len(resume_text))
     logger.info("Resume prompt length: %d characters", len(prompt))
