@@ -134,15 +134,6 @@ def score_preferred_skills(resume: dict, jd: dict) -> tuple[float, list, list]:
 
     matched = []
     missing = []
-    # add this temporarily in score_preferred_skills for debugging
-    for i, skill in enumerate(preferred):
-        best_sim = sim_matrix[i].max().item()
-        best_idx = sim_matrix[i].argmax().item()
-        best_match = candidate[best_idx]
-        logger.info(
-            "Preferred '%s' → best match: '%s' (%.4f)",
-            skill, best_match, best_sim
-        )
 
     for i, skill in enumerate(preferred):
         best_sim = sim_matrix[i].max().item()
