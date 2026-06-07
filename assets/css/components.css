@@ -510,7 +510,78 @@
 .match-skills .ok   { color: var(--green); font-weight: 700; }
 .match-skills .miss { color: var(--red);   font-weight: 700; }
 
-.match-card .job-card-link { margin-top: 10px; }
+.match-card .job-card-link { margin-top: 0; }
+
+.match-actions {
+  display:     flex;
+  align-items: center;
+  gap:         12px;
+  margin-top:  12px;
+}
+
+.apply-toggle {
+  margin-left:   auto;
+  font-size:     12px;
+  font-weight:   600;
+  padding:       5px 12px;
+  border-radius: 7px;
+  border:        1px solid var(--bd);
+  background:    var(--bg-c);
+  color:         var(--t2);
+  cursor:        pointer;
+  font-family:   'Instrument Sans', sans-serif;
+  transition:    all .15s;
+}
+
+.apply-toggle:hover { border-color: var(--accent); color: var(--accent); }
+.apply-toggle.on    { background: var(--green-bg); border-color: var(--green); color: var(--green); }
+
+.match-applied-tag {
+  font-size:    10px;
+  font-weight:  700;
+  color:        var(--green);
+  background:   var(--green-bg);
+  border:       1px solid var(--green);
+  border-radius: 20px;
+  padding:      2px 8px;
+  font-family:  'DM Mono', monospace;
+}
+
+.match-card.is-applied { opacity: .72; }
+.match-card.is-applied:hover { opacity: 1; }
+
+/* History filters */
+.hist-filters {
+  display:       flex;
+  gap:           8px;
+  margin-bottom: 4px;
+}
+
+.hist-fbtn {
+  display:       inline-flex;
+  align-items:   center;
+  gap:           6px;
+  font-size:     13px;
+  padding:       7px 14px;
+  border-radius: 8px;
+  border:        1px solid var(--bd);
+  background:    var(--bg-c);
+  color:         var(--t2);
+  cursor:        pointer;
+  font-family:   'Instrument Sans', sans-serif;
+  transition:    all .15s;
+}
+
+.hist-fbtn:hover  { border-color: var(--t2); color: var(--t1); }
+.hist-fbtn.active { border-color: var(--accent); color: var(--accent); background: var(--accent-s); }
+
+.hist-count {
+  font-size:     11px;
+  font-family:   'DM Mono', monospace;
+  background:    var(--bd-s);
+  border-radius: 10px;
+  padding:       1px 7px;
+}
 
 /* ── JD textarea wrapper ── */
 .jd-wrap { position: relative; }

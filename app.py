@@ -308,6 +308,18 @@ async def api_match_state() -> JSONResponse:
     })
 
 
+@ngapp.post("/api/match/applied")
+async def api_match_applied(request: Request) -> JSONResponse:
+    """Mark a stored job as applied / not applied. Body: {id, applied}."""
+    body    = await request.json()
+    job_id  = (body.get("id") or "").strip()
+    applied = bool(body.get("applied"))
+    if not job_id:
+        return JSONResponse({"ok": False, "error": "id required"}, status_code=400)
+    match_store.set_applied(job_id, applied)
+    return JSONResponse({"ok": True, "id": job_id, "applied": applied})
+
+
 @ngapp.post("/api/match/clear")
 async def api_match_clear() -> JSONResponse:
     """Clear all stored matches."""

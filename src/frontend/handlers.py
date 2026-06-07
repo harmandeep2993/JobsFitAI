@@ -190,6 +190,21 @@ def register_page():
         <div class="fetch-results" id="mt-results"></div>
       </div><!-- /view-matches -->
 
+      <div id="view-history" class="view" style="display:none;">
+        <div class="pg-title">Match <em>History</em></div>
+        <div class="pg-sub">Every job you've scored — track which ones you've applied to</div>
+
+        <div class="divider"></div>
+
+        <div id="hist-filters" class="hist-filters">
+          <button class="hist-fbtn active" data-f="all" onclick="setHistFilter('all')">All <span class="hist-count">0</span></button>
+          <button class="hist-fbtn" data-f="open" onclick="setHistFilter('open')">Not applied <span class="hist-count">0</span></button>
+          <button class="hist-fbtn" data-f="applied" onclick="setHistFilter('applied')">Applied <span class="hist-count">0</span></button>
+        </div>
+
+        <div class="fetch-results" id="hist-results"></div>
+      </div><!-- /view-history -->
+
       <div id="view-settings" class="view" style="display:none;">
         <div class="pg-title">LLM <em>Settings</em></div>
         <div class="pg-sub">Choose the provider and model used for extraction, matching, and summaries</div>
@@ -233,7 +248,7 @@ def register_page():
     """)
 
     # JS assets
-    for js in ["theme", "upload", "analysis", "fetch", "settings", "matches"]:
+    for js in ["theme", "upload", "analysis", "fetch", "settings", "matches", "history"]:
         ui.add_body_html(
             f'<script src="/assets/js/{js}.js?v={_asset_ver(f"assets/js/{js}.js")}"></script>'
         )

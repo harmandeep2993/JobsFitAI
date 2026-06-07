@@ -23,9 +23,12 @@ window.showView = function(name) {
   const nav = document.getElementById('nav-' + name);
   if (nav) nav.classList.add('active');
 
-  // Refresh the matches dashboard when its tab is opened.
+  // Refresh data when a data-backed tab is opened.
   if (name === 'matches' && typeof window.loadMatchState === 'function') {
     window.loadMatchState();
+  }
+  if (name === 'history' && typeof window.loadHistory === 'function') {
+    window.loadHistory();
   }
 };
 

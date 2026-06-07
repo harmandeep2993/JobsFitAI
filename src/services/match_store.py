@@ -74,6 +74,15 @@ def get_all() -> list[dict]:
     return out
 
 
+def set_applied(job_id: str, applied: bool) -> None:
+    """Mark a stored job as applied / not applied."""
+    with db.connect() as conn:
+        conn.execute(
+            "UPDATE matches SET applied = ? WHERE id = ?",
+            (1 if applied else 0, job_id),
+        )
+
+
 def clear() -> None:
     """Remove all stored matches."""
     with db.connect() as conn:
