@@ -32,7 +32,7 @@ from src.parsers import extract_all_text
 from src.extractors.resume import extract_resume
 from src.services.job_matcher import (
     score_new_jobs, discover_and_score, begin_run, end_run, get_run_status,
-    rescore_all,
+    rescore_all, fetch_combined,
 )
 from src.services import match_store, role_filter, event_store
 from src.utils.config import (
@@ -292,8 +292,8 @@ async def api_match_run(request: Request) -> JSONResponse:
 
     async def _bg() -> None:
         def _run() -> None:
-            jobs = fetch_adzuna_multi(titles, location=location,
-                                      country=SEARCH_COUNTRY, per_title=SEARCH_PER_TITLE)
+            jobs = fetch_combined(titles, location=location,
+                                  country=SEARCH_COUNTRY, per_title=SEARCH_PER_TITLE)
             discover_and_score(jobs, entry_only=entry_only)
         try:
             await run_in_threadpool(_run)
@@ -363,7 +363,7 @@ async def _auto_fetch_loop() -> None:
             continue
         try:
             def _run() -> dict:
-                jobs = fetch_adzuna_multi(
+                jobs = fetch_combined(
                     TARGET_TITLES, country=SEARCH_COUNTRY, per_title=SEARCH_PER_TITLE
                 )
                 return discover_and_score(jobs, entry_only=True)

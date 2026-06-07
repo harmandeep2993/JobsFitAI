@@ -9,7 +9,7 @@ Each job costs one JD-extraction LLM call; the resume is extracted once
 
 from datetime import datetime, timezone
 
-from src.fetchers import Job
+from src.fetchers import Job, fetch_adzuna_multi, fetch_arbeitnow_jobs
 from src.fetchers.enrich import fetch_full_description
 from src.extractors.jd import extract_jd
 from src.matcher import match
@@ -118,6 +118,38 @@ def begin_run() -> bool:
 def end_run() -> None:
     """Force-clear the running flag (e.g. after a failure before scoring)."""
     _run_status.update({"running": False, "phase": "idle"})
+
+
+def fetch_combined(titles: list[str], location: str = "", country: str = "de",
+                   per_title: int = 5, arbeitnow_limit: int = 30) -> list[Job]:
+    """
+    Pull jobs from both sources and merge them.
+
+    - Adzuna: server-side search per target title (good volume, full JD via
+      detail-page enrichment later).
+    - Arbeitnow: feed filtered to target-title roles (native full JD).
+
+    Deduped by id; the LLM funnel and (optional) vector dedup refine further.
+    """
+    adzuna = fetch_adzuna_multi(titles, location=location,
+                                country=country, per_title=per_title)
+
+    # Arbeitnow has no server search, so cast a wide query from the title words
+    # then keep only real target-title matches.
+    terms = sorted({w for t in titles for w in t.split()})
+    arb_raw = fetch_arbeitnow_jobs(query=" ".join(terms), location=location,
+                                   limit=arbeitnow_limit)
+    arbeitnow = [j for j in arb_raw if role_filter.is_target_role(j.title, titles)]
+
+    merged, seen = [], set()
+    for job in adzuna + arbeitnow:
+        if job.id and job.id not in seen:
+            seen.add(job.id)
+            merged.append(job)
+
+    logger.info("Combined sources: %d adzuna + %d arbeitnow -> %d unique",
+                len(adzuna), len(arbeitnow), len(merged))
+    return merged
 
 
 def rescore_all() -> int:
