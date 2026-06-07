@@ -28,7 +28,10 @@ from src.parsers import extract_all_text
 from src.extractors.resume import extract_resume
 from src.services.job_matcher import score_new_jobs
 from src.services import match_store, role_filter
-from src.utils.config import TARGET_TITLES, SEARCH_COUNTRY, SEARCH_PER_TITLE
+from src.utils.config import (
+    TARGET_TITLES, SEARCH_COUNTRY, SEARCH_PER_TITLE,
+    ENTRY_KEYWORDS, EXCLUDE_KEYWORDS, MAX_AGE_DAYS, MAX_EXPERIENCE_YEARS,
+)
 
 
 ngapp.add_static_files('/assets', 'assets')
@@ -293,6 +296,13 @@ async def api_match_state() -> JSONResponse:
         "ok":          True,
         "has_resume":  session.has_resume(),
         "resume_name": session.get_resume_name(),
+        "filters": {
+            "target_titles":        TARGET_TITLES,
+            "entry_keywords":       ENTRY_KEYWORDS,
+            "exclude_keywords":     EXCLUDE_KEYWORDS,
+            "max_age_days":         MAX_AGE_DAYS,
+            "max_experience_years": MAX_EXPERIENCE_YEARS,
+        },
         "results":     match_store.get_all(),
     })
 

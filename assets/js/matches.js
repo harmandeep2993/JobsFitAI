@@ -44,10 +44,33 @@ window.loadMatchState = function() {
     .then(d => {
       if (!d.ok) return;
       setResumeStatus(d.has_resume, d.resume_name);
+      renderFilters(d.filters);
       renderMatches(d.results || []);
     })
     .catch(() => {});
 };
+
+// Show which keywords/rules drive the job extraction.
+function renderFilters(f) {
+  const box = document.getElementById('mt-filters');
+  if (!box || !f) return;
+
+  function group(label, arr, cls) {
+    if (!arr || !arr.length) return '';
+    return '<div class="mt-fgroup"><span class="mt-flabel">' + label + '</span>' +
+      arr.map(x => '<span class="mt-chip ' + cls + '">' + mtEsc(x) + '</span>').join('') +
+      '</div>';
+  }
+
+  box.innerHTML =
+    group('Target titles', f.target_titles, 'tc') +
+    group('Entry-level keywords', f.entry_keywords, 'ec') +
+    group('Excluded (seniority)', f.exclude_keywords, 'xc') +
+    '<div class="mt-fgroup"><span class="mt-flabel">Limits</span>' +
+      '<span class="mt-chip">≤ ' + f.max_age_days + ' days old</span>' +
+      '<span class="mt-chip">≤ ' + f.max_experience_years + ' yrs exp</span>' +
+    '</div>';
+}
 
 function setResumeStatus(has, name) {
   const el = document.getElementById('mt-resume-status');

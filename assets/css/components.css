@@ -363,6 +363,48 @@
 
 .mt-select:focus { border-color: var(--accent); }
 
+/* Active filter keywords */
+.mt-filters {
+  margin-top:    14px;
+  padding-top:   14px;
+  border-top:    1px solid var(--bd);
+  display:       flex;
+  flex-direction: column;
+  gap:           8px;
+}
+
+.mt-fgroup {
+  display:     flex;
+  flex-wrap:   wrap;
+  align-items: center;
+  gap:         6px;
+}
+
+.mt-flabel {
+  font-size:      10px;
+  font-weight:    600;
+  text-transform: uppercase;
+  letter-spacing: .8px;
+  color:          var(--t3);
+  font-family:    'DM Mono', monospace;
+  margin-right:   4px;
+  min-width:      120px;
+}
+
+.mt-chip {
+  font-size:     11px;
+  padding:       3px 9px;
+  border-radius: 20px;
+  background:    var(--bg-c);
+  border:        1px solid var(--bd);
+  color:         var(--t2);
+  font-family:   'DM Mono', monospace;
+}
+
+.mt-chip.tc { border-color: var(--accent); color: var(--accent); }
+.mt-chip.ec { border-color: var(--green);  color: var(--green); }
+.mt-chip.xc { border-color: var(--red);    color: var(--red); text-decoration: line-through; }
+
 /* Thumbnail grid of match tiles */
 #mt-results {
   display:               grid;

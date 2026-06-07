@@ -100,6 +100,8 @@ job_search:
     - "ml engineer"
     - "ai engineer"
     - "data scientist"
+    - "data science trainee"
+    - "trainee data scientist"
     - "data analyst"
     - "analytics engineer"
   exclude_keywords:             # seniority markers -> not entry level

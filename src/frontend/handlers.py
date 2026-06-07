@@ -183,6 +183,8 @@ def register_page():
             </select>
             <span class="mt-status" id="mt-poll-status"></span>
           </div>
+
+          <div class="mt-filters" id="mt-filters"></div>
         </div>
 
         <div class="fetch-results" id="mt-results"></div>
