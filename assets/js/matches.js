@@ -99,15 +99,17 @@ window.runMatch = function() {
   const btn    = document.getElementById('mt-run-btn');
   const query  = document.getElementById('mt-query').value.trim();
   const loc    = document.getElementById('mt-loc').value.trim();
+  const entry  = document.getElementById('mt-entry');
+  const entryOnly = entry ? entry.checked : true;
 
   if (btn) { btn.disabled = true; }
-  status.textContent = 'Fetching & scoring…';
+  status.textContent = 'Searching & scoring…';
   status.className = 'mt-status';
 
   const url = '/api/match/run'
-    + '?query='    + encodeURIComponent(query)
-    + '&location=' + encodeURIComponent(loc)
-    + '&limit=15';
+    + '?query='      + encodeURIComponent(query)
+    + '&location='   + encodeURIComponent(loc)
+    + '&entry_only=' + (entryOnly ? 'true' : 'false');
 
   return fetch(url)
     .then(r => r.json().then(j => ({ status: r.status, body: j })))
@@ -123,8 +125,9 @@ window.runMatch = function() {
         return;
       }
       const ts = new Date().toLocaleTimeString();
-      status.textContent = '✓ ' + d.scored + ' new scored · ' +
-                           (d.results || []).length + ' total · ' + ts;
+      status.textContent = '✓ ' + (d.found || 0) + ' matched · ' + d.scored +
+                           ' new scored · ' + (d.results || []).length +
+                           ' total · ' + ts;
       status.className = 'mt-status ok';
       renderMatches(d.results || []);
     })

@@ -89,6 +89,40 @@ matcher:
     partial:   40
 
 
+# Job search — target roles and entry-level filtering for the Matches dashboard
+job_search:
+  default_country: "de"
+  per_title_results: 5          # Adzuna results requested per title query
+  max_experience_years: 2       # keep roles requiring <= this many years (or unknown)
+  target_titles:
+    - "machine learning engineer"
+    - "ml engineer"
+    - "ai engineer"
+    - "data scientist"
+    - "data analyst"
+    - "analytics engineer"
+  exclude_keywords:             # seniority markers -> not entry level
+    - "senior"
+    - "sr."
+    - "lead"
+    - "principal"
+    - "staff"
+    - "head of"
+    - "director"
+    - "manager"
+    - "architect"
+    - "leiter"
+    - "leitung"
+  entry_keywords:               # explicit entry-level markers
+    - "junior"
+    - "entry"
+    - "graduate"
+    - "trainee"
+    - "working student"
+    - "werkstudent"
+    - "intern"
+
+
 # Logging
 logging:
   level: "INFO"   # DEBUG | INFO | WARNING | ERROR

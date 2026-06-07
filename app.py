@@ -21,13 +21,14 @@ from starlette.responses  import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
 from src.frontend.handlers import register_page
-from src.fetchers import fetch_adzuna_jobs, fetch_arbeitnow_jobs
+from src.fetchers import fetch_adzuna_jobs, fetch_arbeitnow_jobs, fetch_adzuna_multi
 from src.utils import session
 from src.utils.router import check_llm
 from src.parsers import extract_all_text
 from src.extractors.resume import extract_resume
 from src.services.job_matcher import score_new_jobs
-from src.services import match_store
+from src.services import match_store, role_filter
+from src.utils.config import TARGET_TITLES, SEARCH_COUNTRY, SEARCH_PER_TITLE
 
 
 ngapp.add_static_files('/assets', 'assets')
@@ -245,9 +246,15 @@ async def api_match_resume(request: Request) -> JSONResponse:
 @ngapp.get("/api/match/run")
 async def api_match_run(request: Request) -> JSONResponse:
     """
-    Fetch jobs from Arbeitnow and score the resume against any new ones.
+    Discover target AI/ML roles via Adzuna multi-title search, filter to
+    entry-level, and score the resume against any new ones.
 
-    Query: query, location, limit. Returns the full ranked result set.
+    Query params:
+        query: optional single-title override (defaults to config target_titles)
+        location: location filter
+        entry_only: "true"/"false" (default true)
+
+    Returns the full ranked result set plus how many were found/scored.
     """
     if not session.has_resume():
         return JSONResponse(
@@ -255,21 +262,25 @@ async def api_match_run(request: Request) -> JSONResponse:
             status_code=400,
         )
 
-    params   = request.query_params
-    query    = (params.get("query") or "").strip()
-    location = (params.get("location") or "").strip()
-    try:
-        limit = max(1, min(int(params.get("limit", 15)), 40))
-    except ValueError:
-        limit = 15
+    params     = request.query_params
+    query      = (params.get("query") or "").strip()
+    location   = (params.get("location") or "").strip()
+    entry_only = (params.get("entry_only", "true").lower() != "false")
+
+    titles = [query] if query else TARGET_TITLES
 
     def _run() -> dict:
-        jobs = fetch_arbeitnow_jobs(query=query, location=location, limit=limit)
-        return score_new_jobs(jobs)
+        jobs     = fetch_adzuna_multi(titles, location=location,
+                                      country=SEARCH_COUNTRY, per_title=SEARCH_PER_TITLE)
+        filtered = role_filter.filter_jobs(jobs, entry_only=entry_only, titles=titles)
+        outcome  = score_new_jobs(filtered)
+        outcome["found"] = len(filtered)
+        return outcome
 
     outcome = await run_in_threadpool(_run)
     return JSONResponse({
         "ok":      True,
+        "found":   outcome.get("found", 0),
         "scored":  outcome.get("scored", 0),
         "results": outcome.get("results", []),
     })

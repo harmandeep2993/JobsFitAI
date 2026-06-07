@@ -99,5 +99,14 @@ SUPPORTED_EXTENSIONS = set(config["validator"]["supported_extensions"])
 WEIGHTS = config["matcher"]["weights"]
 THRESHOLDS = config["matcher"]["thresholds"]
 
+# Job search — target roles + entry-level filtering
+_job_search = config.get("job_search", {})
+SEARCH_COUNTRY        = _job_search.get("default_country", "de")
+SEARCH_PER_TITLE      = _job_search.get("per_title_results", 5)
+MAX_EXPERIENCE_YEARS  = _job_search.get("max_experience_years", 2)
+TARGET_TITLES         = _job_search.get("target_titles", [])
+EXCLUDE_KEYWORDS      = _job_search.get("exclude_keywords", [])
+ENTRY_KEYWORDS        = _job_search.get("entry_keywords", [])
+
 # Logging
 LOG_LEVEL = config.get("logging", {}).get("level", "INFO")

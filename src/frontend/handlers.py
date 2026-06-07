@@ -163,9 +163,13 @@ def register_page():
           </div>
 
           <div class="jd-fetch" style="margin-top:16px;">
-            <input id="mt-query" class="fetch-inp" placeholder="Role e.g. python developer"/>
+            <input id="mt-query" class="fetch-inp" placeholder="Optional: override role (default = your target AI/ML titles)"/>
             <input id="mt-loc" class="fetch-inp fetch-inp-sm" placeholder="Location e.g. berlin"/>
             <button class="btn-primary" id="mt-run-btn" onclick="runMatch()">&rarr; Fetch &amp; Score</button>
+          </div>
+
+          <div class="mt-row" style="margin-top:12px;">
+            <label class="mt-auto"><input type="checkbox" id="mt-entry" checked/> Entry-level only</label>
           </div>
 
           <div class="mt-row" style="margin-top:14px;">

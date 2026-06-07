@@ -170,6 +170,45 @@ def fetch_adzuna_jobs(
     return [_parse_job(job) for job in raw_jobs]
 
 
+def fetch_adzuna_multi(
+    titles: list[str],
+    location: str = "",
+    country: str = "de",
+    per_title: int = 5,
+) -> list[Job]:
+    """
+    Run one Adzuna search per target title and merge the results.
+
+    Adzuna supports server-side search, so this finds far more AI/ML roles
+    than the Arbeitnow feed. Results are deduplicated by id (falling back
+    to url).
+
+    Args:
+        titles (list[str]): Role phrases to search for, one query each.
+        location (str):     Location filter.
+        country (str):      Adzuna country code.
+        per_title (int):    Results requested per title.
+
+    Returns:
+        list[Job]: Unique jobs across all title searches.
+    """
+    seen: set[str] = set()
+    out: list[Job] = []
+
+    for title in titles:
+        for job in fetch_adzuna_jobs(
+            query=title, location=location, results=per_title, country=country
+        ):
+            key = job.id or job.url
+            if key and key not in seen:
+                seen.add(key)
+                out.append(job)
+
+    logger.info("Adzuna multi-title: %d unique jobs across %d titles",
+                len(out), len(titles))
+    return out
+
+
 if __name__ == "__main__":
     # Manual smoke test — prints a compact view of fetched jobs.
     for job in fetch_adzuna_jobs(query="python developer", location="berlin", results=3):
