@@ -30,6 +30,13 @@ _state = {
     "model":    None,
 }
 
+# Extracted resume kept in memory so the Job Matches dashboard can score
+# many jobs without re-extracting the resume each time.
+_resume = {
+    "json": None,
+    "name": "",
+}
+
 
 def get_provider() -> str:
     """Return the active provider name."""
@@ -72,6 +79,28 @@ def set_active(provider: str, model: str | None = None) -> None:
 def get_settings() -> dict:
     """Return the current selection as {'provider', 'model'}."""
     return {"provider": get_provider(), "model": get_model()}
+
+
+def set_resume(resume_json: dict, name: str = "") -> None:
+    """Store the extracted resume for reuse by the matching dashboard."""
+    _resume["json"] = resume_json
+    _resume["name"] = name or ""
+    logger.info("Resume stored for matching: %s", _resume["name"] or "(unnamed)")
+
+
+def get_resume() -> dict | None:
+    """Return the stored resume JSON, or None if none is loaded."""
+    return _resume["json"]
+
+
+def get_resume_name() -> str:
+    """Return the stored resume's display name."""
+    return _resume["name"]
+
+
+def has_resume() -> bool:
+    """True if a resume has been extracted and stored."""
+    return bool(_resume["json"])
 
 
 def provider_catalog() -> list[dict]:

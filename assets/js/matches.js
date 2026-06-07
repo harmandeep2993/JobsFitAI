@@ -1,0 +1,183 @@
+// assets/js/matches.js
+// Job Matches dashboard — load a resume once, fetch German jobs from
+// Arbeitnow, score each against the resume, and show a ranked list.
+// Supports auto-refresh that scores only newly-seen jobs.
+
+window._matchPoll = null;
+
+function mtEsc(s) {
+  return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                  .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function scoreClass(score) {
+  if (score >= 80) return 'sc-exc';
+  if (score >= 60) return 'sc-good';
+  if (score >= 40) return 'sc-partial';
+  return 'sc-poor';
+}
+
+// ── Load current state (resume + stored results) ──────────
+window.loadMatchState = function() {
+  fetch('/api/match/state')
+    .then(r => r.json())
+    .then(d => {
+      if (!d.ok) return;
+      setResumeStatus(d.has_resume, d.resume_name);
+      renderMatches(d.results || []);
+    })
+    .catch(() => {});
+};
+
+function setResumeStatus(has, name) {
+  const el = document.getElementById('mt-resume-status');
+  if (!el) return;
+  if (has) {
+    el.textContent = '✓ ' + (name || 'resume loaded');
+    el.className = 'mt-status ok';
+  } else {
+    el.textContent = 'No resume loaded';
+    el.className = 'mt-status';
+  }
+}
+
+// ── Resume upload ─────────────────────────────────────────
+function uploadMatchResume(file) {
+  if (!file) return;
+  const status = document.getElementById('mt-resume-status');
+  status.textContent = 'Uploading…';
+  status.className = 'mt-status';
+
+  const fd = new FormData();
+  fd.append('file', file);
+
+  fetch('/api/upload', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(d => {
+      if (!d.ok) throw new Error(d.error || 'upload failed');
+      status.textContent = 'Extracting resume…';
+      return fetch('/api/match/resume', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tmp: d.tmp, name: d.name }),
+      });
+    })
+    .then(r => r.json())
+    .then(d => {
+      if (!d.ok) throw new Error(d.error || 'extraction failed');
+      setResumeStatus(true, d.name + ' · ' + d.experience_years + 'y exp');
+    })
+    .catch(e => {
+      status.textContent = '✕ ' + e.message;
+      status.className = 'mt-status err';
+    });
+}
+
+// ── Fetch & score ─────────────────────────────────────────
+window.runMatch = function() {
+  const status = document.getElementById('mt-poll-status');
+  const btn    = document.getElementById('mt-run-btn');
+  const query  = document.getElementById('mt-query').value.trim();
+  const loc    = document.getElementById('mt-loc').value.trim();
+
+  if (btn) { btn.disabled = true; }
+  status.textContent = 'Fetching & scoring…';
+  status.className = 'mt-status';
+
+  const url = '/api/match/run'
+    + '?query='    + encodeURIComponent(query)
+    + '&location=' + encodeURIComponent(loc)
+    + '&limit=15';
+
+  return fetch(url)
+    .then(r => r.json().then(j => ({ status: r.status, body: j })))
+    .then(({ status: code, body: d }) => {
+      if (btn) btn.disabled = false;
+      if (!d.ok) {
+        if (d.error === 'no_resume') {
+          status.textContent = '✕ Load a resume first';
+        } else {
+          status.textContent = '✕ ' + (d.error || 'failed');
+        }
+        status.className = 'mt-status err';
+        return;
+      }
+      const ts = new Date().toLocaleTimeString();
+      status.textContent = '✓ ' + d.scored + ' new scored · ' +
+                           (d.results || []).length + ' total · ' + ts;
+      status.className = 'mt-status ok';
+      renderMatches(d.results || []);
+    })
+    .catch(e => {
+      if (btn) btn.disabled = false;
+      status.textContent = '✕ ' + e;
+      status.className = 'mt-status err';
+    });
+};
+
+// ── Render ranked matches ─────────────────────────────────
+function renderMatches(results) {
+  const box = document.getElementById('mt-results');
+  if (!box) return;
+
+  if (!results.length) {
+    box.innerHTML = '<div class="fetch-empty">No matches yet. Load a resume and click Fetch &amp; Score.</div>';
+    return;
+  }
+
+  box.innerHTML = results.map(r => {
+    const matched = (r.matched_required || []).slice(0, 6).map(mtEsc).join(', ');
+    const missing = (r.missing_required || []).slice(0, 6).map(mtEsc).join(', ');
+    return '' +
+      '<div class="match-card">' +
+        '<div class="match-score ' + scoreClass(r.score) + '">' +
+          Math.round(r.score) + '<span class="match-score-pct">%</span>' +
+        '</div>' +
+        '<div class="match-body">' +
+          '<div class="match-title">' + mtEsc(r.title) + '</div>' +
+          '<div class="match-meta">' +
+            mtEsc(r.company || 'Unknown') +
+            (r.location ? ' · ' + mtEsc(r.location) : '') +
+            (r.label ? ' · ' + mtEsc(r.label) : '') +
+          '</div>' +
+          (matched ? '<div class="match-skills"><span class="ok">✓</span> ' + matched + '</div>' : '') +
+          (missing ? '<div class="match-skills"><span class="miss">✗</span> ' + missing + '</div>' : '') +
+          (r.url ? '<a class="job-card-link" href="' + mtEsc(r.url) +
+                   '" target="_blank" rel="noopener">Open posting ↗</a>' : '') +
+        '</div>' +
+      '</div>';
+  }).join('');
+}
+
+// ── Auto-refresh ──────────────────────────────────────────
+window.toggleAutoMatch = function() {
+  const on = document.getElementById('mt-auto').checked;
+  const status = document.getElementById('mt-poll-status');
+
+  if (window._matchPoll) {
+    clearInterval(window._matchPoll);
+    window._matchPoll = null;
+  }
+
+  if (on) {
+    const secs = parseInt(document.getElementById('mt-interval').value, 10) || 300;
+    runMatch();
+    window._matchPoll = setInterval(runMatch, secs * 1000);
+    status.textContent = 'Auto-refresh on (every ' + (secs / 60) + ' min)';
+    status.className = 'mt-status ok';
+  } else {
+    status.textContent = 'Auto-refresh off';
+    status.className = 'mt-status';
+  }
+};
+
+// ── Bind ──────────────────────────────────────────────────
+(function bindMatches() {
+  const file = document.getElementById('mt-file');
+  if (file) {
+    file.addEventListener('change', () => uploadMatchResume(file.files[0]));
+    loadMatchState();
+  } else {
+    setTimeout(bindMatches, 80);
+  }
+})();

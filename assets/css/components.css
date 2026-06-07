@@ -323,6 +323,109 @@
 .set-status.ok  { color: var(--green); }
 .set-status.err { color: var(--red); }
 
+/* ── Job Matches dashboard ── */
+.mt-row {
+  display:     flex;
+  align-items: center;
+  gap:         12px;
+  flex-wrap:   wrap;
+}
+
+.mt-status {
+  font-size:   12px;
+  font-family: 'DM Mono', monospace;
+  color:       var(--t3);
+}
+
+.mt-status.ok  { color: var(--green); }
+.mt-status.err { color: var(--red); }
+
+.mt-auto {
+  display:     flex;
+  align-items: center;
+  gap:         6px;
+  font-size:   13px;
+  color:       var(--t2);
+  cursor:      pointer;
+}
+
+.mt-select {
+  padding:       7px 10px;
+  border-radius: 7px;
+  border:        1.5px solid var(--bd);
+  background:    var(--bg-c);
+  color:         var(--t1);
+  font-family:   'Instrument Sans', sans-serif;
+  font-size:     13px;
+  outline:       none;
+  cursor:        pointer;
+}
+
+.mt-select:focus { border-color: var(--accent); }
+
+.match-card {
+  display:       flex;
+  gap:           16px;
+  align-items:   flex-start;
+  background:    var(--bg-r);
+  border:        1px solid var(--bd);
+  border-radius: 12px;
+  padding:       16px 18px;
+  box-shadow:    var(--sha-s);
+  transition:    border-color .2s, transform .15s;
+}
+
+.match-card:hover {
+  border-color: var(--accent);
+  transform:    translateY(-1px);
+}
+
+.match-score {
+  flex-shrink:     0;
+  width:           64px;
+  height:          64px;
+  border-radius:   12px;
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  font-size:       22px;
+  font-weight:     700;
+  font-family:     'DM Mono', monospace;
+  color:           #fff;
+}
+
+.match-score-pct { font-size: 11px; font-weight: 500; opacity: .85; margin-left: 1px; }
+
+.sc-exc     { background: var(--green); }
+.sc-good    { background: #2563eb; }
+.sc-partial { background: var(--amber); }
+.sc-poor    { background: var(--red); }
+
+.match-body { flex: 1; min-width: 0; }
+
+.match-title {
+  font-size:   15px;
+  font-weight: 700;
+  color:       var(--t1);
+}
+
+.match-meta {
+  font-size:   12px;
+  color:       var(--t2);
+  margin-top:  3px;
+  font-family: 'DM Mono', monospace;
+}
+
+.match-skills {
+  font-size:   12px;
+  color:       var(--t2);
+  margin-top:  7px;
+  line-height: 1.5;
+}
+
+.match-skills .ok   { color: var(--green); font-weight: 700; }
+.match-skills .miss { color: var(--red);   font-weight: 700; }
+
 /* ── JD textarea wrapper ── */
 .jd-wrap { position: relative; }
 
