@@ -52,10 +52,15 @@ def init() -> None:
                 matched_required TEXT,
                 missing_required TEXT,
                 scored_at        TEXT,
-                applied          INTEGER DEFAULT 0
+                applied          INTEGER DEFAULT 0,
+                jd_json          TEXT
             )
             """
         )
+        # Migrate older DBs that predate the jd_json column.
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(matches)").fetchall()]
+        if "jd_json" not in cols:
+            conn.execute("ALTER TABLE matches ADD COLUMN jd_json TEXT")
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS resume (

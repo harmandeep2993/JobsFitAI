@@ -58,6 +58,7 @@ def _score_one(job: Job, resume_json: dict) -> dict | None:
             "matched_required": result.get("matched_required", []),
             "missing_required": result.get("missing_required", []),
             "scored_at":        datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "jd_json":          jd_json,
         }
     except Exception as e:
         logger.error("Scoring failed for '%s': %s", job.title, e)
@@ -117,6 +118,35 @@ def begin_run() -> bool:
 def end_run() -> None:
     """Force-clear the running flag (e.g. after a failure before scoring)."""
     _run_status.update({"running": False, "phase": "idle"})
+
+
+def rescore_all() -> int:
+    """
+    Re-score every stored job against the current resume using the cached
+    JD — local embeddings only, no LLM tokens and no re-fetch. Used when a
+    new resume is loaded.
+
+    Returns the number of jobs re-scored.
+    """
+    resume_json = session.get_resume()
+    if not resume_json:
+        return 0
+
+    rows = match_store.rows_with_jd()
+    count = 0
+    for row in rows:
+        jd = row.get("jd")
+        if not jd:
+            continue
+        try:
+            result = match(resume_json, jd)
+            match_store.update_score(row["id"], result)
+            count += 1
+        except Exception as e:
+            logger.error("Re-score failed for %s: %s", row["id"], e)
+
+    logger.info("Re-scored %d stored jobs against the new resume", count)
+    return count
 
 
 def discover_and_score(jobs: list[Job], entry_only: bool = True) -> dict:

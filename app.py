@@ -32,6 +32,7 @@ from src.parsers import extract_all_text
 from src.extractors.resume import extract_resume
 from src.services.job_matcher import (
     score_new_jobs, discover_and_score, begin_run, end_run, get_run_status,
+    rescore_all,
 )
 from src.services import match_store, role_filter, event_store
 from src.utils.config import (
@@ -249,8 +250,15 @@ async def api_match_resume(request: Request) -> JSONResponse:
         return JSONResponse({"ok": False, "error": "could not parse resume"}, status_code=422)
 
     session.set_resume(resume_json, name)
+
+    # New resume -> re-score existing jobs against it (local embeddings, no tokens).
+    rescored = await run_in_threadpool(rescore_all)
+    if rescored:
+        event_store.log_event("rescore", "", f"{rescored} jobs re-scored vs {name}")
+
     years = resume_json.get("meta", {}).get("total_experience_years", 0)
-    return JSONResponse({"ok": True, "name": name, "experience_years": years})
+    return JSONResponse({"ok": True, "name": name, "experience_years": years,
+                         "rescored": rescored})
 
 
 @ngapp.get("/api/match/run")

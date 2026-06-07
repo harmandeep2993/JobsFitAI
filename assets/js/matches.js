@@ -123,6 +123,13 @@ function uploadMatchResume(file) {
     .then(d => {
       if (!d.ok) throw new Error(d.error || 'extraction failed');
       setResumeStatus(true, d.name + ' · ' + d.experience_years + 'y exp');
+      // New resume re-scores existing jobs — refresh the list to show it.
+      if (typeof loadMatchState === 'function') loadMatchState();
+      const poll = document.getElementById('mt-poll-status');
+      if (poll && d.rescored) {
+        poll.textContent = '✓ re-scored ' + d.rescored + ' jobs against the new resume';
+        poll.className = 'mt-status ok';
+      }
     })
     .catch(e => {
       status.textContent = '✕ ' + e.message;

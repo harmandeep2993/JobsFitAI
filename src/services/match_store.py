@@ -29,21 +29,22 @@ def known_ids() -> set:
 
 
 def upsert(items: list[dict]) -> None:
-    """Insert or update scored items by id."""
+    """Insert or update scored items by id (stores the extracted JD too)."""
     if not items:
         return
 
     sql = """
         INSERT INTO matches
             (id, source, title, company, location, url, language, posted_at,
-             score, label, matched_required, missing_required, scored_at)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+             score, label, matched_required, missing_required, scored_at, jd_json)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         ON CONFLICT(id) DO UPDATE SET
             source=excluded.source, title=excluded.title, company=excluded.company,
             location=excluded.location, url=excluded.url, language=excluded.language,
             posted_at=excluded.posted_at, score=excluded.score, label=excluded.label,
             matched_required=excluded.matched_required,
-            missing_required=excluded.missing_required, scored_at=excluded.scored_at
+            missing_required=excluded.missing_required, scored_at=excluded.scored_at,
+            jd_json=excluded.jd_json
     """
     rows = [
         (
@@ -53,6 +54,7 @@ def upsert(items: list[dict]) -> None:
             json.dumps(it.get("matched_required", [])),
             json.dumps(it.get("missing_required", [])),
             it.get("scored_at"),
+            json.dumps(it.get("jd_json")) if it.get("jd_json") is not None else None,
         )
         for it in items
     ]
@@ -60,10 +62,19 @@ def upsert(items: list[dict]) -> None:
         conn.executemany(sql, rows)
 
 
+# Columns returned to the UI (jd_json is large — excluded).
+_LIST_COLS = (
+    "id, source, title, company, location, url, language, posted_at, "
+    "score, label, matched_required, missing_required, scored_at, applied"
+)
+
+
 def get_all() -> list[dict]:
-    """Return all stored matches, highest score first."""
+    """Return all stored matches (without the bulky jd_json), highest score first."""
     with db.connect() as conn:
-        rows = conn.execute("SELECT * FROM matches ORDER BY score DESC").fetchall()
+        rows = conn.execute(
+            f"SELECT {_LIST_COLS} FROM matches ORDER BY score DESC"
+        ).fetchall()
 
     out = []
     for r in rows:
@@ -72,6 +83,38 @@ def get_all() -> list[dict]:
         d["missing_required"] = json.loads(d.get("missing_required") or "[]")
         out.append(d)
     return out
+
+
+def rows_with_jd() -> list[dict]:
+    """Return [{id, jd}] for every stored job that has a cached JD."""
+    with db.connect() as conn:
+        rows = conn.execute(
+            "SELECT id, jd_json FROM matches WHERE jd_json IS NOT NULL"
+        ).fetchall()
+    out = []
+    for r in rows:
+        try:
+            out.append({"id": r["id"], "jd": json.loads(r["jd_json"])})
+        except (ValueError, TypeError):
+            continue
+    return out
+
+
+def update_score(job_id: str, result: dict) -> None:
+    """Update only the scoring fields for a job (used when re-scoring)."""
+    with db.connect() as conn:
+        conn.execute(
+            """
+            UPDATE matches SET score=?, label=?, matched_required=?, missing_required=?
+            WHERE id=?
+            """,
+            (
+                result.get("overall_score", 0), result.get("label", ""),
+                json.dumps(result.get("matched_required", [])),
+                json.dumps(result.get("missing_required", [])),
+                job_id,
+            ),
+        )
 
 
 def set_applied(job_id: str, applied: bool) -> None:
