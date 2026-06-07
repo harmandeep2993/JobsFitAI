@@ -51,6 +51,8 @@ class Job:
     url: str
     description: str
     language: str
+    id: str = ""        # stable identifier for dedupe (source-specific)
+    source: str = ""    # e.g. "adzuna", "arbeitnow"
 
 
 def _clean_html(raw: str) -> str:
@@ -113,6 +115,8 @@ def _parse_job(raw: dict) -> Job:
         description=description,
         # Prefer the (longer) description for detection; fall back to title.
         language=_detect_language(description or title),
+        id=str(raw.get("id", "")),
+        source="adzuna",
     )
 
 

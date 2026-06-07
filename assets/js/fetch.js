@@ -22,6 +22,11 @@ window.showView = function(name) {
     .forEach(el => el.classList.remove('active'));
   const nav = document.getElementById('nav-' + name);
   if (nav) nav.classList.add('active');
+
+  // Refresh the matches dashboard when its tab is opened.
+  if (name === 'matches' && typeof window.loadMatchState === 'function') {
+    window.loadMatchState();
+  }
 };
 
 // ── Fetch jobs ────────────────────────────────────────────

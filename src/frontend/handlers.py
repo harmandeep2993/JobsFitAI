@@ -148,6 +148,42 @@ def register_page():
         <div class="fetch-results" id="fetch-results" style="display:none;"></div>
       </div><!-- /view-jobsearch -->
 
+      <div id="view-matches" class="view" style="display:none;">
+        <div class="pg-title">Job <em>Matches</em></div>
+        <div class="pg-sub">Load your resume once, then fetch German jobs (full descriptions via Arbeitnow) and score each against it</div>
+
+        <div class="divider"></div>
+
+        <div class="content-card">
+          <input type="file" id="mt-file" accept=".pdf,.docx,.doc" style="display:none;"/>
+          <div class="mt-row">
+            <button class="btn-ghost" id="mt-upload-btn"
+              onclick="document.getElementById('mt-file').click()">📄 Load Resume</button>
+            <span class="mt-status" id="mt-resume-status">No resume loaded</span>
+          </div>
+
+          <div class="jd-fetch" style="margin-top:16px;">
+            <input id="mt-query" class="fetch-inp" placeholder="Role e.g. python developer"/>
+            <input id="mt-loc" class="fetch-inp fetch-inp-sm" placeholder="Location e.g. berlin"/>
+            <button class="btn-primary" id="mt-run-btn" onclick="runMatch()">&rarr; Fetch &amp; Score</button>
+          </div>
+
+          <div class="mt-row" style="margin-top:14px;">
+            <label class="mt-auto">
+              <input type="checkbox" id="mt-auto" onchange="toggleAutoMatch()"/> Auto-refresh every
+            </label>
+            <select id="mt-interval" class="mt-select">
+              <option value="60">1 min</option>
+              <option value="300" selected>5 min</option>
+              <option value="900">15 min</option>
+            </select>
+            <span class="mt-status" id="mt-poll-status"></span>
+          </div>
+        </div>
+
+        <div class="fetch-results" id="mt-results"></div>
+      </div><!-- /view-matches -->
+
       <div id="view-settings" class="view" style="display:none;">
         <div class="pg-title">LLM <em>Settings</em></div>
         <div class="pg-sub">Choose the provider and model used for extraction, matching, and summaries</div>
@@ -191,7 +227,7 @@ def register_page():
     """)
 
     # JS assets
-    for js in ["theme", "upload", "analysis", "fetch", "settings"]:
+    for js in ["theme", "upload", "analysis", "fetch", "settings", "matches"]:
         ui.add_body_html(
             f'<script src="/assets/js/{js}.js?v={_asset_ver(f"assets/js/{js}.js")}"></script>'
         )

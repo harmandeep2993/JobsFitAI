@@ -9,6 +9,7 @@ Responsibilities:
 - Start the NiceGUI server
 """
 
+import os
 import tempfile
 from pathlib import Path
 from typing import Set
@@ -20,9 +21,13 @@ from starlette.responses  import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
 from src.frontend.handlers import register_page
-from src.fetchers import fetch_adzuna_jobs
+from src.fetchers import fetch_adzuna_jobs, fetch_arbeitnow_jobs
 from src.utils import session
 from src.utils.router import check_llm
+from src.parsers import extract_all_text
+from src.extractors.resume import extract_resume
+from src.services.job_matcher import score_new_jobs
+from src.services import match_store
 
 
 ngapp.add_static_files('/assets', 'assets')
@@ -199,6 +204,93 @@ async def api_set_llm_settings(request: Request) -> JSONResponse:
         "current": session.get_settings(),
         "online":  online,
     })
+
+
+# Job Matches API
+@ngapp.post("/api/match/resume")
+async def api_match_resume(request: Request) -> JSONResponse:
+    """
+    Parse + extract an uploaded resume and store it for matching.
+
+    Body: {"tmp": <temp path from /api/upload>, "name": <original filename>}
+    """
+    body = await request.json()
+    tmp  = (body.get("tmp") or "").strip()
+    name = (body.get("name") or "resume").strip()
+
+    if not tmp or not os.path.exists(tmp):
+        return JSONResponse({"ok": False, "error": "resume file not found"}, status_code=400)
+
+    def _process() -> dict:
+        text = extract_all_text(tmp)
+        if not text or len(text) < 50:
+            return {}
+        return extract_resume(text)
+
+    resume_json = await run_in_threadpool(_process)
+    try:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+    except OSError:
+        pass
+
+    if not resume_json:
+        return JSONResponse({"ok": False, "error": "could not parse resume"}, status_code=422)
+
+    session.set_resume(resume_json, name)
+    years = resume_json.get("meta", {}).get("total_experience_years", 0)
+    return JSONResponse({"ok": True, "name": name, "experience_years": years})
+
+
+@ngapp.get("/api/match/run")
+async def api_match_run(request: Request) -> JSONResponse:
+    """
+    Fetch jobs from Arbeitnow and score the resume against any new ones.
+
+    Query: query, location, limit. Returns the full ranked result set.
+    """
+    if not session.has_resume():
+        return JSONResponse(
+            {"ok": False, "error": "no_resume", "results": match_store.get_all()},
+            status_code=400,
+        )
+
+    params   = request.query_params
+    query    = (params.get("query") or "").strip()
+    location = (params.get("location") or "").strip()
+    try:
+        limit = max(1, min(int(params.get("limit", 15)), 40))
+    except ValueError:
+        limit = 15
+
+    def _run() -> dict:
+        jobs = fetch_arbeitnow_jobs(query=query, location=location, limit=limit)
+        return score_new_jobs(jobs)
+
+    outcome = await run_in_threadpool(_run)
+    return JSONResponse({
+        "ok":      True,
+        "scored":  outcome.get("scored", 0),
+        "results": outcome.get("results", []),
+    })
+
+
+@ngapp.get("/api/match/state")
+async def api_match_state() -> JSONResponse:
+    """Return current resume status and the stored ranked matches."""
+    return JSONResponse({
+        "ok":          True,
+        "has_resume":  session.has_resume(),
+        "resume_name": session.get_resume_name(),
+        "results":     match_store.get_all(),
+    })
+
+
+@ngapp.post("/api/match/clear")
+async def api_match_clear() -> JSONResponse:
+    """Clear all stored matches."""
+    match_store.clear()
+    return JSONResponse({"ok": True})
 
 
 # Main UI Page

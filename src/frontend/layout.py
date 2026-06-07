@@ -32,7 +32,7 @@ def render_sidebar():
       <div class="sb-sec">Navigation</div>
       <div class="sb-item active" id="nav-analyzer" onclick="showView('analyzer')">🎯 Analyzer</div>
       <div class="sb-item" id="nav-jobsearch" onclick="showView('jobsearch')">🔎 Job Search</div>
-      <div class="sb-item">📊 History</div>
+      <div class="sb-item" id="nav-matches" onclick="showView('matches')">📈 Job Matches</div>
       <div class="sb-item" id="nav-settings" onclick="showView('settings')">⚙️ Settings</div>
       <div class="sb-rule"></div>
       <div class="sb-sec">About</div>
