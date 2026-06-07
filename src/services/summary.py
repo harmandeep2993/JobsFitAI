@@ -1,4 +1,4 @@
-# src/extractor/ssummary.py
+# src/services/summary.py
 # Generates a concise candidate summary using LLM
 # Called after scoring — uses score data for accurate narrative
 
@@ -19,37 +19,42 @@ def generate_summary(resume_json, jd_json, results):
     Returns:
         str: 3-4 sentence summary or fallback text
     """
-    # Build focused context — no raw text, only structured data
+    # Build focused context — no raw text, only structured data.
+    # Keys must match match() output (overall_score, section_scores,
+    # matched_*/missing_*) and the resume/jd JSON schemas (nested
+    # candidate/job objects, meta.total_experience_years).
+    candidate_years = resume_json.get("meta", {}).get("total_experience_years", 0)
+    section_scores  = results.get("section_scores", {})
+
     context = {
-        "score":            results.get("final_score", 0),
+        "score":            results.get("overall_score", 0),
         "label":            results.get("label", ""),
         "matched_skills":   results.get("matched_required", []),
-        "missing_skills" :  results.get("missing_required", []),
-        "matched_pref" :    results.get("matched_preferred", []),
+        "missing_skills":   results.get("missing_required", []),
+        "matched_pref":     results.get("matched_preferred", []),
         "missing_pref":     results.get("missing_preferred", []),
-        "candidate_years":  results.get("candidate_years", 0),
-        "required_years":   results.get("required_years", 0),
+        "candidate_years":  candidate_years,
+        "required_years":   0,  # JD schema has no explicit required-years field
         "breakdown": {
-            "required_skills":  results.get("scores", {}).get("required_skills", 0),
-            "responsibilities": results.get("scores", {}).get("responsibilities", 0),
-            "experience":       results.get("scores", {}).get("experience", 0),
-            "education":        results.get("scores", {}).get("education", 0),
+            "required_skills":  section_scores.get("required_skills", 0),
+            "responsibilities": section_scores.get("responsibilities", 0),
+            "experience":       section_scores.get("experience", 0),
+            "education":        section_scores.get("education", 0),
         },
         "candidate": {
-            "title": resume_json.get("current_title", ""),
-            "years": resume_json.get("total_years_experience", 0),
+            "title": resume_json.get("candidate", {}).get("title", ""),
+            "years": candidate_years,
             "education": [
                 f"{e.get('degree','')} {e.get('field','')}"
                 for e in resume_json.get("education", [])
             ],
             "languages": resume_json.get("languages", []),
-            "skills":    _flatten_skills(resume_json.get("skills", {})),
+            "skills":    _flatten_skills(resume_json.get("skills", [])),
         },
         "role": {
-            "title":           jd_json.get("job_title", "this role"),
+            "title":           jd_json.get("job", {}).get("title", "this role"),
             "required_skills": jd_json.get("required_skills", []),
-            "required_years":  jd_json.get("required_years_experience", 0),
-            "required_edu":    jd_json.get("required_education", {}),
+            "required_edu":    jd_json.get("education_requirements", []),
         },
     }
 

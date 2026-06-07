@@ -39,29 +39,31 @@ def _get_jd_schema() -> str:
 
 
 def get_jd_prompt(jd_text: str) -> str:
-    """
-    Build extraction prompt for a job description.
-
-    Args:
-        jd_text (str): Raw job description text
-
-    Returns:
-        str: Final prompt string ready for LLM
-    """
     schema_text = _get_jd_schema()
 
-    prompt = f"""Extract structured information from the job description below.
-Return JSON matching the schema exactly.
-Do not infer or add information not explicitly stated.
-If a field is missing use empty string, empty list, or 0 as appropriate.
+    prompt = f"""Extract job description data into this JSON schema. Follow all rules strictly.
 
-Schema:
-{schema_text}
+    RULES:
+    1. Return ONLY valid JSON. No markdown, no explanation, no extra text.
+    2. JD may be in any language — extract and return ALL values in English.
+    3. required_skills: ALL skills, tools, technologies, competencies marked as required or essential. Split compound entries into individual items (e.g. "Python incl. Pydantic-AI, LangGraph" → ["python", "pydantic-ai", "langgraph"]).
+    4. preferred_skills: bonus, nice-to-have, or optional skills only.
+    5. responsibilities: split into individual action items. Translate to English.
+    6. experience_requirements: explicit statements only. Empty list if none stated.
+    7. education_requirements: explicit statements only. Empty list if none stated.
+    8. work_mode: remote|hybrid|on-site|not specified
+    9. employment_type: full-time|part-time|contract|internship|not specified
+    10. job_level: junior|mid-level|senior|lead|not specified
+    11. job_summary: 1-2 sentences describing the ROLE and KEY RESPONSIBILITIES only. Not the company intro. Write in English.
+    12. Missing fields → empty string, empty list, or 0.
 
-Job Description:
-{jd_text}
+    SCHEMA:
+    {schema_text}
 
-JSON:"""
+    JOB DESCRIPTION:
+    {jd_text}
+
+    JSON:"""
 
     logger.info("JD length: %d characters", len(jd_text))
     logger.info("JD prompt length: %d characters", len(prompt))

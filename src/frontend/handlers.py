@@ -9,9 +9,22 @@ from nicegui import ui
 from src.parsers import extract_all_text
 from src.extractors import extract_all
 from src.utils.router import check_llm
-from src.matcher import get_match_score
+from src.matcher.matcher import match
 from src.frontend.components import make_steps
-from src.frontend.results import render_results
+from src.frontend.results import build_results_html
+
+
+def _asset_ver(rel_path: str) -> int:
+    """
+    Cache-busting token derived from a file's modified time.
+
+    Appended as ?v=... to asset URLs so the browser refetches CSS/JS as
+    soon as the file changes — no manual hard-refresh needed.
+    """
+    try:
+        return int(os.path.getmtime(rel_path))
+    except OSError:
+        return 0
 
 
 def safe_js(code: str):
@@ -32,12 +45,11 @@ def register_page():
     from src.frontend.layout import render_shell, TELEPORT_JS
 
     llm_ok = check_llm()
-    assets = Path("assets")
 
     # CSS
     for css in ["theme", "layout", "components", "results"]:
         ui.add_head_html(
-            f'<link rel="stylesheet" href="/assets/css/{css}.css">'
+            f'<link rel="stylesheet" href="/assets/css/{css}.css?v={_asset_ver(f"assets/css/{css}.css")}">'
         )
 
     # Fonts
@@ -48,10 +60,12 @@ def register_page():
     # Shell
     ui.add_body_html(render_shell(llm_ok))
 
-    # Inject ALL main content directly into body — bypasses NiceGUI sanitizer
+    # Main content
     steps_html = make_steps(1)
     ui.add_body_html(f"""
     <div id="ng-main-content">
+
+      <div id="view-analyzer" class="view">
       <div class="pg-title">AI Resume <em>Matcher</em></div>
       <div class="pg-sub">Upload a resume and paste a job description to get a semantic match score</div>
 
@@ -63,7 +77,6 @@ def register_page():
         <input type="file" id="file-input" accept=".pdf,.docx,.doc" style="display:none;"/>
         <div class="two-col">
 
-          <!-- Resume upload — left, narrow (1fr) -->
           <div>
             <div class="sec-lbl-row">
               <div class="sec-lbl">Resume File</div>
@@ -85,7 +98,6 @@ def register_page():
             </div>
           </div>
 
-          <!-- JD textarea — right, wide (2fr) -->
           <div>
             <div class="sec-lbl-row">
               <div class="sec-lbl">Job Description</div>
@@ -115,19 +127,113 @@ def register_page():
 
       <div class="divider"></div>
       <div id="jf-results" style="display:none;"></div>
+      </div><!-- /view-analyzer -->
+
+      <div id="view-jobsearch" class="view" style="display:none;">
+        <div class="pg-title">Job <em>Search</em></div>
+        <div class="pg-sub">Search live job postings from Adzuna</div>
+
+        <div class="divider"></div>
+
+        <div class="content-card">
+          <div class="jd-fetch">
+            <input id="fetch-query" class="fetch-inp"
+              placeholder="Role e.g. machine learning engineer"/>
+            <input id="fetch-loc" class="fetch-inp fetch-inp-sm"
+              placeholder="Location"/>
+            <button class="btn-primary fetch-btn" id="fetch-btn" onclick="fetchJobs()">&rarr; Fetch Jobs</button>
+          </div>
+        </div>
+
+        <div class="fetch-results" id="fetch-results" style="display:none;"></div>
+      </div><!-- /view-jobsearch -->
+
+      <div id="view-matches" class="view" style="display:none;">
+        <div class="pg-title">Job <em>Matches</em></div>
+        <div class="pg-sub">Load your resume once, then fetch German jobs (full descriptions via Arbeitnow) and score each against it</div>
+
+        <div class="divider"></div>
+
+        <div class="content-card">
+          <input type="file" id="mt-file" accept=".pdf,.docx,.doc" style="display:none;"/>
+          <div class="mt-row">
+            <button class="btn-ghost" id="mt-upload-btn"
+              onclick="document.getElementById('mt-file').click()">📄 Load Resume</button>
+            <span class="mt-status" id="mt-resume-status">No resume loaded</span>
+          </div>
+
+          <div class="jd-fetch" style="margin-top:16px;">
+            <input id="mt-query" class="fetch-inp" placeholder="Role e.g. python developer"/>
+            <input id="mt-loc" class="fetch-inp fetch-inp-sm" placeholder="Location e.g. berlin"/>
+            <button class="btn-primary" id="mt-run-btn" onclick="runMatch()">&rarr; Fetch &amp; Score</button>
+          </div>
+
+          <div class="mt-row" style="margin-top:14px;">
+            <label class="mt-auto">
+              <input type="checkbox" id="mt-auto" onchange="toggleAutoMatch()"/> Auto-refresh every
+            </label>
+            <select id="mt-interval" class="mt-select">
+              <option value="60">1 min</option>
+              <option value="300" selected>5 min</option>
+              <option value="900">15 min</option>
+            </select>
+            <span class="mt-status" id="mt-poll-status"></span>
+          </div>
+        </div>
+
+        <div class="fetch-results" id="mt-results"></div>
+      </div><!-- /view-matches -->
+
+      <div id="view-settings" class="view" style="display:none;">
+        <div class="pg-title">LLM <em>Settings</em></div>
+        <div class="pg-sub">Choose the provider and model used for extraction, matching, and summaries</div>
+
+        <div class="divider"></div>
+
+        <div class="content-card">
+          <div class="set-row">
+            <label class="set-lbl">Provider</label>
+            <div class="dd" id="dd-provider">
+              <button class="dd-btn" type="button" onclick="ddToggle(event,'provider')">
+                <span class="dd-val" id="dd-provider-val">—</span>
+                <span class="dd-arrow">▾</span>
+              </button>
+              <div class="dd-menu" id="dd-provider-menu"></div>
+            </div>
+          </div>
+          <div class="set-row">
+            <label class="set-lbl">Model</label>
+            <div class="dd" id="dd-model">
+              <button class="dd-btn" type="button" onclick="ddToggle(event,'model')">
+                <span class="dd-val" id="dd-model-val">—</span>
+                <span class="dd-arrow">▾</span>
+              </button>
+              <div class="dd-menu" id="dd-model-menu"></div>
+            </div>
+          </div>
+          <div class="set-row">
+            <label class="set-lbl">Custom model</label>
+            <input id="set-model-custom" class="fetch-inp"
+              placeholder="Optional — type a model id to override the dropdown"/>
+          </div>
+          <div class="set-actions">
+            <button class="btn-primary" id="set-apply" onclick="applySettings()">Apply</button>
+            <span class="set-status" id="set-status"></span>
+          </div>
+        </div>
+      </div><!-- /view-settings -->
+
     </div>
     """)
 
     # JS assets
-    for js in ["theme", "upload", "analysis"]:
+    for js in ["theme", "upload", "analysis", "fetch", "settings", "matches"]:
         ui.add_body_html(
-            f'<script src="/assets/js/{js}.js"></script>'
+            f'<script src="/assets/js/{js}.js?v={_asset_ver(f"assets/js/{js}.js")}"></script>'
         )
 
-    # Teleport last
     ui.add_body_html(TELEPORT_JS)
 
-    # Results rendered via JS injection — no NiceGUI element needed
     def on_file_uploaded():
         safe_js(f"""
         var s = document.querySelector('.steps');
@@ -186,10 +292,10 @@ def register_page():
                 return
 
             safe_js('document.getElementById("spin-text").innerText="Calculating match score...";')
-            results = get_match_score(resume_json, jd_json)
+            results = match(resume_json, jd_json)
 
             safe_js('document.getElementById("spin-text").innerText="Generating summary...";')
-            from src.extractors.summary import generate_summary
+            from src.services.summary import generate_summary
             summary = await asyncio.get_event_loop().run_in_executor(
                 None, lambda: generate_summary(resume_json, jd_json, results)
             )
@@ -199,12 +305,9 @@ def register_page():
             if(s) s.outerHTML = `{make_steps(4)}`;
             """)
 
-            # Build results HTML and inject via JS
-            from src.frontend.results import build_results_html
             html = build_results_html(results, resume_json, jd_json, summary)
-
-            # Escape for JS template literal
             html_escaped = html.replace('\\', '\\\\').replace('`', '\\`').replace('$', '\\$')
+
             safe_js(f"""
             var r = document.getElementById('jf-results');
             if(r) {{
@@ -213,15 +316,14 @@ def register_page():
             }}
             """)
 
-            # Inject tab switching function AFTER innerHTML — scripts in innerHTML don't execute
             safe_js("""
             window.jfTab = function(el, panelId) {
-                document.querySelectorAll('#jf-tab-row .tab-item').forEach(function(t) {{
+                document.querySelectorAll('#jf-tab-row .tab-item').forEach(function(t) {
                     t.classList.remove('active');
-                }});
-                document.querySelectorAll('.jf-panel').forEach(function(p) {{
+                });
+                document.querySelectorAll('.jf-panel').forEach(function(p) {
                     p.style.display = 'none';
-                }});
+                });
                 el.classList.add('active');
                 var panel = document.getElementById(panelId);
                 if (panel) panel.style.display = 'block';

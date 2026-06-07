@@ -1,31 +1,94 @@
 # config.example.yaml
-# Copy this to config.yaml and fill in your values
+# Copy this to config.yaml and adjust values.
+# API keys are loaded from .env — do not hardcode keys here.
+# The active provider/model can also be changed at runtime from the
+# Settings tab in the UI (in-memory; resets to these defaults on restart).
 
-llm:
-  provider:    "ollama"       # ollama | openai | groq
-  model:       "qwen2.5:3b"  # see provider options above
-  api_key:     ""             # or set LLM_API_KEY in .env
-  timeout:     60
-  temperature: 0.2
-  max_tokens:  500
 
-ollama:
+# Common LLM parameters
+llm_config:
+  timeout:                60
+  temperature:            0.0
+  resume_max_input_chars: 10000
+  jd_max_input_chars:     5000
+  max_output_tokens:      2000
+
+
+# OpenAI
+openai_provider:
+  provider_name: "openai"
+  url:   "https://api.openai.com/v1/chat/completions"
+  model: "gpt-4o-mini"
+  models:
+    - "gpt-4o-mini"
+    - "gpt-5-mini"
+    - "gpt-5-nano"
+
+
+# Groq
+groq_provider:
+  provider_name: "groq"
+  url:   "https://api.groq.com/openai/v1/chat/completions"
+  model: "llama-3.1-8b-instant"
+  models:
+    - "llama-3.1-8b-instant"
+    - "llama-3.3-70b-versatile"
+    - "openai/gpt-oss-20b"
+
+
+# Gemini
+gemini_provider:
+  provider_name: "gemini"
+  url:   "https://generativelanguage.googleapis.com/v1beta2/models/{model}:generateContent"
+  model: "gemini-1.5-pro"
+
+
+# HuggingFace
+huggingface_provider:
+  provider_name: "huggingface"
+  url:   "https://api-inference.huggingface.co/models/{model}"
+  model: "meta-llama/Llama-3.1-8B-Instruct"
+
+
+# Ollama — local only, no API key required
+ollama_provider:
+  provider_name: "ollama"
   url:        "http://localhost:11434/api/generate"
   health_url: "http://localhost:11434"
+  model:      "qwen2.5:3b"
+  models:
+    - "qwen2.5:3b"
+    - "llama3.2"
+    - "phi3"
 
-extractor:
-  resume_max_chars: 10000
-  jd_max_chars:     5000
 
+# Parser
+parser:
+  min_text_parser_limit: 250
+
+
+# Validator
+validator:
+  max_file_size_mb:     10
+  supported_extensions: [".pdf", ".docx", ".txt"]
+
+
+# Matcher
 matcher:
   weights:
-    required_skills:   0.50
-    responsibilities:  0.20
-    experience:        0.10
+    required_skills:   0.35
+    responsibilities:  0.22
+    experience:        0.15
     education:         0.10
-    preferred_skills:  0.05
+    preferred_skills:  0.08
     languages:         0.05
+    certifications:    0.05
   thresholds:
     excellent: 80
     good:      60
     partial:   40
+
+
+# Logging
+logging:
+  level: "INFO"   # DEBUG | INFO | WARNING | ERROR

@@ -3,8 +3,11 @@
 Configuration loader for JobFitAI.
 
 Loads configuration from:
-1. config.yaml
-2. environment variables (.env)
+    1. config.yaml — static provider configs, weights, limits
+    2. .env — API keys (never hardcode in config.yaml)
+
+Provider selection and API key are set at runtime via UI
+through src/utils/session.py — not from this file.
 
 The configuration is loaded once when the module is imported
 and exposed as constants across the application.
@@ -15,18 +18,16 @@ import yaml
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Load .env file before reading env vars
-# .env sits in project root next to config.yaml
-load_dotenv()
+import logging
+_logger = logging.getLogger(__name__)
+
+status = load_dotenv()
+_logger.info("Loaded .env file: %s", "success" if status else "not found")
 
 
-def load_config(config_path="config.yaml"):
+def load_config(config_path: str = "config.yaml") -> dict:
     """
-    Load configuration from yaml file.
-
-    Parameters:
-        config_path : str
-        Path to config.yaml.
+    Load and return configuration from YAML file.
 
     Args:
         config_path (str): Path to config.yaml
@@ -35,10 +36,9 @@ def load_config(config_path="config.yaml"):
         dict: Parsed configuration dictionary
 
     Raises:
-        FileNotFoundError: If config file not found.
-        ValueError: If config file is invalid or empty.
+        FileNotFoundError: If config file not found
+        ValueError: If config file is invalid or empty
     """
-
     path = Path(config_path)
 
     if not path.exists():
@@ -54,49 +54,50 @@ def load_config(config_path="config.yaml"):
         if not config:
             raise ValueError("Config file is empty")
 
+        _logger.info("Loaded config from %s", config_path)
         return config
 
     except yaml.YAMLError as e:
         raise ValueError(f"Invalid config.yaml: {e}")
 
 
-# Load configuration once when module is imported
 config = load_config()
 
-# LLM Configuration
-LLM_PROVIDER    = config["llm"]["provider"]
-LLM_MODEL       = config["llm"]["model"]
+# Common LLM parameters
+_llm = config["llm_config"]
 
-# API key priority:
-# 1. config.yaml
-# 2. environment variable (LLM_API_KEY)
-LLM_API_KEY = config["llm"].get("api_key") or os.getenv("LLM_API_KEY", "")
+LLM_TIMEOUT            = _llm["timeout"]
+LLM_TEMPERATURE        = _llm["temperature"]
+LLM_MAX_OUTPUT_TOKENS  = _llm["max_output_tokens"]
+RESUME_MAX_CHARS       = _llm["resume_max_input_chars"]
+JD_MAX_CHARS           = _llm["jd_max_input_chars"]
 
-LLM_TIMEOUT     = config["llm"]["timeout"]
-LLM_TEMPERATURE = config["llm"]["temperature"]
-LLM_MAX_TOKENS  = config["llm"]["max_tokens"]
+# Provider configs
+OPENAI_CONFIG      = config["openai_provider"]
+GROQ_CONFIG        = config["groq_provider"]
+GEMINI_CONFIG      = config["gemini_provider"]
+HUGGINGFACE_CONFIG = config["huggingface_provider"]
+OLLAMA_CONFIG      = config["ollama_provider"]
 
-# Ollama Configuration
-OLLAMA_URL        = config["ollama"]["url"]
-OLLAMA_HEALTH_URL = config["ollama"]["health_url"]
+# All providers indexed by name
+PROVIDER_CONFIGS = {
+    "openai":      OPENAI_CONFIG,
+    "groq":        GROQ_CONFIG,
+    "gemini":      GEMINI_CONFIG,
+    "huggingface": HUGGINGFACE_CONFIG,
+    "ollama":      OLLAMA_CONFIG,
+}
 
-# Parser Limit
-# Check if the text is extracted from pdf
+# Parser
 MIN_TEXT_LIMIT = config["parser"]["min_text_parser_limit"]
 
-# Validator constants
+# Validator
 MAX_FILE_SIZE_MB = config["validator"]["max_file_size_mb"]
 SUPPORTED_EXTENSIONS = set(config["validator"]["supported_extensions"])
 
-# Extractor Limits
-RESUME_MAX_CHARS = config["extractor"]["resume_max_chars"]
-JD_MAX_CHARS     = config["extractor"]["jd_max_chars"]
-
-# Matcher Configuration
-WEIGHTS    = config["matcher"]["weights"]
+# Matcher
+WEIGHTS = config["matcher"]["weights"]
 THRESHOLDS = config["matcher"]["thresholds"]
 
 # Logging
-# Controls console log level — DEBUG | INFO | WARNING | ERROR
-# File handler always logs DEBUG and above regardless of this setting
-LOG_LEVEL = config.get("logging", {}).get("level")
+LOG_LEVEL = config.get("logging", {}).get("level", "INFO")
