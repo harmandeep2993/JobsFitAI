@@ -10,6 +10,7 @@ Each job costs one JD-extraction LLM call; the resume is extracted once
 from datetime import datetime, timezone
 
 from src.fetchers import Job
+from src.fetchers.enrich import fetch_full_description
 from src.extractors.jd import extract_jd
 from src.matcher import match
 from src.utils import session
@@ -17,6 +18,20 @@ from src.services import match_store
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+# Below this length an Adzuna description is just a snippet — fetch the full JD.
+_SNIPPET_LIMIT = 1200
+
+
+def _enrich(job: Job) -> None:
+    """Replace a thin Adzuna snippet with the full JD from its detail page."""
+    if job.source != "adzuna" or len(job.description) >= _SNIPPET_LIMIT:
+        return
+    full = fetch_full_description(job.url)
+    if full and len(full) > len(job.description):
+        logger.info("Enriched '%s': %d -> %d chars",
+                    job.title[:40], len(job.description), len(full))
+        job.description = full
 
 
 def _score_one(job: Job, resume_json: dict) -> dict | None:
@@ -66,7 +81,12 @@ def score_new_jobs(jobs: list[Job]) -> dict:
     new_jobs = [j for j in jobs if j.id and j.id not in seen]
     logger.info("Scoring %d new jobs (of %d fetched)", len(new_jobs), len(jobs))
 
-    scored = [item for job in new_jobs if (item := _score_one(job, resume_json))]
+    scored = []
+    for job in new_jobs:
+        _enrich(job)                       # fetch full JD (snippet -> full text)
+        item = _score_one(job, resume_json)
+        if item:
+            scored.append(item)
     match_store.upsert(scored)
 
     return {
