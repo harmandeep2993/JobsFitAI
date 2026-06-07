@@ -412,17 +412,11 @@
 
 .match-score-pct { font-size: 10px; font-weight: 500; opacity: .85; margin-left: 1px; }
 
+/* Badge colors match the label scheme: 🟢 excellent, 🟡 good, 🟠 partial, 🔴 poor */
 .sc-exc     { background: var(--green); }
-.sc-good    { background: #2563eb; }
-.sc-partial { background: var(--amber); }
+.sc-good    { background: #ca8a04; }   /* amber/yellow */
+.sc-partial { background: #ea580c; }   /* orange */
 .sc-poor    { background: var(--red); }
-
-.match-label {
-  font-size:   11px;
-  color:       var(--t3);
-  font-family: 'DM Mono', monospace;
-  text-align:  right;
-}
 
 .match-title {
   font-size:   14px;

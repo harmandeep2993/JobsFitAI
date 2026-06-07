@@ -10,7 +10,13 @@ function mtEsc(s) {
                   .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-function scoreClass(score) {
+// Badge color follows the match label (falls back to score thresholds).
+function labelClass(label, score) {
+  const l = (label || '').toLowerCase();
+  if (l.includes('excellent')) return 'sc-exc';
+  if (l.includes('good'))      return 'sc-good';
+  if (l.includes('partial'))   return 'sc-partial';
+  if (l.includes('poor'))      return 'sc-poor';
   if (score >= 80) return 'sc-exc';
   if (score >= 60) return 'sc-good';
   if (score >= 40) return 'sc-partial';
@@ -146,10 +152,9 @@ function renderMatches(results) {
     return '' +
       '<div class="match-card">' +
         '<div class="match-top">' +
-          '<div class="match-score ' + scoreClass(r.score) + '">' +
+          '<div class="match-score ' + labelClass(r.label, r.score) + '">' +
             Math.round(r.score) + '<span class="match-score-pct">%</span>' +
           '</div>' +
-          (r.label ? '<span class="match-label">' + mtEsc(r.label) + '</span>' : '') +
         '</div>' +
         '<div class="match-title">' + mtEsc(r.title) + '</div>' +
         '<div class="match-meta">' +
