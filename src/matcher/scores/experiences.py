@@ -163,14 +163,24 @@ def score_experience(resume: dict, jd: dict) -> float:
             logger.warning("No explicit requirements and no relevant experience — returning 20")
             return 20.0
 
-    # Build candidate text from relevant entries only
+    # Build candidate text from the relevant entries. If the relevance
+    # filter excluded everything, fall back to ALL entries rather than
+    # zeroing the score — a candidate with real experience should still be
+    # scored against the requirements, not penalized for a strict pre-filter.
+    scoring_entries = relevant_entries or experience_entries
+    if not relevant_entries:
+        logger.info(
+            "No entries passed the relevance filter — scoring all %d entries instead",
+            len(experience_entries)
+        )
+
     candidate_text = " ".join([
         _build_entry_text(entry)
-        for entry in relevant_entries
+        for entry in scoring_entries
     ]).strip()
 
     if not candidate_text:
-        logger.warning("Relevant entries produced no text")
+        logger.warning("No experience text available to score")
         return 0.0
 
     requirements_text = " ".join(experience_requirements).strip()
