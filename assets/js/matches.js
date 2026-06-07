@@ -45,7 +45,7 @@ window.loadMatchState = function() {
       if (!d.ok) return;
       setResumeStatus(d.has_resume, d.resume_name);
       renderFilters(d.filters);
-      renderMatches(d.results || []);
+      renderMatches(d.results || [], new Set());
     })
     .catch(() => {});
 };
@@ -152,7 +152,7 @@ window.runMatch = function() {
                            ' new scored · ' + (d.results || []).length +
                            ' total · ' + ts;
       status.className = 'mt-status ok';
-      renderMatches(d.results || []);
+      renderMatches(d.results || [], new Set(d.new_ids || []));
     })
     .catch(e => {
       if (btn) btn.disabled = false;
@@ -162,25 +162,36 @@ window.runMatch = function() {
 };
 
 // ── Render ranked matches ─────────────────────────────────
-function renderMatches(results) {
+function renderMatches(results, newIds) {
   const box = document.getElementById('mt-results');
   if (!box) return;
+  newIds = newIds || new Set();
 
   if (!results.length) {
     box.innerHTML = '<div class="fetch-empty">No matches yet. Load a resume and click Fetch &amp; Score.</div>';
     return;
   }
 
-  box.innerHTML = results.map(r => {
+  // New jobs first, then by score within each group.
+  const ordered = results.slice().sort((a, b) => {
+    const an = newIds.has(a.id) ? 1 : 0;
+    const bn = newIds.has(b.id) ? 1 : 0;
+    if (an !== bn) return bn - an;
+    return (b.score || 0) - (a.score || 0);
+  });
+
+  box.innerHTML = ordered.map(r => {
+    const isNew   = newIds.has(r.id);
     const matched = (r.matched_required || []).slice(0, 5).map(mtEsc).join(', ');
     const missing = (r.missing_required || []).slice(0, 5).map(mtEsc).join(', ');
     const posted  = relTime(r.posted_at);
     return '' +
-      '<div class="match-card">' +
+      '<div class="match-card' + (isNew ? ' is-new' : '') + '">' +
         '<div class="match-top">' +
           '<div class="match-score ' + labelClass(r.label, r.score) + '">' +
             Math.round(r.score) + '<span class="match-score-pct">%</span>' +
           '</div>' +
+          (isNew ? '<span class="match-new">✨ NEW</span>' : '') +
         '</div>' +
         '<div class="match-title">' + mtEsc(r.title) + '</div>' +
         '<div class="match-meta">' +

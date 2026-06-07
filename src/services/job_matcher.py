@@ -69,4 +69,8 @@ def score_new_jobs(jobs: list[Job]) -> dict:
     scored = [item for job in new_jobs if (item := _score_one(job, resume_json))]
     match_store.upsert(scored)
 
-    return {"scored": len(scored), "results": match_store.get_all()}
+    return {
+        "scored":  len(scored),
+        "new_ids": [s["id"] for s in scored],
+        "results": match_store.get_all(),
+    }

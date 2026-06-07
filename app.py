@@ -285,6 +285,7 @@ async def api_match_run(request: Request) -> JSONResponse:
         "ok":      True,
         "found":   outcome.get("found", 0),
         "scored":  outcome.get("scored", 0),
+        "new_ids": outcome.get("new_ids", []),
         "results": outcome.get("results", []),
     })
 

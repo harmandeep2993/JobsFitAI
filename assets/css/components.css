@@ -429,6 +429,23 @@
   transform:    translateY(-2px);
 }
 
+.match-card.is-new {
+  border-color: var(--accent);
+  box-shadow:   0 0 0 1px var(--accent), var(--sha-s);
+}
+
+.match-new {
+  font-size:      10px;
+  font-weight:    700;
+  letter-spacing: .5px;
+  color:          var(--accent);
+  background:     var(--accent-s);
+  border:         1px solid var(--accent);
+  border-radius:  20px;
+  padding:        2px 8px;
+  font-family:    'DM Mono', monospace;
+}
+
 .match-top {
   display:         flex;
   align-items:     center;
