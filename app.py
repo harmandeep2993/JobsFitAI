@@ -30,7 +30,9 @@ from src.utils import session
 from src.utils.router import check_llm
 from src.parsers import extract_all_text
 from src.extractors.resume import extract_resume
-from src.services.job_matcher import score_new_jobs, discover_and_score
+from src.services.job_matcher import (
+    score_new_jobs, discover_and_score, begin_run, end_run, get_run_status,
+)
 from src.services import match_store, role_filter, event_store
 from src.utils.config import (
     TARGET_TITLES, SEARCH_COUNTRY, SEARCH_PER_TITLE,
@@ -270,26 +272,30 @@ async def api_match_run(request: Request) -> JSONResponse:
             status_code=400,
         )
 
+    # Don't start a second run on top of an in-progress one.
+    if not begin_run():
+        return JSONResponse({"ok": True, "started": False, "already_running": True})
+
     params     = request.query_params
     query      = (params.get("query") or "").strip()
     location   = (params.get("location") or "").strip()
     entry_only = (params.get("entry_only", "true").lower() != "false")
+    titles     = [query] if query else TARGET_TITLES
 
-    titles = [query] if query else TARGET_TITLES
+    async def _bg() -> None:
+        def _run() -> None:
+            jobs = fetch_adzuna_multi(titles, location=location,
+                                      country=SEARCH_COUNTRY, per_title=SEARCH_PER_TITLE)
+            discover_and_score(jobs, entry_only=entry_only)
+        try:
+            await run_in_threadpool(_run)
+        except Exception as e:
+            logger.error("match run failed: %s", e)
+            end_run()
 
-    def _run() -> dict:
-        jobs = fetch_adzuna_multi(titles, location=location,
-                                  country=SEARCH_COUNTRY, per_title=SEARCH_PER_TITLE)
-        return discover_and_score(jobs, entry_only=entry_only)
-
-    outcome = await run_in_threadpool(_run)
-    return JSONResponse({
-        "ok":      True,
-        "checked": outcome.get("checked", 0),
-        "scored":  outcome.get("scored", 0),
-        "new_ids": outcome.get("new_ids", []),
-        "results": outcome.get("results", []),
-    })
+    # Fire-and-forget: results stream into the DB; the client polls /state.
+    asyncio.create_task(_bg())
+    return JSONResponse({"ok": True, "started": True})
 
 
 @ngapp.get("/api/match/state")
@@ -308,6 +314,7 @@ async def api_match_state() -> JSONResponse:
         },
         "stats":       event_store.stats(),
         "events":      event_store.recent_events(30),
+        "run_status":  get_run_status(),
         "results":     match_store.get_all(),
     })
 
@@ -342,6 +349,9 @@ async def _auto_fetch_loop() -> None:
         await asyncio.sleep(interval * 60)
         if not session.has_resume():
             logger.info("[scheduler] skip — no resume loaded")
+            continue
+        if get_run_status()["running"]:
+            logger.info("[scheduler] skip — a run is already in progress")
             continue
         try:
             def _run() -> dict:

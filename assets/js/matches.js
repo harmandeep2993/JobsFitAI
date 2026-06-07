@@ -130,7 +130,7 @@ function uploadMatchResume(file) {
     });
 }
 
-// ── Fetch & score ─────────────────────────────────────────
+// ── Fetch & score (streams results as the funnel runs) ────
 window.runMatch = function() {
   const status = document.getElementById('mt-poll-status');
   const btn    = document.getElementById('mt-run-btn');
@@ -139,34 +139,31 @@ window.runMatch = function() {
   const entry  = document.getElementById('mt-entry');
   const entryOnly = entry ? entry.checked : true;
 
-  if (btn) { btn.disabled = true; }
-  status.textContent = 'Searching & scoring…';
+  if (btn) btn.disabled = true;
+  status.textContent = 'Starting…';
   status.className = 'mt-status';
 
-  const url = '/api/match/run'
-    + '?query='      + encodeURIComponent(query)
-    + '&location='   + encodeURIComponent(loc)
-    + '&entry_only=' + (entryOnly ? 'true' : 'false');
-
-  return fetch(url)
-    .then(r => r.json().then(j => ({ status: r.status, body: j })))
-    .then(({ status: code, body: d }) => {
-      if (btn) btn.disabled = false;
+  // Snapshot current ids so everything scored this run is flagged NEW.
+  fetch('/api/match/state')
+    .then(r => r.json())
+    .then(prev => {
+      window._preRunIds = new Set((prev.results || []).map(x => x.id));
+      const url = '/api/match/run'
+        + '?query='      + encodeURIComponent(query)
+        + '&location='   + encodeURIComponent(loc)
+        + '&entry_only=' + (entryOnly ? 'true' : 'false');
+      return fetch(url);
+    })
+    .then(r => r.json())
+    .then(d => {
       if (!d.ok) {
-        if (d.error === 'no_resume') {
-          status.textContent = '✕ Load a resume first';
-        } else {
-          status.textContent = '✕ ' + (d.error || 'failed');
-        }
+        if (btn) btn.disabled = false;
+        status.textContent = d.error === 'no_resume'
+          ? '✕ Load a resume first' : '✕ ' + (d.error || 'failed');
         status.className = 'mt-status err';
         return;
       }
-      const ts = new Date().toLocaleTimeString();
-      status.textContent = '✓ ' + (d.checked || 0) + ' new checked · ' + d.scored +
-                           ' scored · ' + (d.results || []).length +
-                           ' total · ' + ts;
-      status.className = 'mt-status ok';
-      renderMatches(d.results || [], new Set(d.new_ids || []));
+      pollRun();   // results stream in as the funnel scores them
     })
     .catch(e => {
       if (btn) btn.disabled = false;
@@ -174,6 +171,40 @@ window.runMatch = function() {
       status.className = 'mt-status err';
     });
 };
+
+// Poll run progress and re-render; new jobs appear (highlighted) as scored.
+function pollRun() {
+  const status = document.getElementById('mt-poll-status');
+  const btn    = document.getElementById('mt-run-btn');
+
+  fetch('/api/match/state')
+    .then(r => r.json())
+    .then(d => {
+      if (!d.ok) return;
+      renderStats(d.stats);
+
+      const pre = window._preRunIds || new Set();
+      const newIds = new Set((d.results || []).filter(r => !pre.has(r.id)).map(r => r.id));
+      renderMatches(d.results || [], newIds);
+
+      const rs = d.run_status || {};
+      if (rs.running) {
+        status.className = 'mt-status';
+        status.textContent = rs.phase === 'fetching'
+          ? 'Fetching jobs…'
+          : 'Scoring… ' + (rs.scored || 0) + ' found · ' +
+            (rs.checked || 0) + '/' + (rs.total || 0) + ' checked';
+        setTimeout(pollRun, 2000);
+      } else {
+        if (btn) btn.disabled = false;
+        status.textContent = '✓ ' + newIds.size + ' new · ' +
+                             (d.results || []).length + ' total · ' +
+                             new Date().toLocaleTimeString();
+        status.className = 'mt-status ok';
+      }
+    })
+    .catch(() => { if (btn) btn.disabled = false; });
+}
 
 // ── Render ranked matches ─────────────────────────────────
 // Shared match-card builder, reused by the Matches and History views.

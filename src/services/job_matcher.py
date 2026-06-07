@@ -96,57 +96,85 @@ def score_new_jobs(jobs: list[Job]) -> dict:
     }
 
 
+# Progress of the current/last run, polled by the dashboard for live updates.
+_run_status = {"running": False, "phase": "idle", "checked": 0, "scored": 0, "total": 0}
+
+
+def get_run_status() -> dict:
+    """Snapshot of the current run's progress."""
+    return dict(_run_status)
+
+
+def begin_run() -> bool:
+    """Mark a run as starting. Returns False if one is already in progress."""
+    if _run_status["running"]:
+        return False
+    _run_status.update({"running": True, "phase": "fetching",
+                        "checked": 0, "scored": 0, "total": 0})
+    return True
+
+
+def end_run() -> None:
+    """Force-clear the running flag (e.g. after a failure before scoring)."""
+    _run_status.update({"running": False, "phase": "idle"})
+
+
 def discover_and_score(jobs: list[Job], entry_only: bool = True) -> dict:
     """
     Token-efficient funnel:
       skip already-seen -> recency -> cheap LLM relevance gate ->
       full-JD enrich + extract + score.
 
-    Every new job is seen/classified at most once (recorded in seen_jobs),
-    so repeat runs only spend tokens on genuinely new postings.
+    Each scored job is persisted immediately so the dashboard can show
+    results streaming in. Progress is exposed via get_run_status().
     """
+    _run_status["running"] = True   # idempotent (begin_run may have set it)
     resume_json = session.get_resume()
     if not resume_json:
+        _run_status.update({"running": False, "phase": "idle"})
         return {"error": "no_resume", "checked": 0, "scored": 0,
-                "new_ids": [], "results": match_store.get_all()}
+                "results": match_store.get_all()}
 
     seen     = event_store.seen_ids()
     new_jobs = [j for j in jobs if j.id and j.id not in seen]
     logger.info("Funnel: %d fetched, %d new (unseen)", len(jobs), len(new_jobs))
+    _run_status.update({"phase": "scoring", "total": len(new_jobs),
+                        "checked": 0, "scored": 0})
 
-    scored = []
-    for job in new_jobs:
-        # 1. recency (free)
-        if not role_filter.is_recent(job):
-            event_store.mark_seen(job, "stale")
-            continue
+    scored = 0
+    try:
+        for job in new_jobs:
+            _run_status["checked"] += 1
 
-        # 2. cheap LLM relevance gate (title + snippet only)
-        verdict = relevance.classify(job.title, job.description)
-        if not verdict["relevant"]:
-            event_store.mark_seen(job, "irrelevant")
-            continue
-        if entry_only and not verdict["entry_level"]:
-            event_store.mark_seen(job, "not_entry")
-            continue
+            # 1. recency (free)
+            if not role_filter.is_recent(job):
+                event_store.mark_seen(job, "stale")
+                continue
 
-        # 3. expensive path only for survivors: full JD + score
-        _enrich(job)
-        item = _score_one(job, resume_json)
-        if item:
-            scored.append(item)
-            event_store.mark_seen(job, "scored")
-            event_store.log_event("scored", job.id,
-                                  f"{round(item['score'])}% · {item['title'][:40]}")
-        else:
-            event_store.mark_seen(job, "irrelevant")
+            # 2. cheap LLM relevance gate (title + snippet only)
+            verdict = relevance.classify(job.title, job.description)
+            if not verdict["relevant"]:
+                event_store.mark_seen(job, "irrelevant")
+                continue
+            if entry_only and not verdict["entry_level"]:
+                event_store.mark_seen(job, "not_entry")
+                continue
 
-    match_store.upsert(scored)
-    event_store.log_event("run", "", f"{len(new_jobs)} new checked, {len(scored)} scored")
+            # 3. expensive path only for survivors: full JD + score
+            _enrich(job)
+            item = _score_one(job, resume_json)
+            if item:
+                match_store.upsert([item])          # persist immediately -> streams to UI
+                scored += 1
+                _run_status["scored"] = scored
+                event_store.mark_seen(job, "scored")
+                event_store.log_event("scored", job.id,
+                                      f"{round(item['score'])}% · {item['title'][:40]}")
+            else:
+                event_store.mark_seen(job, "irrelevant")
 
-    return {
-        "checked": len(new_jobs),
-        "scored":  len(scored),
-        "new_ids": [s["id"] for s in scored],
-        "results": match_store.get_all(),
-    }
+        event_store.log_event("run", "", f"{len(new_jobs)} new checked, {scored} scored")
+    finally:
+        _run_status.update({"running": False, "phase": "idle"})
+
+    return {"checked": len(new_jobs), "scored": scored, "results": match_store.get_all()}
