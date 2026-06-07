@@ -14,7 +14,7 @@ from src.fetchers.enrich import fetch_full_description
 from src.extractors.jd import extract_jd
 from src.matcher import match
 from src.utils import session
-from src.services import match_store, event_store, relevance, role_filter
+from src.services import match_store, event_store, relevance, role_filter, vector_store
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -213,6 +213,11 @@ def discover_and_score(jobs: list[Job], entry_only: bool = True) -> dict:
                 event_store.mark_seen(job, "stale")
                 continue
 
+            # 1b. cross-source semantic dedup (free, local embeddings)
+            if vector_store.is_duplicate(job):
+                event_store.mark_seen(job, "duplicate")
+                continue
+
             # 2. cheap LLM relevance gate (title + snippet only)
             verdict = relevance.classify(job.title, job.description)
             if not verdict["relevant"]:
@@ -227,6 +232,7 @@ def discover_and_score(jobs: list[Job], entry_only: bool = True) -> dict:
             item = _score_one(job, resume_json)
             if item:
                 match_store.upsert([item])          # persist immediately -> streams to UI
+                vector_store.add(job)               # register for future dedup
                 scored += 1
                 _run_status["scored"] = scored
                 event_store.mark_seen(job, "scored")

@@ -34,7 +34,7 @@ from src.services.job_matcher import (
     score_new_jobs, discover_and_score, begin_run, end_run, get_run_status,
     rescore_all, fetch_combined,
 )
-from src.services import match_store, role_filter, event_store
+from src.services import match_store, role_filter, event_store, vector_store
 from src.utils.config import (
     TARGET_TITLES, SEARCH_COUNTRY, SEARCH_PER_TITLE,
     ENTRY_KEYWORDS, EXCLUDE_KEYWORDS, MAX_AGE_DAYS, MAX_EXPERIENCE_YEARS,
@@ -343,9 +343,10 @@ async def api_match_applied(request: Request) -> JSONResponse:
 
 @ngapp.post("/api/match/clear")
 async def api_match_clear() -> JSONResponse:
-    """Clear all stored matches, seen-jobs, and events."""
+    """Clear all stored matches, seen-jobs, events, and job vectors."""
     match_store.clear()
     event_store.clear()
+    vector_store.clear()
     return JSONResponse({"ok": True})
 
 
