@@ -51,8 +51,9 @@ class Job:
     url: str
     description: str
     language: str
-    id: str = ""        # stable identifier for dedupe (source-specific)
-    source: str = ""    # e.g. "adzuna", "arbeitnow"
+    id: str = ""          # stable identifier for dedupe (source-specific)
+    source: str = ""      # e.g. "adzuna", "arbeitnow"
+    posted_at: str = ""   # publication time (unix epoch as string), if known
 
 
 def _clean_html(raw: str) -> str:

@@ -37,6 +37,7 @@ def _score_one(job: Job, resume_json: dict) -> dict | None:
             "location":         job.location,
             "url":              job.url,
             "language":         job.language,
+            "posted_at":        job.posted_at,
             "score":            result.get("overall_score", 0),
             "label":            result.get("label", ""),
             "matched_required": result.get("matched_required", []),

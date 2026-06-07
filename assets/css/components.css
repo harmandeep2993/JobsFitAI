@@ -363,55 +363,85 @@
 
 .mt-select:focus { border-color: var(--accent); }
 
+/* Thumbnail grid of match tiles */
+#mt-results {
+  display:               grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap:                   14px;
+  margin-top:            20px;
+}
+
 .match-card {
-  display:       flex;
-  gap:           16px;
-  align-items:   flex-start;
-  background:    var(--bg-r);
-  border:        1px solid var(--bd);
-  border-radius: 12px;
-  padding:       16px 18px;
-  box-shadow:    var(--sha-s);
-  transition:    border-color .2s, transform .15s;
+  display:        flex;
+  flex-direction: column;
+  background:     var(--bg-r);
+  border:         1px solid var(--bd);
+  border-radius:  12px;
+  padding:        16px;
+  box-shadow:     var(--sha-s);
+  transition:     border-color .2s, transform .15s;
 }
 
 .match-card:hover {
   border-color: var(--accent);
-  transform:    translateY(-1px);
+  transform:    translateY(-2px);
+}
+
+.match-top {
+  display:         flex;
+  align-items:     center;
+  justify-content: space-between;
+  gap:             8px;
+  margin-bottom:   10px;
 }
 
 .match-score {
   flex-shrink:     0;
-  width:           64px;
-  height:          64px;
-  border-radius:   12px;
+  min-width:       52px;
+  height:          40px;
+  padding:         0 10px;
+  border-radius:   9px;
   display:         flex;
   align-items:     center;
   justify-content: center;
-  font-size:       22px;
+  font-size:       18px;
   font-weight:     700;
   font-family:     'DM Mono', monospace;
   color:           #fff;
 }
 
-.match-score-pct { font-size: 11px; font-weight: 500; opacity: .85; margin-left: 1px; }
+.match-score-pct { font-size: 10px; font-weight: 500; opacity: .85; margin-left: 1px; }
 
 .sc-exc     { background: var(--green); }
 .sc-good    { background: #2563eb; }
 .sc-partial { background: var(--amber); }
 .sc-poor    { background: var(--red); }
 
-.match-body { flex: 1; min-width: 0; }
+.match-label {
+  font-size:   11px;
+  color:       var(--t3);
+  font-family: 'DM Mono', monospace;
+  text-align:  right;
+}
 
 .match-title {
-  font-size:   15px;
+  font-size:   14px;
   font-weight: 700;
   color:       var(--t1);
+  line-height: 1.3;
 }
 
 .match-meta {
   font-size:   12px;
   color:       var(--t2);
+  margin-top:  4px;
+  font-family: 'DM Mono', monospace;
+  word-break:  break-word;
+}
+
+.match-sub {
+  font-size:   11px;
+  color:       var(--t3);
   margin-top:  3px;
   font-family: 'DM Mono', monospace;
 }
@@ -419,12 +449,15 @@
 .match-skills {
   font-size:   12px;
   color:       var(--t2);
-  margin-top:  7px;
+  margin-top:  8px;
   line-height: 1.5;
+  word-break:  break-word;
 }
 
 .match-skills .ok   { color: var(--green); font-weight: 700; }
 .match-skills .miss { color: var(--red);   font-weight: 700; }
+
+.match-card .job-card-link { margin-top: 10px; }
 
 /* ── JD textarea wrapper ── */
 .jd-wrap { position: relative; }

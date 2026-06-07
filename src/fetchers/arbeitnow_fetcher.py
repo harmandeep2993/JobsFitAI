@@ -56,6 +56,7 @@ def _parse_job(raw: dict) -> Job:
         language=_detect_language(description or title),
         id=raw.get("slug", "") or raw.get("url", ""),
         source="arbeitnow",
+        posted_at=str(raw.get("created_at", "") or ""),
     )
 
 

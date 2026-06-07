@@ -17,6 +17,20 @@ function scoreClass(score) {
   return 'sc-poor';
 }
 
+// Human-friendly "time since published" from a unix-epoch string.
+function relTime(posted) {
+  const ts = parseInt(posted, 10);
+  if (!ts) return '';
+  const days = Math.floor((Date.now() / 1000 - ts) / 86400);
+  if (days <= 0)  return 'today';
+  if (days === 1) return '1 day ago';
+  if (days < 7)   return days + ' days ago';
+  const weeks = Math.floor(days / 7);
+  if (weeks < 5)  return weeks + (weeks === 1 ? ' week ago' : ' weeks ago');
+  const months = Math.floor(days / 30);
+  return months + (months === 1 ? ' month ago' : ' months ago');
+}
+
 // ── Load current state (resume + stored results) ──────────
 window.loadMatchState = function() {
   fetch('/api/match/state')
@@ -126,25 +140,31 @@ function renderMatches(results) {
   }
 
   box.innerHTML = results.map(r => {
-    const matched = (r.matched_required || []).slice(0, 6).map(mtEsc).join(', ');
-    const missing = (r.missing_required || []).slice(0, 6).map(mtEsc).join(', ');
+    const matched = (r.matched_required || []).slice(0, 5).map(mtEsc).join(', ');
+    const missing = (r.missing_required || []).slice(0, 5).map(mtEsc).join(', ');
+    const posted  = relTime(r.posted_at);
     return '' +
       '<div class="match-card">' +
-        '<div class="match-score ' + scoreClass(r.score) + '">' +
-          Math.round(r.score) + '<span class="match-score-pct">%</span>' +
-        '</div>' +
-        '<div class="match-body">' +
-          '<div class="match-title">' + mtEsc(r.title) + '</div>' +
-          '<div class="match-meta">' +
-            mtEsc(r.company || 'Unknown') +
-            (r.location ? ' · ' + mtEsc(r.location) : '') +
-            (r.label ? ' · ' + mtEsc(r.label) : '') +
+        '<div class="match-top">' +
+          '<div class="match-score ' + scoreClass(r.score) + '">' +
+            Math.round(r.score) + '<span class="match-score-pct">%</span>' +
           '</div>' +
-          (matched ? '<div class="match-skills"><span class="ok">✓</span> ' + matched + '</div>' : '') +
-          (missing ? '<div class="match-skills"><span class="miss">✗</span> ' + missing + '</div>' : '') +
-          (r.url ? '<a class="job-card-link" href="' + mtEsc(r.url) +
-                   '" target="_blank" rel="noopener">Open posting ↗</a>' : '') +
+          (r.label ? '<span class="match-label">' + mtEsc(r.label) + '</span>' : '') +
         '</div>' +
+        '<div class="match-title">' + mtEsc(r.title) + '</div>' +
+        '<div class="match-meta">' +
+          mtEsc(r.company || 'Unknown') +
+          (r.location ? ' · ' + mtEsc(r.location) : '') +
+        '</div>' +
+        '<div class="match-sub">' +
+          (posted ? '🕒 ' + posted : '') +
+          (posted && r.language ? ' · ' : '') +
+          (r.language ? mtEsc(r.language) : '') +
+        '</div>' +
+        (matched ? '<div class="match-skills"><span class="ok">✓</span> ' + matched + '</div>' : '') +
+        (missing ? '<div class="match-skills"><span class="miss">✗</span> ' + missing + '</div>' : '') +
+        (r.url ? '<a class="job-card-link" href="' + mtEsc(r.url) +
+                 '" target="_blank" rel="noopener">Open posting ↗</a>' : '') +
       '</div>';
   }).join('');
 }
