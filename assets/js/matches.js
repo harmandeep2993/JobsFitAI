@@ -44,11 +44,25 @@ window.loadMatchState = function() {
     .then(d => {
       if (!d.ok) return;
       setResumeStatus(d.has_resume, d.resume_name);
+      renderStats(d.stats);
       renderFilters(d.filters);
       renderMatches(d.results || [], new Set());
     })
     .catch(() => {});
 };
+
+// Live metrics bar.
+function renderStats(s) {
+  const box = document.getElementById('mt-stats');
+  if (!box || !s) return;
+  const cards = [
+    ['Seen', s.seen], ['Scored', s.scored], ['Good 60+', s.good], ['Applied', s.applied],
+  ];
+  box.innerHTML = cards.map(([k, v]) =>
+    '<div class="stat"><div class="stat-n">' + (v || 0) + '</div>' +
+    '<div class="stat-l">' + k + '</div></div>'
+  ).join('');
+}
 
 // Show which keywords/rules drive the job extraction.
 function renderFilters(f) {

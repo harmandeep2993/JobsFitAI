@@ -150,9 +150,11 @@ def register_page():
 
       <div id="view-matches" class="view" style="display:none;">
         <div class="pg-title">Job <em>Matches</em></div>
-        <div class="pg-sub">Load your resume once, then fetch German jobs (full descriptions via Arbeitnow) and score each against it</div>
+        <div class="pg-sub">Load your resume once, then fetch German AI/ML jobs (full descriptions) and score each against it</div>
 
         <div class="divider"></div>
+
+        <div class="mt-stats" id="mt-stats"></div>
 
         <div class="content-card">
           <input type="file" id="mt-file" accept=".pdf,.docx,.doc" style="display:none;"/>
@@ -203,6 +205,8 @@ def register_page():
         </div>
 
         <div class="fetch-results" id="hist-results"></div>
+
+        <div class="hist-events" id="hist-events"></div>
       </div><!-- /view-history -->
 
       <div id="view-settings" class="view" style="display:none;">

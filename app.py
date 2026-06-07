@@ -10,6 +10,7 @@ Responsibilities:
 """
 
 import os
+import asyncio
 import tempfile
 from pathlib import Path
 from typing import Set
@@ -21,6 +22,9 @@ from starlette.responses  import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
 from src.frontend.handlers import register_page
+from src.utils.logger import get_logger
+
+logger = get_logger("app")
 from src.fetchers import fetch_adzuna_jobs, fetch_arbeitnow_jobs, fetch_adzuna_multi
 from src.utils import session
 from src.utils.router import check_llm
@@ -31,6 +35,7 @@ from src.services import match_store, role_filter, event_store
 from src.utils.config import (
     TARGET_TITLES, SEARCH_COUNTRY, SEARCH_PER_TITLE,
     ENTRY_KEYWORDS, EXCLUDE_KEYWORDS, MAX_AGE_DAYS, MAX_EXPERIENCE_YEARS,
+    AUTO_FETCH_MINUTES,
 )
 
 
@@ -301,6 +306,8 @@ async def api_match_state() -> JSONResponse:
             "max_age_days":         MAX_AGE_DAYS,
             "max_experience_years": MAX_EXPERIENCE_YEARS,
         },
+        "stats":       event_store.stats(),
+        "events":      event_store.recent_events(30),
         "results":     match_store.get_all(),
     })
 
@@ -325,6 +332,40 @@ async def api_match_clear() -> JSONResponse:
     match_store.clear()
     event_store.clear()
     return JSONResponse({"ok": True})
+
+
+# Background auto-fetch scheduler (opt-in via config.auto_fetch_minutes)
+async def _auto_fetch_loop() -> None:
+    """Periodically discover + score new jobs, server-side, until stopped."""
+    interval = max(1, int(AUTO_FETCH_MINUTES))
+    while True:
+        await asyncio.sleep(interval * 60)
+        if not session.has_resume():
+            logger.info("[scheduler] skip — no resume loaded")
+            continue
+        try:
+            def _run() -> dict:
+                jobs = fetch_adzuna_multi(
+                    TARGET_TITLES, country=SEARCH_COUNTRY, per_title=SEARCH_PER_TITLE
+                )
+                return discover_and_score(jobs, entry_only=True)
+
+            out = await run_in_threadpool(_run)
+            logger.info("[scheduler] auto-fetch: %d checked, %d scored",
+                        out.get("checked", 0), out.get("scored", 0))
+        except Exception as e:
+            logger.error("[scheduler] error: %s", e)
+
+
+async def _start_scheduler() -> None:
+    if AUTO_FETCH_MINUTES and int(AUTO_FETCH_MINUTES) > 0:
+        asyncio.create_task(_auto_fetch_loop())
+        logger.info("[scheduler] auto-fetch enabled every %s min", AUTO_FETCH_MINUTES)
+    else:
+        logger.info("[scheduler] auto-fetch disabled (auto_fetch_minutes = 0)")
+
+
+ngapp.on_startup(_start_scheduler)
 
 
 # Main UI Page

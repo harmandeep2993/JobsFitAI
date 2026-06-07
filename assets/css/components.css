@@ -363,6 +363,79 @@
 
 .mt-select:focus { border-color: var(--accent); }
 
+/* Live stats bar */
+.mt-stats {
+  display:       grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap:           12px;
+  margin-bottom: 20px;
+}
+
+.stat {
+  background:    var(--bg-r);
+  border:        1px solid var(--bd);
+  border-radius: 12px;
+  padding:       14px 16px;
+  text-align:    center;
+  box-shadow:    var(--sha-s);
+}
+
+.stat-n {
+  font-size:   24px;
+  font-weight: 700;
+  color:       var(--accent);
+  font-family: 'DM Mono', monospace;
+}
+
+.stat-l {
+  font-size:      10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color:          var(--t3);
+  margin-top:     2px;
+}
+
+.mt-stats:empty { display: none; }
+
+/* History activity timeline */
+.hist-events { margin-top: 22px; }
+
+.hist-ev-title {
+  font-size:      11px;
+  font-weight:    600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color:          var(--t3);
+  font-family:    'DM Mono', monospace;
+  margin-bottom:  10px;
+}
+
+.hist-ev {
+  display:       flex;
+  align-items:   center;
+  gap:           10px;
+  padding:       6px 0;
+  border-bottom: 1px solid var(--bd);
+  font-size:     12px;
+}
+
+.hist-ev-type {
+  flex-shrink:   0;
+  width:         64px;
+  font-size:     10px;
+  font-weight:   700;
+  text-transform: uppercase;
+  font-family:   'DM Mono', monospace;
+  color:         var(--t3);
+}
+
+.hist-ev-type.ev-scored  { color: var(--accent); }
+.hist-ev-type.ev-applied { color: var(--green); }
+.hist-ev-type.ev-run     { color: var(--t2); }
+
+.hist-ev-d { flex: 1; color: var(--t2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hist-ev-t { flex-shrink: 0; color: var(--t3); font-family: 'DM Mono', monospace; font-size: 11px; }
+
 /* Active filter keywords */
 .mt-filters {
   margin-top:    14px;
