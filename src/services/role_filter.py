@@ -11,6 +11,7 @@ code changes.
 """
 
 import re
+import time
 
 from src.fetchers import Job
 from src.utils.config import (
@@ -18,6 +19,7 @@ from src.utils.config import (
     EXCLUDE_KEYWORDS,
     ENTRY_KEYWORDS,
     MAX_EXPERIENCE_YEARS,
+    MAX_AGE_DAYS,
 )
 from src.utils.logger import get_logger
 
@@ -75,17 +77,45 @@ def is_entry_level(job: Job) -> bool:
     return True
 
 
+def job_age_days(job: Job) -> float | None:
+    """Age of the posting in days from its epoch posted_at, or None if unknown."""
+    try:
+        ts = int(job.posted_at)
+    except (TypeError, ValueError):
+        return None
+    if ts <= 0:
+        return None
+    return (time.time() - ts) / 86400.0
+
+
+def is_recent(job: Job, max_age_days: int | None = None) -> bool:
+    """True if the posting is within the age limit (unknown dates are kept)."""
+    limit = MAX_AGE_DAYS if max_age_days is None else max_age_days
+    age = job_age_days(job)
+    return age is None or age <= limit
+
+
 def filter_jobs(jobs: list[Job], entry_only: bool = True,
                 titles: list[str] | None = None) -> list[Job]:
-    """Keep target-role jobs; if entry_only, also keep only entry-level ones."""
+    """
+    Keep target-role, recent jobs; if entry_only, also require entry-level.
+
+    Drops stale postings (older than MAX_AGE_DAYS) which are likely filled.
+    """
     kept = []
+    dropped_old = 0
     for job in jobs:
         if not is_target_role(job.title, titles):
+            continue
+        if not is_recent(job):
+            dropped_old += 1
             continue
         if entry_only and not is_entry_level(job):
             continue
         kept.append(job)
 
-    logger.info("Role filter: kept %d / %d jobs (entry_only=%s)",
-                len(kept), len(jobs), entry_only)
+    logger.info(
+        "Role filter: kept %d / %d jobs (entry_only=%s, dropped %d stale > %dd)",
+        len(kept), len(jobs), entry_only, dropped_old, MAX_AGE_DAYS
+    )
     return kept

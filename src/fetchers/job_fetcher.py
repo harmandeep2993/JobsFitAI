@@ -16,6 +16,7 @@ Reuse note:
 import os
 import re
 import html
+import datetime as dt
 from dataclasses import dataclass
 
 import requests
@@ -75,6 +76,17 @@ def _clean_html(raw: str) -> str:
     return " ".join(text.split())
 
 
+def _iso_to_epoch(created: str) -> str:
+    """Convert an ISO8601 timestamp (e.g. Adzuna 'created') to epoch seconds as a string."""
+    if not created:
+        return ""
+    try:
+        d = dt.datetime.fromisoformat(created.replace("Z", "+00:00"))
+        return str(int(d.timestamp()))
+    except (ValueError, TypeError):
+        return ""
+
+
 def _detect_language(text: str) -> str:
     """
     Detect the ISO 639-1 language code of a piece of text.
@@ -118,6 +130,7 @@ def _parse_job(raw: dict) -> Job:
         language=_detect_language(description or title),
         id=str(raw.get("id", "")),
         source="adzuna",
+        posted_at=_iso_to_epoch(raw.get("created", "")),
     )
 
 
