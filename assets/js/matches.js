@@ -148,8 +148,8 @@ window.runMatch = function() {
         return;
       }
       const ts = new Date().toLocaleTimeString();
-      status.textContent = '✓ ' + (d.found || 0) + ' matched · ' + d.scored +
-                           ' new scored · ' + (d.results || []).length +
+      status.textContent = '✓ ' + (d.checked || 0) + ' new checked · ' + d.scored +
+                           ' scored · ' + (d.results || []).length +
                            ' total · ' + ts;
       status.className = 'mt-status ok';
       renderMatches(d.results || [], new Set(d.new_ids || []));

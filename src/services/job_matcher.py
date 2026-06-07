@@ -14,7 +14,7 @@ from src.fetchers.enrich import fetch_full_description
 from src.extractors.jd import extract_jd
 from src.matcher import match
 from src.utils import session
-from src.services import match_store
+from src.services import match_store, event_store, relevance, role_filter
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -90,6 +90,62 @@ def score_new_jobs(jobs: list[Job]) -> dict:
     match_store.upsert(scored)
 
     return {
+        "scored":  len(scored),
+        "new_ids": [s["id"] for s in scored],
+        "results": match_store.get_all(),
+    }
+
+
+def discover_and_score(jobs: list[Job], entry_only: bool = True) -> dict:
+    """
+    Token-efficient funnel:
+      skip already-seen -> recency -> cheap LLM relevance gate ->
+      full-JD enrich + extract + score.
+
+    Every new job is seen/classified at most once (recorded in seen_jobs),
+    so repeat runs only spend tokens on genuinely new postings.
+    """
+    resume_json = session.get_resume()
+    if not resume_json:
+        return {"error": "no_resume", "checked": 0, "scored": 0,
+                "new_ids": [], "results": match_store.get_all()}
+
+    seen     = event_store.seen_ids()
+    new_jobs = [j for j in jobs if j.id and j.id not in seen]
+    logger.info("Funnel: %d fetched, %d new (unseen)", len(jobs), len(new_jobs))
+
+    scored = []
+    for job in new_jobs:
+        # 1. recency (free)
+        if not role_filter.is_recent(job):
+            event_store.mark_seen(job, "stale")
+            continue
+
+        # 2. cheap LLM relevance gate (title + snippet only)
+        verdict = relevance.classify(job.title, job.description)
+        if not verdict["relevant"]:
+            event_store.mark_seen(job, "irrelevant")
+            continue
+        if entry_only and not verdict["entry_level"]:
+            event_store.mark_seen(job, "not_entry")
+            continue
+
+        # 3. expensive path only for survivors: full JD + score
+        _enrich(job)
+        item = _score_one(job, resume_json)
+        if item:
+            scored.append(item)
+            event_store.mark_seen(job, "scored")
+            event_store.log_event("scored", job.id,
+                                  f"{round(item['score'])}% · {item['title'][:40]}")
+        else:
+            event_store.mark_seen(job, "irrelevant")
+
+    match_store.upsert(scored)
+    event_store.log_event("run", "", f"{len(new_jobs)} new checked, {len(scored)} scored")
+
+    return {
+        "checked": len(new_jobs),
         "scored":  len(scored),
         "new_ids": [s["id"] for s in scored],
         "results": match_store.get_all(),

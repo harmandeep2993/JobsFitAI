@@ -26,8 +26,8 @@ from src.utils import session
 from src.utils.router import check_llm
 from src.parsers import extract_all_text
 from src.extractors.resume import extract_resume
-from src.services.job_matcher import score_new_jobs
-from src.services import match_store, role_filter
+from src.services.job_matcher import score_new_jobs, discover_and_score
+from src.services import match_store, role_filter, event_store
 from src.utils.config import (
     TARGET_TITLES, SEARCH_COUNTRY, SEARCH_PER_TITLE,
     ENTRY_KEYWORDS, EXCLUDE_KEYWORDS, MAX_AGE_DAYS, MAX_EXPERIENCE_YEARS,
@@ -273,17 +273,14 @@ async def api_match_run(request: Request) -> JSONResponse:
     titles = [query] if query else TARGET_TITLES
 
     def _run() -> dict:
-        jobs     = fetch_adzuna_multi(titles, location=location,
-                                      country=SEARCH_COUNTRY, per_title=SEARCH_PER_TITLE)
-        filtered = role_filter.filter_jobs(jobs, entry_only=entry_only, titles=titles)
-        outcome  = score_new_jobs(filtered)
-        outcome["found"] = len(filtered)
-        return outcome
+        jobs = fetch_adzuna_multi(titles, location=location,
+                                  country=SEARCH_COUNTRY, per_title=SEARCH_PER_TITLE)
+        return discover_and_score(jobs, entry_only=entry_only)
 
     outcome = await run_in_threadpool(_run)
     return JSONResponse({
         "ok":      True,
-        "found":   outcome.get("found", 0),
+        "checked": outcome.get("checked", 0),
         "scored":  outcome.get("scored", 0),
         "new_ids": outcome.get("new_ids", []),
         "results": outcome.get("results", []),
@@ -317,13 +314,16 @@ async def api_match_applied(request: Request) -> JSONResponse:
     if not job_id:
         return JSONResponse({"ok": False, "error": "id required"}, status_code=400)
     match_store.set_applied(job_id, applied)
+    if applied:
+        event_store.log_event("applied", job_id)
     return JSONResponse({"ok": True, "id": job_id, "applied": applied})
 
 
 @ngapp.post("/api/match/clear")
 async def api_match_clear() -> JSONResponse:
-    """Clear all stored matches."""
+    """Clear all stored matches, seen-jobs, and events."""
     match_store.clear()
+    event_store.clear()
     return JSONResponse({"ok": True})
 
 

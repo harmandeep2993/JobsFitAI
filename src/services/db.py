@@ -66,6 +66,31 @@ def init() -> None:
             )
             """
         )
+        # Every job id we've ever encountered (incl. rejected), so we never
+        # re-fetch or re-classify the same posting — the main token saver.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS seen_jobs (
+                id          TEXT PRIMARY KEY,
+                source      TEXT,
+                title       TEXT,
+                first_seen  TEXT,
+                decision    TEXT      -- scored | irrelevant | not_entry | stale
+            )
+            """
+        )
+        # Timeline of what the system did and when.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS events (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                type       TEXT,      -- fetched | scored | applied | run
+                job_id     TEXT,
+                detail     TEXT,
+                created_at TEXT
+            )
+            """
+        )
     logger.info("SQLite ready at %s", DB_PATH)
 
 
