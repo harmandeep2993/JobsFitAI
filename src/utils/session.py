@@ -11,8 +11,12 @@ The router reads `get_provider()` / `get_model()` on every call, so a
 change here takes effect on the next analysis without a restart.
 """
 
+import json
+from datetime import datetime, timezone
+
 from src.utils.config import PROVIDER_CONFIGS
 from src.utils.logger import get_logger
+from src.services import db
 
 logger = get_logger(__name__)
 
@@ -30,12 +34,31 @@ _state = {
     "model":    None,
 }
 
-# Extracted resume kept in memory so the Job Matches dashboard can score
-# many jobs without re-extracting the resume each time.
+# Extracted resume — cached in memory and persisted to SQLite so it
+# survives restarts (no re-extraction). "loaded" tracks whether we've
+# tried loading from the DB yet.
 _resume = {
-    "json": None,
-    "name": "",
+    "json":   None,
+    "name":   "",
+    "loaded": False,
 }
+
+
+def _ensure_resume_loaded() -> None:
+    """Lazily load the persisted resume from the DB on first access."""
+    if _resume["loaded"]:
+        return
+    try:
+        with db.connect() as conn:
+            row = conn.execute("SELECT name, json FROM resume WHERE id = 1").fetchone()
+        if row and row["json"]:
+            _resume["json"] = json.loads(row["json"])
+            _resume["name"] = row["name"] or ""
+            logger.info("Loaded persisted resume: %s", _resume["name"] or "(unnamed)")
+    except Exception as e:
+        logger.error("Failed to load persisted resume: %s", e)
+    finally:
+        _resume["loaded"] = True
 
 
 def get_provider() -> str:
@@ -82,25 +105,43 @@ def get_settings() -> dict:
 
 
 def set_resume(resume_json: dict, name: str = "") -> None:
-    """Store the extracted resume for reuse by the matching dashboard."""
-    _resume["json"] = resume_json
-    _resume["name"] = name or ""
+    """Store the extracted resume (in memory + persisted) for reuse."""
+    _resume["json"]   = resume_json
+    _resume["name"]   = name or ""
+    _resume["loaded"] = True
+
+    try:
+        with db.connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO resume (id, name, json, created_at) VALUES (1, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    name=excluded.name, json=excluded.json, created_at=excluded.created_at
+                """,
+                (_resume["name"], json.dumps(resume_json),
+                 datetime.now(timezone.utc).isoformat(timespec="seconds")),
+            )
+    except Exception as e:
+        logger.error("Failed to persist resume: %s", e)
+
     logger.info("Resume stored for matching: %s", _resume["name"] or "(unnamed)")
 
 
 def get_resume() -> dict | None:
     """Return the stored resume JSON, or None if none is loaded."""
+    _ensure_resume_loaded()
     return _resume["json"]
 
 
 def get_resume_name() -> str:
     """Return the stored resume's display name."""
+    _ensure_resume_loaded()
     return _resume["name"]
 
 
 def has_resume() -> bool:
     """True if a resume has been extracted and stored."""
-    return bool(_resume["json"])
+    return get_resume() is not None
 
 
 def provider_catalog() -> list[dict]:

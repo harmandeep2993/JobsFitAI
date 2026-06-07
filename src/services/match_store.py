@@ -1,67 +1,80 @@
 # src/services/match_store.py
 """
-Persistence for scored job matches.
+Persistence for scored job matches (SQLite-backed).
 
-Stores results in a local JSON file (data/ is gitignored) so the Job
-Matches dashboard keeps history across restarts and can deduplicate jobs
-it has already scored. Keyed by job id.
+Keeps the same API the rest of the app uses (known_ids / upsert / get_all /
+clear); storage moved from a JSON file to SQLite (src/services/db.py) so it
+queries cleanly and dedupes by primary key.
 """
 
 import json
-import threading
-from pathlib import Path
 
+from src.services import db
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-STORE_PATH = Path("data/job_matches.json")
-_lock = threading.Lock()
-
-
-def _load() -> list[dict]:
-    if not STORE_PATH.exists():
-        return []
-    try:
-        return json.loads(STORE_PATH.read_text(encoding="utf-8"))
-    except Exception as e:
-        logger.error("Failed to read match store: %s", e)
-        return []
-
-
-def _save(items: list[dict]) -> None:
-    STORE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    STORE_PATH.write_text(
-        json.dumps(items, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+_COLUMNS = (
+    "id", "source", "title", "company", "location", "url", "language",
+    "posted_at", "score", "label", "matched_required", "missing_required",
+    "scored_at",
+)
 
 
 def known_ids() -> set:
     """Return the set of job ids already scored and stored."""
-    with _lock:
-        return {it.get("id") for it in _load() if it.get("id")}
+    with db.connect() as conn:
+        rows = conn.execute("SELECT id FROM matches").fetchall()
+    return {r["id"] for r in rows if r["id"]}
 
 
 def upsert(items: list[dict]) -> None:
     """Insert or update scored items by id."""
     if not items:
         return
-    with _lock:
-        by_id = {it.get("id"): it for it in _load()}
-        for it in items:
-            by_id[it.get("id")] = it
-        _save(list(by_id.values()))
+
+    sql = """
+        INSERT INTO matches
+            (id, source, title, company, location, url, language, posted_at,
+             score, label, matched_required, missing_required, scored_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+        ON CONFLICT(id) DO UPDATE SET
+            source=excluded.source, title=excluded.title, company=excluded.company,
+            location=excluded.location, url=excluded.url, language=excluded.language,
+            posted_at=excluded.posted_at, score=excluded.score, label=excluded.label,
+            matched_required=excluded.matched_required,
+            missing_required=excluded.missing_required, scored_at=excluded.scored_at
+    """
+    rows = [
+        (
+            it.get("id"), it.get("source"), it.get("title"), it.get("company"),
+            it.get("location"), it.get("url"), it.get("language"), it.get("posted_at"),
+            it.get("score"), it.get("label"),
+            json.dumps(it.get("matched_required", [])),
+            json.dumps(it.get("missing_required", [])),
+            it.get("scored_at"),
+        )
+        for it in items
+    ]
+    with db.connect() as conn:
+        conn.executemany(sql, rows)
 
 
 def get_all() -> list[dict]:
     """Return all stored matches, highest score first."""
-    with _lock:
-        items = _load()
-    items.sort(key=lambda x: x.get("score", 0), reverse=True)
-    return items
+    with db.connect() as conn:
+        rows = conn.execute("SELECT * FROM matches ORDER BY score DESC").fetchall()
+
+    out = []
+    for r in rows:
+        d = dict(r)
+        d["matched_required"] = json.loads(d.get("matched_required") or "[]")
+        d["missing_required"] = json.loads(d.get("missing_required") or "[]")
+        out.append(d)
+    return out
 
 
 def clear() -> None:
     """Remove all stored matches."""
-    with _lock:
-        _save([])
+    with db.connect() as conn:
+        conn.execute("DELETE FROM matches")
