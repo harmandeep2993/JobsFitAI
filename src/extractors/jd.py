@@ -93,14 +93,12 @@ def extract_jd(jd_text: str) -> dict:
         raise ValueError("Invalid LLM response format")
 
     result = _lowercase_all(result)
-    logger.info("JD lowercasing complete")
 
-    # Warn about any empty fields in the extracted result
     empty_keys = [k for k, v in result.items() if _is_empty(v)]
     if empty_keys:
-        logger.warning("Empty values for keys: %s", empty_keys)
-    else:
-        logger.info("All JD fields extracted successfully")
+        logger.debug("Empty JD fields: %s", empty_keys)
 
-    logger.info("JD extraction complete")
+    n_req  = len(result.get("required_skills", []))
+    n_resp = len(result.get("responsibilities", []))
+    logger.info("JD extracted: %d required skills, %d responsibilities", n_req, n_resp)
     return result

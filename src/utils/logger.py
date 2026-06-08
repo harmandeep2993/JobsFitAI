@@ -33,14 +33,16 @@ BACKUP_COUNT = 3
 FILE_FORMAT = "%(asctime)s | %(levelname)-7s | %(name)-15s | %(message)s"
 DATE_FORMAT = "%H:%M:%S"
 
-# Chatty internal modules — pinned to WARNING so normal runs stay readable.
-# Set config logging.level to DEBUG to see their detail again.
+# Low-level helpers pinned to WARNING so their per-call detail stays out of
+# normal runs. The major-event modules (resume_parser, resume, jd, matcher,
+# job_matcher, app, …) log clean one-line INFO summaries and are NOT muted.
+# Set config logging.level to DEBUG to see all detail again.
 _QUIET_INTERNAL = [
-    "matcher", "skills", "responsibilities", "experiences", "experience",
+    "skills", "responsibilities", "experiences", "experience",
     "education", "languages", "certifications",
-    "resume", "jd", "extract", "resume_prompt", "jd_prompt",
+    "extract", "resume_prompt", "jd_prompt",
     "router", "embedding_model", "config", "validator",
-    "pdf_parser", "docx_parser", "text_cleaner", "resume_parser",
+    "pdf_parser", "docx_parser", "text_cleaner",
     "summary", "match_store",
 ]
 

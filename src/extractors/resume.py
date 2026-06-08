@@ -147,7 +147,7 @@ def _compute_experience_durations(result: dict) -> dict:
     if isinstance(meta, dict):
         meta["total_experience_years"] = total
 
-    logger.info("Computed total experience: %.1f years", total)
+    logger.debug("Computed total experience: %.1f years", total)
     return result
 
 
@@ -230,16 +230,18 @@ def extract_resume(resume_text: str) -> dict:
 
     # Durations are computed here (deterministically), not by the LLM.
     result = _compute_experience_durations(result)
-
     result = _lowercase_all(result)
-    logger.info("Resume lowercasing complete")
 
-    # Warn about any empty fields in the extracted result
     empty_keys = [k for k, v in result.items() if _is_empty(v)]
     if empty_keys:
-        logger.warning("Empty values for keys: %s", empty_keys)
-    else:
-        logger.info("All resume fields extracted successfully")
+        logger.debug("Empty resume fields: %s", empty_keys)
 
-    logger.info("Resume extraction complete")
+    skills = result.get("skills", [])
+    n_skills = (len(skills) if isinstance(skills, list)
+                else sum(len(v) for v in skills.values() if isinstance(v, list))
+                if isinstance(skills, dict) else 0)
+    n_roles = len(result.get("experience_entries", []))
+    years   = result.get("meta", {}).get("total_experience_years", 0)
+    logger.info("Resume extracted: %d skills, %d roles, %.1fy experience",
+                n_skills, n_roles, years)
     return result

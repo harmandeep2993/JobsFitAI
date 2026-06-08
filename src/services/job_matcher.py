@@ -212,8 +212,7 @@ def discover_and_score(jobs: list[Job], entry_only: bool = True) -> dict:
                 event_store.mark_seen(job, "scored")
                 event_store.log_event("scored", job.id,
                                       f"{round(item['score'])}% · {item['title'][:40]}")
-                logger.info("   scored %3d%% %-13s | %s",
-                            round(item["score"]), item["label"], tag)
+                logger.debug("   stored %3d%% | %s", round(item["score"]), tag)
             else:
                 event_store.mark_seen(job, "irrelevant")
                 logger.debug("   skip no-jd       | %s", tag)
