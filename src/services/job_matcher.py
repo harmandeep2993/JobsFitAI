@@ -89,26 +89,31 @@ def end_run() -> None:
     _run_status.update({"running": False, "phase": "idle"})
 
 
-def fetch_combined(titles: list[str], location: str = "", country: str = "de",
+def fetch_combined(titles: list[str], location: str = "",
+                   countries: list[str] | None = None,
                    per_title: int = 5, arbeitnow_limit: int = 30) -> list[Job]:
     """
-    Pull jobs from both sources and merge them.
+    Pull jobs from both sources across one or more countries, and merge.
 
-    - Adzuna: server-side search per target title (good volume, full JD via
-      detail-page enrichment later).
-    - Arbeitnow: feed filtered to target-title roles (native full JD).
+    - Adzuna: server-side search per target title, per country code.
+    - Arbeitnow: Germany feed filtered to target-title roles (only when
+      Germany is among the countries; it has no other-country data).
 
-    Deduped by id; the LLM funnel and (optional) vector dedup refine further.
+    Deduped by id; the LLM funnel and vector dedup refine further.
     """
-    adzuna = fetch_adzuna_multi(titles, location=location,
-                                country=country, per_title=per_title)
+    countries = countries or ["de"]
 
-    # Arbeitnow has no server search, so cast a wide query from the title words
-    # then keep only real target-title matches.
-    terms = sorted({w for t in titles for w in t.split()})
-    arb_raw = fetch_arbeitnow_jobs(query=" ".join(terms), location=location,
-                                   limit=arbeitnow_limit)
-    arbeitnow = [j for j in arb_raw if role_filter.is_target_role(j.title, titles)]
+    adzuna: list[Job] = []
+    for code in countries:
+        adzuna += fetch_adzuna_multi(titles, location=location,
+                                     country=code, per_title=per_title)
+
+    arbeitnow: list[Job] = []
+    if "de" in countries:
+        terms = sorted({w for t in titles for w in t.split()})
+        arb_raw = fetch_arbeitnow_jobs(query=" ".join(terms), location=location,
+                                       limit=arbeitnow_limit)
+        arbeitnow = [j for j in arb_raw if role_filter.is_target_role(j.title, titles)]
 
     merged, seen = [], set()
     for job in adzuna + arbeitnow:
@@ -116,8 +121,8 @@ def fetch_combined(titles: list[str], location: str = "", country: str = "de",
             seen.add(job.id)
             merged.append(job)
 
-    logger.info("Combined sources: %d adzuna + %d arbeitnow -> %d unique",
-                len(adzuna), len(arbeitnow), len(merged))
+    logger.info("Combined sources (%s): %d adzuna + %d arbeitnow -> %d unique",
+                ",".join(countries), len(adzuna), len(arbeitnow), len(merged))
     return merged
 
 

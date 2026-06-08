@@ -32,12 +32,9 @@ from src.services.job_matcher import (
     discover_and_score, begin_run, end_run, get_run_status,
     rescore_all, fetch_combined,
 )
-from src.services import match_store, event_store, vector_store
+from src.services import match_store, event_store, vector_store, settings_store
 from src.services.summary import generate_summary
-from src.utils.config import (
-    TARGET_TITLES, SEARCH_COUNTRY, SEARCH_PER_TITLE, MAX_AGE_DAYS,
-    AUTO_FETCH_MINUTES,
-)
+from src.utils.config import SEARCH_PER_TITLE, MAX_AGE_DAYS, AUTO_FETCH_MINUTES
 
 
 ngapp.add_static_files('/assets', 'assets')
@@ -238,14 +235,15 @@ async def api_match_run(request: Request) -> JSONResponse:
 
     params     = request.query_params
     query      = (params.get("query") or "").strip()
-    location   = (params.get("location") or "").strip()
     entry_only = (params.get("entry_only", "true").lower() != "false")
-    titles     = [query] if query else TARGET_TITLES
+    titles     = [query] if query else settings_store.get_titles()
+    location   = (params.get("location") or "").strip() or settings_store.get_location()
+    countries  = settings_store.get_countries()
 
     async def _bg() -> None:
         def _run() -> None:
             jobs = fetch_combined(titles, location=location,
-                                  country=SEARCH_COUNTRY, per_title=SEARCH_PER_TITLE)
+                                  countries=countries, per_title=SEARCH_PER_TITLE)
             discover_and_score(jobs, entry_only=entry_only)
         try:
             await run_in_threadpool(_run)
@@ -266,8 +264,10 @@ async def api_match_state() -> JSONResponse:
         "has_resume":  session.has_resume(),
         "resume_name": session.get_resume_name(),
         "filters": {
-            "target_titles": TARGET_TITLES,
-            "max_age_days":   MAX_AGE_DAYS,
+            "target_titles": settings_store.get_titles(),
+            "countries":     settings_store.country_names(),
+            "location":      settings_store.get_location(),
+            "max_age_days":  MAX_AGE_DAYS,
         },
         "stats":       event_store.stats(),
         "run_status":  get_run_status(),
@@ -339,6 +339,33 @@ async def api_match_detail(request: Request) -> JSONResponse:
     })
 
 
+@ngapp.post("/api/match/filters")
+async def api_match_filters(request: Request) -> JSONResponse:
+    """
+    Update editable search settings. Body may include:
+      target_titles: [str], countries: [str] or "germany, netherlands", location: str
+    """
+    body = await request.json()
+
+    if isinstance(body.get("target_titles"), list):
+        settings_store.set_titles(body["target_titles"])
+
+    if "countries" in body:
+        c = body["countries"]
+        names = c if isinstance(c, list) else str(c).replace(",", " ").split()
+        settings_store.set_countries(names)
+
+    if "location" in body:
+        settings_store.set_location(body.get("location") or "")
+
+    return JSONResponse({
+        "ok": True,
+        "target_titles": settings_store.get_titles(),
+        "countries":     settings_store.country_names(),
+        "location":      settings_store.get_location(),
+    })
+
+
 @ngapp.post("/api/match/clear")
 async def api_match_clear() -> JSONResponse:
     """Clear all stored matches, seen-jobs, events, and job vectors."""
@@ -363,7 +390,10 @@ async def _auto_fetch_loop() -> None:
         try:
             def _run() -> dict:
                 jobs = fetch_combined(
-                    TARGET_TITLES, country=SEARCH_COUNTRY, per_title=SEARCH_PER_TITLE
+                    settings_store.get_titles(),
+                    location=settings_store.get_location(),
+                    countries=settings_store.get_countries(),
+                    per_title=SEARCH_PER_TITLE,
                 )
                 return discover_and_score(jobs, entry_only=True)
 

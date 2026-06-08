@@ -99,6 +99,10 @@ def init() -> None:
             )
             """
         )
+        # User-editable search settings (target titles, countries, location).
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)"
+        )
     logger.info("SQLite ready at %s", DB_PATH)
 
 
