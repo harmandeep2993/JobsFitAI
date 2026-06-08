@@ -91,7 +91,7 @@ def end_run() -> None:
 
 def fetch_combined(titles: list[str], location: str = "",
                    countries: list[str] | None = None,
-                   per_title: int = 5, arbeitnow_limit: int = 30) -> list[Job]:
+                   per_title: int = 5, arbeitnow_limit: int = 100) -> list[Job]:
     """
     Pull jobs from both sources across one or more countries, and merge.
 
