@@ -32,17 +32,17 @@ def _get_provider():
 
     if name == "openai":
         from src.utils.providers import openai
-        logger.info("Using OpenAI provider")
+        logger.debug("Using OpenAI provider")
         return openai
 
     if name == "groq":
         from src.utils.providers import groq
-        logger.info("Using Groq provider")
+        logger.debug("Using Groq provider")
         return groq
 
     # Default — ollama
     from src.utils.providers import ollama
-    logger.info("Using Ollama provider")
+    logger.debug("Using Ollama provider")
     return ollama
 
 
@@ -54,7 +54,7 @@ def check_llm() -> bool:
         bool: True if provider is reachable
     """
     provider = _get_provider()
-    logger.info("Checking %s provider connectivity...", session.get_provider())
+    logger.debug("Checking %s provider connectivity...", session.get_provider())
     return provider.check()
 
 
@@ -70,10 +70,8 @@ def call_llm(prompt: str) -> str | None:
     """
     provider = _get_provider()
     model    = session.get_model()
-    logger.info(
-        "Calling %s (%s) with prompt: %s...",
-        session.get_provider(), model, prompt[:100]
-    )
+    logger.debug("Calling %s (%s) — prompt %d chars",
+                 session.get_provider(), model, len(prompt))
     return provider.call(prompt, model)
 
 
