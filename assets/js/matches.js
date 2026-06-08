@@ -45,6 +45,7 @@ window.loadMatchState = function() {
       setResumeStatus(d.has_resume, d.resume_name);
       renderStats(d.stats);
       renderResume(d.resume);
+      renderScheduler(d.scheduler);
       renderFilters(d.filters);
       renderMatches(d.results || [], new Set());
     })
@@ -94,6 +95,43 @@ window.openResume = function() {
   if (!r || !modal || !box) return;
   box.innerHTML = resumeHTML(r);
   modal.style.display = 'flex';
+};
+
+// Background scheduler control.
+function schedLabel(m) {
+  return '● ON · every ' + (m >= 60 ? (m / 60) + 'h' : m + 'm');
+}
+
+function renderScheduler(s) {
+  s = s || {};
+  const cb = document.getElementById('mt-sched');
+  const iv = document.getElementById('mt-sched-interval');
+  const st = document.getElementById('mt-sched-status');
+  if (cb) cb.checked = !!s.enabled;
+  if (iv && s.interval) iv.value = String(s.interval);
+  if (st) {
+    st.textContent = s.enabled ? schedLabel(s.interval) : '○ off';
+    st.className = 'mt-status ' + (s.enabled ? 'ok' : '');
+  }
+}
+
+window.toggleScheduler = function() {
+  const on = document.getElementById('mt-sched').checked;
+  const interval = parseInt(document.getElementById('mt-sched-interval').value, 10) || 60;
+  const st = document.getElementById('mt-sched-status');
+  st.textContent = '…';
+  fetch('/api/match/scheduler', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ enabled: on, interval: interval }),
+  })
+    .then(r => r.json())
+    .then(d => {
+      if (!d.ok) { st.textContent = '✕'; return; }
+      st.textContent = d.enabled ? schedLabel(d.interval) : '○ off';
+      st.className = 'mt-status ' + (d.enabled ? 'ok' : '');
+    })
+    .catch(() => { st.textContent = '✕'; });
 };
 
 // Live metrics bar.

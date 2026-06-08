@@ -10,6 +10,7 @@ Responsibilities:
 """
 
 import os
+import time
 import asyncio
 import tempfile
 from pathlib import Path
@@ -34,7 +35,7 @@ from src.services.job_matcher import (
 )
 from src.services import match_store, event_store, vector_store, settings_store
 from src.services.summary import generate_summary
-from src.utils.config import SEARCH_PER_TITLE, MAX_AGE_DAYS, AUTO_FETCH_MINUTES
+from src.utils.config import SEARCH_PER_TITLE, MAX_AGE_DAYS
 
 
 ngapp.add_static_files('/assets', 'assets')
@@ -272,6 +273,10 @@ async def api_match_state() -> JSONResponse:
         "stats":       event_store.stats(),
         "run_status":  get_run_status(),
         "resume":      session.resume_info(),
+        "scheduler": {
+            "enabled":  settings_store.get_scheduler_enabled(),
+            "interval": settings_store.get_scheduler_interval(),
+        },
         "results":     match_store.get_all(),
     })
 
@@ -366,6 +371,24 @@ async def api_match_filters(request: Request) -> JSONResponse:
     })
 
 
+@ngapp.post("/api/match/scheduler")
+async def api_match_scheduler(request: Request) -> JSONResponse:
+    """Turn the background auto-fetch on/off and set its interval (minutes)."""
+    global _sched_last
+    body = await request.json()
+    if "enabled" in body:
+        settings_store.set_scheduler_enabled(bool(body["enabled"]))
+        if body.get("enabled"):
+            _sched_last = 0.0   # run on the next wake (~30s)
+    if "interval" in body:
+        settings_store.set_scheduler_interval(int(body["interval"]))
+    return JSONResponse({
+        "ok":       True,
+        "enabled":  settings_store.get_scheduler_enabled(),
+        "interval": settings_store.get_scheduler_interval(),
+    })
+
+
 @ngapp.post("/api/match/clear")
 async def api_match_clear() -> JSONResponse:
     """Clear all stored matches, seen-jobs, events, and job vectors."""
@@ -375,19 +398,26 @@ async def api_match_clear() -> JSONResponse:
     return JSONResponse({"ok": True})
 
 
-# Background auto-fetch scheduler (opt-in via config.auto_fetch_minutes)
+# Background auto-fetch scheduler — runtime-controlled via the UI / settings.
+_sched_last = 0.0   # monotonic time of last auto-run (0 = run on next wake)
+
+
 async def _auto_fetch_loop() -> None:
-    """Periodically discover + score new jobs, server-side, until stopped."""
-    interval = max(1, int(AUTO_FETCH_MINUTES))
+    """Always running; honors the enabled flag + interval from settings."""
+    global _sched_last
     while True:
-        await asyncio.sleep(interval * 60)
-        if not session.has_resume():
-            logger.info("[scheduler] skip — no resume loaded")
-            continue
-        if get_run_status()["running"]:
-            logger.info("[scheduler] skip — a run is already in progress")
-            continue
+        await asyncio.sleep(30)   # wake periodically to check settings
         try:
+            if not settings_store.get_scheduler_enabled():
+                continue
+            interval = settings_store.get_scheduler_interval() * 60
+            if _sched_last and (time.monotonic() - _sched_last) < interval:
+                continue
+            if not session.has_resume() or get_run_status()["running"]:
+                continue
+
+            _sched_last = time.monotonic()
+
             def _run() -> dict:
                 jobs = fetch_combined(
                     settings_store.get_titles(),
@@ -405,11 +435,10 @@ async def _auto_fetch_loop() -> None:
 
 
 async def _start_scheduler() -> None:
-    if AUTO_FETCH_MINUTES and int(AUTO_FETCH_MINUTES) > 0:
-        asyncio.create_task(_auto_fetch_loop())
-        logger.info("[scheduler] auto-fetch enabled every %s min", AUTO_FETCH_MINUTES)
-    else:
-        logger.info("[scheduler] auto-fetch disabled (auto_fetch_minutes = 0)")
+    asyncio.create_task(_auto_fetch_loop())
+    logger.info("[scheduler] loop started (enabled=%s, every %s min)",
+                settings_store.get_scheduler_enabled(),
+                settings_store.get_scheduler_interval())
 
 
 ngapp.on_startup(_start_scheduler)

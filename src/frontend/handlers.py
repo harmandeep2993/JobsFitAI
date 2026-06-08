@@ -154,6 +154,17 @@ def register_page():
             <label class="mt-auto"><input type="checkbox" id="mt-entry" checked/> Entry-level only</label>
           </div>
 
+          <div class="mt-row" style="margin-top:12px;">
+            <label class="mt-auto"><input type="checkbox" id="mt-sched" onchange="toggleScheduler()"/> Auto-fetch in background</label>
+            <select id="mt-sched-interval" class="mt-select" onchange="toggleScheduler()">
+              <option value="30">every 30 min</option>
+              <option value="60" selected>every 1 hr</option>
+              <option value="180">every 3 hr</option>
+              <option value="360">every 6 hr</option>
+            </select>
+            <span class="mt-status" id="mt-sched-status"></span>
+          </div>
+
           <div class="mt-row" style="margin-top:14px;">
             <span class="mt-status" id="mt-poll-status"></span>
           </div>
