@@ -357,13 +357,50 @@ window.matchCardHTML = function(r, isNew) {
   const missing = (r.missing_required || []).slice(0, 5).map(mtEsc).join(', ');
   const posted  = relTime(r.posted_at);
   const applied = !!r.applied;
+  const pending = r.status === 'pending';
+  const noJd    = r.status === 'jd_unavailable';
+
+  // Score badge: real score, or a state marker for pending / jd-unavailable.
+  const badge = pending
+    ? '<div class="match-score sc-na">…</div>'
+    : noJd
+      ? '<div class="match-score sc-na" title="JD not on Adzuna">JD?</div>'
+      : '<div class="match-score ' + labelClass(r.label, r.score) + '">' +
+          Math.round(r.score) + '<span class="match-score-pct">%</span></div>';
+
+  let body;
+  if (noJd) {
+    body = '<div class="match-na">JD not available on Adzuna — open the posting to read it, then score it on the Analyzer tab.</div>';
+  } else if (pending) {
+    body = '<div class="match-na">Scoring…</div>';
+  } else {
+    body =
+      (matched ? '<div class="match-skills"><span class="ok">✓</span> ' + matched + '</div>' : '') +
+      (missing ? '<div class="match-skills"><span class="miss">✗</span> ' + missing + '</div>' : '');
+  }
+
+  const actions =
+    '<div class="match-actions">' +
+      (noJd
+        ? '<button class="analyze-btn" onclick="showView(\'analyzer\')">📝 Score in Analyzer</button>'
+        : '<button class="analyze-btn" onclick="openDetail(\'' + mtEsc(r.id) + '\')">🔍 Analyze</button>') +
+      (r.url ? '<a class="job-card-link" href="' + mtEsc(r.url) +
+               '" target="_blank" rel="noopener">Open ↗</a>' : '') +
+      '<button class="apply-toggle' + (applied ? ' on' : '') +
+        '" onclick="toggleApplied(\'' + mtEsc(r.id) + '\',' + (applied ? 1 : 0) + ')">' +
+        (applied ? 'Applied ✓' : 'Mark applied') +
+      '</button>' +
+      '<button class="del-btn" onclick="deleteMatch(\'' + mtEsc(r.id) +
+        '\')" title="Delete &amp; never show again">🗑</button>' +
+    '</div>';
+
   return '' +
-    '<div class="match-card' + (isNew ? ' is-new' : '') + (applied ? ' is-applied' : '') + '">' +
+    '<div class="match-card' + (isNew ? ' is-new' : '') + (applied ? ' is-applied' : '') +
+        (noJd ? ' is-na' : '') + '">' +
       '<div class="match-top">' +
-        '<div class="match-score ' + labelClass(r.label, r.score) + '">' +
-          Math.round(r.score) + '<span class="match-score-pct">%</span>' +
-        '</div>' +
+        badge +
         (isNew ? '<span class="match-new">✨ NEW</span>' : '') +
+        (noJd ? '<span class="match-na-tag">manual</span>' : '') +
         (applied ? '<span class="match-applied-tag">✓ Applied</span>' : '') +
       '</div>' +
       '<div class="match-title">' + mtEsc(r.title) + '</div>' +
@@ -377,19 +414,8 @@ window.matchCardHTML = function(r, isNew) {
         (r.language ? mtEsc(r.language) : '') +
         (r.source ? ' · <span class="src-tag">' + mtEsc(r.source) + '</span>' : '') +
       '</div>' +
-      (matched ? '<div class="match-skills"><span class="ok">✓</span> ' + matched + '</div>' : '') +
-      (missing ? '<div class="match-skills"><span class="miss">✗</span> ' + missing + '</div>' : '') +
-      '<div class="match-actions">' +
-        '<button class="analyze-btn" onclick="openDetail(\'' + mtEsc(r.id) + '\')">🔍 Analyze</button>' +
-        (r.url ? '<a class="job-card-link" href="' + mtEsc(r.url) +
-                 '" target="_blank" rel="noopener">Open ↗</a>' : '') +
-        '<button class="apply-toggle' + (applied ? ' on' : '') +
-          '" onclick="toggleApplied(\'' + mtEsc(r.id) + '\',' + (applied ? 1 : 0) + ')">' +
-          (applied ? 'Applied ✓' : 'Mark applied') +
-        '</button>' +
-        '<button class="del-btn" onclick="deleteMatch(\'' + mtEsc(r.id) +
-          '\')" title="Delete &amp; never show again">🗑</button>' +
-      '</div>' +
+      body +
+      actions +
     '</div>';
 };
 

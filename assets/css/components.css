@@ -589,6 +589,25 @@
 .sc-good    { background: #ca8a04; }   /* amber/yellow */
 .sc-partial { background: #ea580c; }   /* orange */
 .sc-poor    { background: var(--red); }
+.sc-na      { background: var(--t3); font-size: 13px; }   /* pending / JD unavailable */
+
+.match-na {
+  font-size:   12px;
+  color:       var(--t2);
+  line-height: 1.5;
+  margin-top:  8px;
+}
+.match-na-tag {
+  font-size:    10px;
+  font-weight:  700;
+  text-transform: uppercase;
+  color:        var(--t2);
+  background:   var(--bd-s);
+  border-radius: 20px;
+  padding:      2px 8px;
+  font-family:  'DM Mono', monospace;
+}
+.match-card.is-na { opacity: .85; }
 
 .match-title {
   font-size:   14px;

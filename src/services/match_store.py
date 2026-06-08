@@ -37,15 +37,16 @@ def upsert(items: list[dict]) -> None:
         INSERT INTO matches
             (id, source, title, company, location, url, language, posted_at,
              score, label, matched_required, missing_required, scored_at,
-             jd_json, section_scores)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+             jd_json, section_scores, status)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         ON CONFLICT(id) DO UPDATE SET
             source=excluded.source, title=excluded.title, company=excluded.company,
             location=excluded.location, url=excluded.url, language=excluded.language,
             posted_at=excluded.posted_at, score=excluded.score, label=excluded.label,
             matched_required=excluded.matched_required,
             missing_required=excluded.missing_required, scored_at=excluded.scored_at,
-            jd_json=excluded.jd_json, section_scores=excluded.section_scores
+            jd_json=excluded.jd_json, section_scores=excluded.section_scores,
+            status=excluded.status
     """
     rows = [
         (
@@ -57,6 +58,7 @@ def upsert(items: list[dict]) -> None:
             it.get("scored_at"),
             json.dumps(it.get("jd_json")) if it.get("jd_json") is not None else None,
             json.dumps(it.get("section_scores", {})),
+            it.get("status", "scored"),
         )
         for it in items
     ]
@@ -64,10 +66,27 @@ def upsert(items: list[dict]) -> None:
         conn.executemany(sql, rows)
 
 
+def upsert_pending(job) -> None:
+    """Store a job's metadata immediately (status='pending'), before scoring."""
+    upsert([{
+        "id": job.id, "source": job.source, "title": job.title,
+        "company": job.company, "location": job.location, "url": job.url,
+        "language": job.language, "posted_at": job.posted_at,
+        "score": 0, "label": "", "matched_required": [], "missing_required": [],
+        "section_scores": {}, "scored_at": "", "jd_json": None, "status": "pending",
+    }])
+
+
+def set_status(job_id: str, status: str) -> None:
+    """Update only a job's status (e.g. 'jd_unavailable')."""
+    with db.connect() as conn:
+        conn.execute("UPDATE matches SET status = ? WHERE id = ?", (status, job_id))
+
+
 # Columns returned to the UI (jd_json is large — excluded).
 _LIST_COLS = (
     "id, source, title, company, location, url, language, posted_at, "
-    "score, label, matched_required, missing_required, scored_at, applied"
+    "score, label, matched_required, missing_required, scored_at, applied, status"
 )
 
 

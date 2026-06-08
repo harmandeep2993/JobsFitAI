@@ -64,6 +64,8 @@ def init() -> None:
         for col in ("jd_json", "section_scores", "summary"):
             if col not in cols:
                 conn.execute(f"ALTER TABLE matches ADD COLUMN {col} TEXT")
+        if "status" not in cols:
+            conn.execute("ALTER TABLE matches ADD COLUMN status TEXT DEFAULT 'scored'")
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS resume (

@@ -206,12 +206,19 @@ def discover_and_score(jobs: list[Job], entry_only: bool = True) -> dict:
                 logger.debug("   skip senior     | %s", tag)
                 continue
 
-            # 3. expensive path only for survivors: full JD + score
+            # 3. survivor: store metadata now (appears on dashboard), then
+            #    enrich + extract + score.
+            match_store.upsert_pending(job)
+            vector_store.add(job)               # register for future dedup
+
             _enrich(job)
             item = _score_one(job, resume_json)
-            if item:
-                match_store.upsert([item])          # persist immediately -> streams to UI
-                vector_store.add(job)               # register for future dedup
+            jd = item.get("jd_json") if item else None
+            has_jd = bool(jd and (jd.get("required_skills") or jd.get("responsibilities")))
+
+            if item and has_jd:
+                item["status"] = "scored"
+                match_store.upsert([item])      # full result -> streams to UI
                 scored += 1
                 _run_status["scored"] = scored
                 event_store.mark_seen(job, "scored")
@@ -219,8 +226,11 @@ def discover_and_score(jobs: list[Job], entry_only: bool = True) -> dict:
                                       f"{round(item['score'])}% · {item['title'][:40]}")
                 logger.debug("   stored %3d%% | %s", round(item["score"]), tag)
             else:
-                event_store.mark_seen(job, "irrelevant")
-                logger.debug("   skip no-jd       | %s", tag)
+                # JD not on Adzuna (real posting lives elsewhere) — keep the job
+                # for manual review instead of storing a fake score.
+                match_store.set_status(job.id, "jd_unavailable")
+                event_store.mark_seen(job, "jd_unavailable")
+                logger.debug("   jd-unavailable | %s", tag)
 
         event_store.log_event("run", "", f"{len(new_jobs)} new checked, {scored} scored")
         logger.info("== Run complete: %d checked, %d scored", len(new_jobs), scored)
