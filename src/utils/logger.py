@@ -30,8 +30,19 @@ LOG_FILE     = LOG_DIR / "jobfitai.log"
 MAX_BYTES    = 5 * 1024 * 1024
 BACKUP_COUNT = 3
 
-FILE_FORMAT = "%(asctime)s | %(levelname)-8s | %(name)-30s | %(message)s"
-DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
+FILE_FORMAT = "%(asctime)s | %(levelname)-7s | %(name)-15s | %(message)s"
+DATE_FORMAT = "%H:%M:%S"
+
+# Chatty internal modules — pinned to WARNING so normal runs stay readable.
+# Set config logging.level to DEBUG to see their detail again.
+_QUIET_INTERNAL = [
+    "matcher", "skills", "responsibilities", "experiences", "experience",
+    "education", "languages", "certifications",
+    "resume", "jd", "extract", "resume_prompt", "jd_prompt",
+    "router", "embedding_model", "config", "validator",
+    "pdf_parser", "docx_parser", "text_cleaner", "resume_parser",
+    "summary", "match_store",
+]
 
 # Module-level flag — survives re-imports in same process
 _INITIALISED = False
@@ -56,8 +67,8 @@ class _ColourFormatter(logging.Formatter):
         colour = self.COLOURS.get(record.levelno, "")
         reset  = self.RESET
         fmt = (
-            f"%(asctime)s | {colour}%(levelname)-8s{reset}"
-            " | %(name)-30s | %(message)s"
+            f"%(asctime)s | {colour}%(levelname)-7s{reset}"
+            " | %(name)-15s | %(message)s"
         )
         formatter = logging.Formatter(fmt, datefmt=DATE_FORMAT)
         return formatter.format(record)
@@ -107,7 +118,7 @@ def _setup_logging(level: str = "DEBUG") -> None:
         "nicegui", "uvicorn", "uvicorn.access", "uvicorn.error",
         "fastapi", "httpx", "httpcore", "multipart",
         "sentence_transformers", "transformers", "torch",
-        "PIL", "pdfplumber",
+        "PIL", "pdfplumber", "chromadb", "chromadb.telemetry",
         "pdfminer", "pdfminer.pdfpage", "pdfminer.pdfinterp",
         "pdfminer.pdfdocument", "pdfminer.pdfparser",
         "pdfminer.cmapdb", "pdfminer.encodingdb", "pdfminer.converter",
@@ -115,9 +126,12 @@ def _setup_logging(level: str = "DEBUG") -> None:
     for noisy in noisy_loggers:
         logging.getLogger(noisy).setLevel(logging.WARNING)
 
-    # Catch any remaining third party loggers not listed above
-    # by setting propagate=False on our own loggers only
-    logging.getLogger("src").setLevel(logging.DEBUG)
+    # Pin chatty internal modules to WARNING so a run reads as a clean
+    # high-level story (handled by job_matcher / app / relevance / etc.).
+    # Skipped when the configured level is already DEBUG (full detail).
+    if numeric_level > logging.DEBUG:
+        for mod in _QUIET_INTERNAL:
+            logging.getLogger(mod).setLevel(logging.WARNING)
 
     _INITIALISED = True
 

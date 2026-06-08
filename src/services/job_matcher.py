@@ -29,8 +29,8 @@ def _enrich(job: Job) -> None:
         return
     full = fetch_full_description(job.url)
     if full and len(full) > len(job.description):
-        logger.info("Enriched '%s': %d -> %d chars",
-                    job.title[:40], len(job.description), len(full))
+        logger.debug("Enriched '%s': %d -> %d chars",
+                     job.title[:40], len(job.description), len(full))
         job.description = full
 
 
@@ -168,7 +168,7 @@ def discover_and_score(jobs: list[Job], entry_only: bool = True) -> dict:
 
     seen     = event_store.seen_ids()
     new_jobs = [j for j in jobs if j.id and j.id not in seen]
-    logger.info("Funnel: %d fetched, %d new (unseen)", len(jobs), len(new_jobs))
+    logger.info(">> Run: %d fetched, %d new to check", len(jobs), len(new_jobs))
     _run_status.update({"phase": "scoring", "total": len(new_jobs),
                         "checked": 0, "scored": 0})
 
@@ -176,24 +176,29 @@ def discover_and_score(jobs: list[Job], entry_only: bool = True) -> dict:
     try:
         for job in new_jobs:
             _run_status["checked"] += 1
+            tag = f"{job.title[:42]} @ {job.company[:20]}"
 
             # 1. recency (free)
             if not role_filter.is_recent(job):
                 event_store.mark_seen(job, "stale")
+                logger.debug("   skip stale      | %s", tag)
                 continue
 
             # 1b. cross-source semantic dedup (free, local embeddings)
             if vector_store.is_duplicate(job):
                 event_store.mark_seen(job, "duplicate")
+                logger.debug("   skip duplicate  | %s", tag)
                 continue
 
             # 2. cheap LLM relevance gate (title + snippet only)
             verdict = relevance.classify(job.title, job.description)
             if not verdict["relevant"]:
                 event_store.mark_seen(job, "irrelevant")
+                logger.debug("   skip irrelevant | %s", tag)
                 continue
             if entry_only and not verdict["entry_level"]:
                 event_store.mark_seen(job, "not_entry")
+                logger.debug("   skip senior     | %s", tag)
                 continue
 
             # 3. expensive path only for survivors: full JD + score
@@ -207,10 +212,14 @@ def discover_and_score(jobs: list[Job], entry_only: bool = True) -> dict:
                 event_store.mark_seen(job, "scored")
                 event_store.log_event("scored", job.id,
                                       f"{round(item['score'])}% · {item['title'][:40]}")
+                logger.info("   scored %3d%% %-13s | %s",
+                            round(item["score"]), item["label"], tag)
             else:
                 event_store.mark_seen(job, "irrelevant")
+                logger.debug("   skip no-jd       | %s", tag)
 
         event_store.log_event("run", "", f"{len(new_jobs)} new checked, {scored} scored")
+        logger.info("== Run complete: %d checked, %d scored", len(new_jobs), scored)
     finally:
         _run_status.update({"running": False, "phase": "idle"})
 
