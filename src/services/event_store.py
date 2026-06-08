@@ -40,6 +40,19 @@ def mark_seen(job, decision: str) -> None:
         )
 
 
+def block(job_id: str) -> None:
+    """Mark a job id as 'deleted' so the funnel never resurfaces it."""
+    with db.connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO seen_jobs (id, source, title, first_seen, decision)
+            VALUES (?, '', '', ?, 'deleted')
+            ON CONFLICT(id) DO UPDATE SET decision = 'deleted'
+            """,
+            (job_id, _now()),
+        )
+
+
 # ── Events ────────────────────────────────────────────────
 def log_event(event_type: str, job_id: str = "", detail: str = "") -> None:
     """Append an event to the timeline."""

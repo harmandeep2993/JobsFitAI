@@ -153,6 +153,12 @@ def set_applied(job_id: str, applied: bool) -> None:
         )
 
 
+def delete(job_id: str) -> None:
+    """Remove a single match."""
+    with db.connect() as conn:
+        conn.execute("DELETE FROM matches WHERE id = ?", (job_id,))
+
+
 def clear() -> None:
     """Remove all stored matches."""
     with db.connect() as conn:

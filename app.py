@@ -389,6 +389,18 @@ async def api_match_scheduler(request: Request) -> JSONResponse:
     })
 
 
+@ngapp.post("/api/match/delete")
+async def api_match_delete(request: Request) -> JSONResponse:
+    """Delete a single job and block it from being re-fetched."""
+    body   = await request.json()
+    job_id = (body.get("id") or "").strip()
+    if not job_id:
+        return JSONResponse({"ok": False, "error": "id required"}, status_code=400)
+    match_store.delete(job_id)
+    event_store.block(job_id)
+    return JSONResponse({"ok": True})
+
+
 @ngapp.post("/api/match/clear")
 async def api_match_clear() -> JSONResponse:
     """Clear all stored matches, seen-jobs, events, and job vectors."""

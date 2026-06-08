@@ -92,7 +92,7 @@ matcher:
 # Job search — target roles and entry-level filtering for the Matches dashboard
 job_search:
   default_country: "de"
-  per_title_results: 5          # Adzuna results requested per title query
+  per_title_results: 50         # Adzuna results per title query (max 50); LLM gate filters them
   max_experience_years: 2       # keep roles requiring <= this many years (or unknown)
   max_age_days: 45              # drop postings older than this (stale/likely filled)
   auto_fetch_minutes: 0         # server-side auto-fetch interval; 0 = disabled, e.g. 60 = hourly

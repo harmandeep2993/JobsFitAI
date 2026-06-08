@@ -375,6 +375,7 @@ window.matchCardHTML = function(r, isNew) {
         (posted ? '🕒 ' + posted : '') +
         (posted && r.language ? ' · ' : '') +
         (r.language ? mtEsc(r.language) : '') +
+        (r.source ? ' · <span class="src-tag">' + mtEsc(r.source) + '</span>' : '') +
       '</div>' +
       (matched ? '<div class="match-skills"><span class="ok">✓</span> ' + matched + '</div>' : '') +
       (missing ? '<div class="match-skills"><span class="miss">✗</span> ' + missing + '</div>' : '') +
@@ -386,8 +387,29 @@ window.matchCardHTML = function(r, isNew) {
           '" onclick="toggleApplied(\'' + mtEsc(r.id) + '\',' + (applied ? 1 : 0) + ')">' +
           (applied ? 'Applied ✓' : 'Mark applied') +
         '</button>' +
+        '<button class="del-btn" onclick="deleteMatch(\'' + mtEsc(r.id) +
+          '\')" title="Delete &amp; never show again">🗑</button>' +
       '</div>' +
     '</div>';
+};
+
+window.deleteMatch = function(id) {
+  fetch('/api/match/delete', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ id: id }),
+  })
+    .then(r => r.json())
+    .then(d => { if (d.ok) loadMatchState(); })
+    .catch(() => {});
+};
+
+window.clearAllMatches = function() {
+  if (!confirm('Clear ALL matches, history, and seen-jobs? This cannot be undone.')) return;
+  fetch('/api/match/clear', { method: 'POST' })
+    .then(r => r.json())
+    .then(d => { if (d.ok) loadMatchState(); })
+    .catch(() => {});
 };
 
 // ── Detail / "more analysis" modal ────────────────────────

@@ -167,6 +167,7 @@ def register_page():
 
           <div class="mt-row" style="margin-top:14px;">
             <span class="mt-status" id="mt-poll-status"></span>
+            <button class="mt-clear" onclick="clearAllMatches()">🗑 Clear all</button>
           </div>
 
           <button class="mt-toggle" id="mt-filters-toggle" onclick="toggleFilters()">&#9881; Filters &amp; keywords &#9656;</button>
