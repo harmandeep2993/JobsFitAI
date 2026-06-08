@@ -109,11 +109,9 @@ function renderFilters(f) {
 
   box.innerHTML =
     group('Target titles', f.target_titles, 'tc') +
-    group('Entry-level keywords', f.entry_keywords, 'ec') +
-    group('Excluded (seniority)', f.exclude_keywords, 'xc') +
     '<div class="mt-fgroup"><span class="mt-flabel">Limits</span>' +
       '<span class="mt-chip">≤ ' + f.max_age_days + ' days old</span>' +
-      '<span class="mt-chip">≤ ' + f.max_experience_years + ' yrs exp</span>' +
+      '<span class="mt-chip">LLM relevance + entry-level gate</span>' +
     '</div>';
 }
 

@@ -66,38 +66,6 @@ def _score_one(job: Job, resume_json: dict) -> dict | None:
         return None
 
 
-def score_new_jobs(jobs: list[Job]) -> dict:
-    """
-    Score jobs not already in the store, persist them, and return the
-    full ranked list.
-
-    Returns:
-        dict: {"scored": <int new>, "results": [<all stored, ranked>]}
-              or {"error": "no_resume", ...} if no resume is loaded.
-    """
-    resume_json = session.get_resume()
-    if not resume_json:
-        return {"error": "no_resume", "scored": 0, "results": match_store.get_all()}
-
-    seen = match_store.known_ids()
-    new_jobs = [j for j in jobs if j.id and j.id not in seen]
-    logger.info("Scoring %d new jobs (of %d fetched)", len(new_jobs), len(jobs))
-
-    scored = []
-    for job in new_jobs:
-        _enrich(job)                       # fetch full JD (snippet -> full text)
-        item = _score_one(job, resume_json)
-        if item:
-            scored.append(item)
-    match_store.upsert(scored)
-
-    return {
-        "scored":  len(scored),
-        "new_ids": [s["id"] for s in scored],
-        "results": match_store.get_all(),
-    }
-
-
 # Progress of the current/last run, polled by the dashboard for live updates.
 _run_status = {"running": False, "phase": "idle", "checked": 0, "scored": 0, "total": 0}
 

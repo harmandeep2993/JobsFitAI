@@ -12,26 +12,9 @@ window.loadHistory = function() {
       if (!d.ok) return;
       window._histData = d.results || [];
       renderHistory();
-      renderEvents(d.events || []);
     })
     .catch(() => {});
 };
-
-function renderEvents(events) {
-  const box = document.getElementById('hist-events');
-  if (!box) return;
-  if (!events.length) { box.innerHTML = ''; return; }
-  box.innerHTML = '<div class="hist-ev-title">Recent activity</div>' +
-    events.slice(0, 15).map(e => {
-      const t = (e.created_at || '').replace('T', ' ').slice(0, 16);
-      const d = e.detail || e.job_id || '';
-      return '<div class="hist-ev">' +
-        '<span class="hist-ev-type ev-' + e.type + '">' + e.type + '</span>' +
-        '<span class="hist-ev-d">' + mtEsc(d) + '</span>' +
-        '<span class="hist-ev-t">' + t + '</span>' +
-      '</div>';
-    }).join('');
-}
 
 window.setHistFilter = function(f) {
   window._histFilter = f;

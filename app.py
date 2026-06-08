@@ -14,7 +14,6 @@ import asyncio
 import tempfile
 from pathlib import Path
 from typing import Set
-from dataclasses import asdict
 
 from nicegui import ui, app as ngapp
 from starlette.requests   import Request
@@ -25,20 +24,18 @@ from src.frontend.handlers import register_page
 from src.utils.logger import get_logger
 
 logger = get_logger("app")
-from src.fetchers import fetch_adzuna_jobs, fetch_arbeitnow_jobs, fetch_adzuna_multi
 from src.utils import session
 from src.utils.router import check_llm
 from src.parsers import extract_all_text
 from src.extractors.resume import extract_resume
 from src.services.job_matcher import (
-    score_new_jobs, discover_and_score, begin_run, end_run, get_run_status,
+    discover_and_score, begin_run, end_run, get_run_status,
     rescore_all, fetch_combined,
 )
-from src.services import match_store, role_filter, event_store, vector_store
+from src.services import match_store, event_store, vector_store
 from src.services.summary import generate_summary
 from src.utils.config import (
-    TARGET_TITLES, SEARCH_COUNTRY, SEARCH_PER_TITLE,
-    ENTRY_KEYWORDS, EXCLUDE_KEYWORDS, MAX_AGE_DAYS, MAX_EXPERIENCE_YEARS,
+    TARGET_TITLES, SEARCH_COUNTRY, SEARCH_PER_TITLE, MAX_AGE_DAYS,
     AUTO_FETCH_MINUTES,
 )
 
@@ -119,52 +116,6 @@ async def api_upload(request: Request) -> JSONResponse:
         "ext":  suffix.upper()[1:],
         }
     )
-
-# Job Fetch API
-@ngapp.get("/api/fetch-jobs")
-async def api_fetch_jobs(request: Request) -> JSONResponse:
-    """
-    Fetch job postings from Adzuna for a role/location search.
-
-    Query parameters
-    ----------------
-    query : str
-        Role to search for (required).
-    location : str
-        Location filter (optional).
-    results : int
-        Number of results to return (1-20, default 8).
-
-    Returns
-    -------
-    JSONResponse
-        {"ok": True, "jobs": [Job, ...]} where each Job is the dataclass
-        serialized to a dict (title, company, location, url, description,
-        language), or {"ok": False, "error": ...} on failure.
-    """
-    params   = request.query_params
-    query    = (params.get("query") or "").strip()
-    location = (params.get("location") or "").strip()
-
-    if not query:
-        return JSONResponse(
-            {"ok": False, "error": "query is required"},
-            status_code=400,
-        )
-
-    try:
-        results = int(params.get("results", 8))
-    except ValueError:
-        results = 8
-    results = max(1, min(results, 20))
-
-    # fetch_adzuna_jobs is synchronous (uses requests) — run off the event loop.
-    jobs = await run_in_threadpool(
-        fetch_adzuna_jobs, query, location, results
-    )
-
-    return JSONResponse({"ok": True, "jobs": [asdict(job) for job in jobs]})
-
 
 # LLM Settings API
 @ngapp.get("/api/llm-settings")
@@ -315,14 +266,10 @@ async def api_match_state() -> JSONResponse:
         "has_resume":  session.has_resume(),
         "resume_name": session.get_resume_name(),
         "filters": {
-            "target_titles":        TARGET_TITLES,
-            "entry_keywords":       ENTRY_KEYWORDS,
-            "exclude_keywords":     EXCLUDE_KEYWORDS,
-            "max_age_days":         MAX_AGE_DAYS,
-            "max_experience_years": MAX_EXPERIENCE_YEARS,
+            "target_titles": TARGET_TITLES,
+            "max_age_days":   MAX_AGE_DAYS,
         },
         "stats":       event_store.stats(),
-        "events":      event_store.recent_events(30),
         "run_status":  get_run_status(),
         "resume":      session.resume_info(),
         "results":     match_store.get_all(),

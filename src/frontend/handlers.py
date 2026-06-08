@@ -129,25 +129,6 @@ def register_page():
       <div id="jf-results" style="display:none;"></div>
       </div><!-- /view-analyzer -->
 
-      <div id="view-jobsearch" class="view" style="display:none;">
-        <div class="pg-title">Job <em>Search</em></div>
-        <div class="pg-sub">Search live job postings from Adzuna</div>
-
-        <div class="divider"></div>
-
-        <div class="content-card">
-          <div class="jd-fetch">
-            <input id="fetch-query" class="fetch-inp"
-              placeholder="Role e.g. machine learning engineer"/>
-            <input id="fetch-loc" class="fetch-inp fetch-inp-sm"
-              placeholder="Location"/>
-            <button class="btn-primary fetch-btn" id="fetch-btn" onclick="fetchJobs()">&rarr; Fetch Jobs</button>
-          </div>
-        </div>
-
-        <div class="fetch-results" id="fetch-results" style="display:none;"></div>
-      </div><!-- /view-jobsearch -->
-
       <div id="view-matches" class="view" style="display:none;">
         <div class="pg-title">Job <em>Matches</em></div>
         <div class="pg-sub">Load your resume once, then fetch German AI/ML jobs (full descriptions) and score each against it</div>
@@ -207,8 +188,6 @@ def register_page():
         </div>
 
         <div class="fetch-results" id="hist-results"></div>
-
-        <div class="hist-events" id="hist-events"></div>
       </div><!-- /view-history -->
 
       <div id="view-settings" class="view" style="display:none;">
