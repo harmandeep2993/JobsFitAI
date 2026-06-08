@@ -171,8 +171,7 @@ def _lowercase_all(data):
         return {k: _lowercase_all(v) for k, v in data.items()}
 
     else:
-        # Preserve numbers, booleans, None — return as-is
-        logger.warning("Unexpected type in _lowercase_all: %s", type(data))
+        # Numbers, booleans, None — preserved as-is (expected, not an error).
         return data
 
 

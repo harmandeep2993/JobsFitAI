@@ -140,7 +140,7 @@ def _check_mime_type(path: Path) -> None:
     except ValueError:
         raise
     except ImportError:
-        logger.warning("python-magic not installed — skipping MIME type check")
+        logger.debug("python-magic not installed — skipping MIME type check")
     except Exception as e:
         logger.warning("MIME check failed unexpectedly: %s — skipping", e)
 

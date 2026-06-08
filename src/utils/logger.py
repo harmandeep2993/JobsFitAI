@@ -126,6 +126,10 @@ def _setup_logging(level: str = "DEBUG") -> None:
     for noisy in noisy_loggers:
         logging.getLogger(noisy).setLevel(logging.WARNING)
 
+    # These warn even at WARNING (e.g. HF unauthenticated-request notice) — mute to ERROR.
+    for q in ("huggingface_hub", "huggingface_hub.utils._http", "safetensors"):
+        logging.getLogger(q).setLevel(logging.ERROR)
+
     # Pin chatty internal modules to WARNING so a run reads as a clean
     # high-level story (handled by job_matcher / app / relevance / etc.).
     # Skipped when the configured level is already DEBUG (full detail).
