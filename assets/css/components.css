@@ -625,8 +625,10 @@
 
 .match-card .job-card-link { margin-top: 0; }
 
-/* Uploaded-resume panel */
-.mt-resume:empty { display: none; }
+/* Resume details button row */
+.mt-resume-row { margin-bottom: 18px; }
+
+/* Uploaded-resume panel (rendered inside the detail modal) */
 .mt-resume {
   background:    var(--bg-r);
   border:        1px solid var(--bd);

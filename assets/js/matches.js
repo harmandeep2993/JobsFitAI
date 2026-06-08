@@ -53,19 +53,15 @@ window.loadMatchState = function() {
 };
 
 // Uploaded resume + the info extracted from it.
+// Store the resume and just show/hide the "View Resume Details" button.
 function renderResume(r) {
-  const box = document.getElementById('mt-resume');
-  const tog = document.getElementById('mt-resume-toggle');
-  if (!box) return;
-  if (!r || !r.name) {
-    box.innerHTML = '';
-    box.style.display = 'none';
-    if (tog) tog.style.display = 'none';
-    return;
-  }
-  if (tog) tog.style.display = 'block';   // panel stays collapsed until clicked
+  const btn = document.getElementById('mt-resume-btn');
+  window._resumeInfo = (r && r.name) ? r : null;
+  if (btn) btn.style.display = window._resumeInfo ? 'inline-flex' : 'none';
+}
 
-  const skills = (r.skills || []).slice(0, 24).map(s =>
+function resumeHTML(r) {
+  const skills = (r.skills || []).slice(0, 30).map(s =>
     '<span class="rz-chip">' + mtEsc(s) + '</span>').join('');
   const exp = (r.experience || []).map(e =>
     '<div class="rz-row"><span class="rz-role">' + mtEsc(e.title || '') + '</span>' +
@@ -76,18 +72,30 @@ function renderResume(r) {
     '<div class="rz-row">' + mtEsc((e.degree || '') + ' ' + (e.field || '')) +
     ' · ' + mtEsc(e.institution || '') + '</div>').join('');
   const langs = (r.languages || []).map(mtEsc).join(', ');
+  const certs = (r.certifications || []).map(mtEsc).join(', ');
 
-  box.innerHTML =
-    '<div class="rz-head">' +
-      '<span class="rz-doc">📄 ' + mtEsc(r.name) + '</span>' +
-      '<span class="rz-meta">' + mtEsc(r.title || '') +
-        (r.total_years ? ' · ' + r.total_years + 'y total' : '') + '</span>' +
+  return '' +
+    '<div class="dt-head">' +
+      '<div><div class="dt-title">📄 ' + mtEsc(r.name) + '</div>' +
+        '<div class="dt-sub">' + mtEsc(r.title || '') +
+          (r.total_years ? ' · ' + r.total_years + 'y experience' : '') + '</div></div>' +
+      '<button class="dt-close" id="detail-close" onclick="closeDetail(event)">✕</button>' +
     '</div>' +
     (skills ? '<div class="rz-sec"><div class="rz-label">Skills</div><div class="rz-chips">' + skills + '</div></div>' : '') +
     (exp   ? '<div class="rz-sec"><div class="rz-label">Experience</div>' + exp + '</div>' : '') +
     (edu   ? '<div class="rz-sec"><div class="rz-label">Education</div>' + edu + '</div>' : '') +
-    (langs ? '<div class="rz-sec"><div class="rz-label">Languages</div><div class="rz-row">' + langs + '</div></div>' : '');
+    (langs ? '<div class="rz-sec"><div class="rz-label">Languages</div><div class="rz-row">' + langs + '</div></div>' : '') +
+    (certs ? '<div class="rz-sec"><div class="rz-label">Certifications</div><div class="rz-row">' + certs + '</div></div>' : '');
 }
+
+window.openResume = function() {
+  const r = window._resumeInfo;
+  const modal = document.getElementById('detail-modal');
+  const box = document.getElementById('detail-box');
+  if (!r || !modal || !box) return;
+  box.innerHTML = resumeHTML(r);
+  modal.style.display = 'flex';
+};
 
 // Live metrics bar.
 function renderStats(s) {
@@ -178,14 +186,6 @@ window.toggleFilters = function() {
   const show = p.style.display === 'none';
   p.style.display = show ? 'block' : 'none';
   if (t) t.innerHTML = '⚙ Filters &amp; keywords ' + (show ? '▾' : '▸');
-};
-
-window.toggleResume = function() {
-  const p = document.getElementById('mt-resume');
-  const t = document.getElementById('mt-resume-toggle');
-  const show = p.style.display === 'none';
-  p.style.display = show ? 'block' : 'none';
-  if (t) t.innerHTML = '📄 Resume details ' + (show ? '▾' : '▸');
 };
 
 function setResumeStatus(has, name) {

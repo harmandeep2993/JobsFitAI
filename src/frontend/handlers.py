@@ -170,8 +170,9 @@ def register_page():
           <div class="mt-filters" id="mt-filters" style="display:none;"></div>
         </div>
 
-        <button class="mt-toggle" id="mt-resume-toggle" style="display:none;" onclick="toggleResume()">&#128196; Resume details &#9656;</button>
-        <div class="mt-resume" id="mt-resume" style="display:none;"></div>
+        <div class="mt-resume-row">
+          <button class="btn-ghost" id="mt-resume-btn" style="display:none;" onclick="openResume()">&#128196; View Resume Details</button>
+        </div>
 
         <div class="fetch-results" id="mt-results"></div>
       </div><!-- /view-matches -->
