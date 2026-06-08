@@ -18,7 +18,7 @@ _PROMPT = """You screen job postings for an ENTRY-LEVEL candidate targeting AI /
 
 Decide two things from the title and snippet:
 - relevant: true only if it is an AI/ML/Data role (NOT sales, marketing, finance, accounting, HR, civil/mechanical engineering, consulting, support, etc.).
-- entry_level: true if suitable for 0-2 years experience (junior/graduate/trainee/working student, or no senior/lead/principal/staff/manager wording and not requiring 3+ years).
+- entry_level: true by DEFAULT. Set it false ONLY when the role is clearly senior — i.e. the title contains senior / sr. / lead / principal / staff / head / director / manager / architect, OR the text explicitly requires 3+ years of experience. A plain role with no seniority wording (e.g. "Data Scientist", "ML Engineer") IS entry_level=true.
 
 Return ONLY JSON, no prose: {{"relevant": true/false, "entry_level": true/false, "reason": "<=8 words"}}
 
