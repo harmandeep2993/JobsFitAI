@@ -2,6 +2,7 @@
 # OpenAI API provider
 
 import os
+import time
 import requests
 
 from src.utils.config import LLM_TEMPERATURE, LLM_MAX_OUTPUT_TOKENS, LLM_TIMEOUT, OPENAI_CONFIG
@@ -57,29 +58,35 @@ def call(prompt, model: str | None = None):
         return None
 
     use_model = model or _MODEL
+    payload = {
+        "model":       use_model,
+        "messages":    [{"role": "user", "content": prompt}],
+        "temperature": LLM_TEMPERATURE,
+        "max_tokens":  LLM_MAX_OUTPUT_TOKENS,
+    }
+    headers = {"Authorization": f"Bearer {_API_KEY}", "Content-Type": "application/json"}
 
-    try:
-        response = requests.post(
-            OPENAI_URL,
-            headers={
-                "Authorization": f"Bearer {_API_KEY}",
-                "Content-Type":  "application/json",
-            },
-            json={
-                "model":       use_model,
-                "messages":    [{"role": "user", "content": prompt}],
-                "temperature": LLM_TEMPERATURE,
-                "max_tokens":  LLM_MAX_OUTPUT_TOKENS,
-            },
-            timeout=LLM_TIMEOUT,
-        )
+    # Retry on transient rate-limit / server errors so a 429 under load
+    # doesn't turn a real job into a false "JD unavailable".
+    for attempt in range(4):
+        try:
+            response = requests.post(OPENAI_URL, headers=headers, json=payload,
+                                     timeout=LLM_TIMEOUT)
+            if response.status_code == 200:
+                return response.json()["choices"][0]["message"]["content"].strip()
 
-        if response.status_code == 200:
-            return response.json()["choices"][0]["message"]["content"].strip()
+            if response.status_code in (429, 500, 502, 503, 504) and attempt < 3:
+                wait = float(response.headers.get("retry-after", 2 * (attempt + 1)))
+                logger.warning("[OpenAI] %s — retry in %.0fs", response.status_code, min(wait, 30))
+                time.sleep(min(wait, 30))
+                continue
 
-        logger.error("[OpenAI] error %s: %s", response.status_code, response.text[:200])
-        return None
+            logger.error("[OpenAI] error %s: %s", response.status_code, response.text[:200])
+            return None
 
-    except Exception as e:
-        logger.error("[OpenAI] call() failed: %s", e)
-        return None
+        except requests.RequestException as e:
+            if attempt < 3:
+                time.sleep(2 * (attempt + 1))
+                continue
+            logger.error("[OpenAI] call() failed: %s", e)
+            return None

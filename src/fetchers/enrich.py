@@ -11,6 +11,7 @@ so the matcher scores against the complete JD.
 import re
 import html
 import json
+import time
 
 import requests
 
@@ -57,12 +58,22 @@ def fetch_full_description(url: str) -> str:
     if not url:
         return ""
 
-    try:
-        resp = requests.get(url, timeout=15, headers=_HEADERS)
-        if resp.status_code != 200:
+    resp = None
+    for attempt in range(3):
+        try:
+            resp = requests.get(url, timeout=15, headers=_HEADERS)
+            if resp.status_code in (429, 500, 502, 503, 504) and attempt < 2:
+                time.sleep(1.0 * (attempt + 1))
+                continue
+            break
+        except requests.RequestException as e:
+            if attempt < 2:
+                time.sleep(1.0 * (attempt + 1))
+                continue
+            logger.warning("Full-JD fetch failed (%s): %s", url[:60], e)
             return ""
-    except requests.RequestException as e:
-        logger.warning("Full-JD fetch failed (%s): %s", url[:60], e)
+
+    if resp is None or resp.status_code != 200:
         return ""
 
     best = ""
