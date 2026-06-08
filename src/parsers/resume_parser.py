@@ -23,6 +23,7 @@ from src.parsers.docx_parser import parse_docx
 from src.parsers.text_cleaner import clean
 from src.utils.logger import get_logger
 
+# 
 logger = get_logger(__name__)
 
 
