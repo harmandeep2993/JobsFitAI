@@ -436,6 +436,46 @@
 .hist-ev-d { flex: 1; color: var(--t2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hist-ev-t { flex-shrink: 0; color: var(--t3); font-family: 'DM Mono', monospace; font-size: 11px; }
 
+/* Collapsible filters toggle */
+.mt-toggle {
+  margin-top:    16px;
+  background:    transparent;
+  border:        none;
+  color:         var(--t2);
+  font-size:     12px;
+  font-weight:   600;
+  font-family:   'DM Mono', monospace;
+  cursor:        pointer;
+  padding:       4px 0;
+}
+.mt-toggle:hover { color: var(--accent); }
+
+/* Editable keyword chips */
+.kw-wrap { flex: 1; display: flex; flex-wrap: wrap; gap: 6px; }
+.kw-chip {
+  display:       inline-flex;
+  align-items:   center;
+  gap:           5px;
+  font-size:     11px;
+  padding:       3px 4px 3px 10px;
+  border-radius: 20px;
+  background:    var(--bg-c);
+  border:        1px solid var(--bd);
+  color:         var(--t2);
+  font-family:   'DM Mono', monospace;
+}
+.kw-x {
+  border:        none;
+  background:    transparent;
+  color:         var(--t3);
+  cursor:        pointer;
+  font-size:     11px;
+  line-height:   1;
+  padding:       2px 4px;
+  border-radius: 50%;
+}
+.kw-x:hover { color: var(--red); background: var(--red-bg); }
+
 /* Active filter keywords */
 .mt-filters {
   margin-top:    14px;

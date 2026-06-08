@@ -55,8 +55,15 @@ window.loadMatchState = function() {
 // Uploaded resume + the info extracted from it.
 function renderResume(r) {
   const box = document.getElementById('mt-resume');
+  const tog = document.getElementById('mt-resume-toggle');
   if (!box) return;
-  if (!r || !r.name) { box.innerHTML = ''; return; }
+  if (!r || !r.name) {
+    box.innerHTML = '';
+    box.style.display = 'none';
+    if (tog) tog.style.display = 'none';
+    return;
+  }
+  if (tog) tog.style.display = 'block';   // panel stays collapsed until clicked
 
   const skills = (r.skills || []).slice(0, 24).map(s =>
     '<span class="rz-chip">' + mtEsc(s) + '</span>').join('');
@@ -95,25 +102,91 @@ function renderStats(s) {
   ).join('');
 }
 
-// Show which keywords/rules drive the job extraction.
+// Editable filter panel — built once so polling doesn't clobber edits.
 function renderFilters(f) {
+  if (!f) return;
+  window._filtersData = f;
   const box = document.getElementById('mt-filters');
-  if (!box || !f) return;
+  if (!box || window._filtersRendered) return;
+  window._filtersRendered = true;
 
-  function group(label, arr, cls) {
-    if (!arr || !arr.length) return '';
-    return '<div class="mt-fgroup"><span class="mt-flabel">' + label + '</span>' +
-      arr.map(x => '<span class="mt-chip ' + cls + '">' + mtEsc(x) + '</span>').join('') +
-      '</div>';
-  }
-
+  window._titles = (f.target_titles || []).slice();
   box.innerHTML =
-    group('Target titles', f.target_titles, 'tc') +
-    '<div class="mt-fgroup"><span class="mt-flabel">Limits</span>' +
-      '<span class="mt-chip">≤ ' + f.max_age_days + ' days old</span>' +
-      '<span class="mt-chip">LLM relevance + entry-level gate</span>' +
-    '</div>';
+    '<div class="set-row"><label class="set-lbl">Countries</label>' +
+      '<input id="flt-countries" class="fetch-inp" value="' +
+        mtEsc((f.countries || []).join(', ')) +
+        '" placeholder="germany, netherlands, belgium"/></div>' +
+    '<div class="set-row"><label class="set-lbl">Location</label>' +
+      '<input id="flt-location" class="fetch-inp" value="' + mtEsc(f.location || '') +
+        '" placeholder="city (optional) — blank = whole country"/></div>' +
+    '<div class="set-row" style="align-items:flex-start;">' +
+      '<label class="set-lbl">Target titles</label>' +
+      '<div class="kw-wrap" id="kw-wrap"></div></div>' +
+    '<div class="set-row"><label class="set-lbl"></label>' +
+      '<input id="flt-newtitle" class="fetch-inp" placeholder="add a role keyword"/>' +
+      '<button class="btn-ghost" onclick="addTitle()">Add</button></div>' +
+    '<div class="set-actions"><button class="btn-primary" onclick="saveFilters()">Save</button>' +
+      '<span class="mt-status" id="flt-status">≤ ' + f.max_age_days +
+        ' days old · LLM relevance + entry-level gate</span></div>';
+  rerenderChips();
 }
+
+function rerenderChips() {
+  const w = document.getElementById('kw-wrap');
+  if (!w) return;
+  w.innerHTML = (window._titles || []).map((t, i) =>
+    '<span class="kw-chip">' + mtEsc(t) +
+    '<button class="kw-x" onclick="removeTitle(' + i + ')" title="remove">✕</button></span>'
+  ).join('');
+}
+
+window.removeTitle = function(i) { window._titles.splice(i, 1); rerenderChips(); };
+
+window.addTitle = function() {
+  const el = document.getElementById('flt-newtitle');
+  const v = (el.value || '').trim().toLowerCase();
+  if (v && !window._titles.includes(v)) { window._titles.push(v); el.value = ''; rerenderChips(); }
+};
+
+window.saveFilters = function() {
+  const st = document.getElementById('flt-status');
+  st.textContent = 'Saving…';
+  fetch('/api/match/filters', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      target_titles: window._titles,
+      countries:     document.getElementById('flt-countries').value,
+      location:      document.getElementById('flt-location').value,
+    }),
+  })
+    .then(r => r.json())
+    .then(d => {
+      if (!d.ok) { st.textContent = '✕ save failed'; return; }
+      window._titles = d.target_titles;
+      rerenderChips();
+      st.textContent = '✓ Saved · ' + d.target_titles.length + ' titles · ' +
+        ((d.countries || []).join(', ') || 'germany') +
+        (d.location ? ' · ' + d.location : '');
+    })
+    .catch(() => { st.textContent = '✕ save error'; });
+};
+
+window.toggleFilters = function() {
+  const p = document.getElementById('mt-filters');
+  const t = document.getElementById('mt-filters-toggle');
+  const show = p.style.display === 'none';
+  p.style.display = show ? 'block' : 'none';
+  if (t) t.innerHTML = '⚙ Filters &amp; keywords ' + (show ? '▾' : '▸');
+};
+
+window.toggleResume = function() {
+  const p = document.getElementById('mt-resume');
+  const t = document.getElementById('mt-resume-toggle');
+  const show = p.style.display === 'none';
+  p.style.display = show ? 'block' : 'none';
+  if (t) t.innerHTML = '📄 Resume details ' + (show ? '▾' : '▸');
+};
 
 function setResumeStatus(has, name) {
   const el = document.getElementById('mt-resume-status');
@@ -171,7 +244,6 @@ window.runMatch = function() {
   const status = document.getElementById('mt-poll-status');
   const btn    = document.getElementById('mt-run-btn');
   const query  = document.getElementById('mt-query').value.trim();
-  const loc    = document.getElementById('mt-loc').value.trim();
   const entry  = document.getElementById('mt-entry');
   const entryOnly = entry ? entry.checked : true;
 
@@ -186,7 +258,6 @@ window.runMatch = function() {
       window._preRunIds = new Set((prev.results || []).map(x => x.id));
       const url = '/api/match/run'
         + '?query='      + encodeURIComponent(query)
-        + '&location='   + encodeURIComponent(loc)
         + '&entry_only=' + (entryOnly ? 'true' : 'false');
       return fetch(url);
     })

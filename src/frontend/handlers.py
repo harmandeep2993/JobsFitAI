@@ -146,8 +146,7 @@ def register_page():
           </div>
 
           <div class="jd-fetch" style="margin-top:16px;">
-            <input id="mt-query" class="fetch-inp" placeholder="Optional: override role (default = your target AI/ML titles)"/>
-            <input id="mt-loc" class="fetch-inp fetch-inp-sm" placeholder="Location e.g. berlin"/>
+            <input id="mt-query" class="fetch-inp" placeholder="Optional: search one role now (default = your saved titles)"/>
             <button class="btn-primary" id="mt-run-btn" onclick="runMatch()">&rarr; Fetch &amp; Score</button>
           </div>
 
@@ -167,10 +166,12 @@ def register_page():
             <span class="mt-status" id="mt-poll-status"></span>
           </div>
 
-          <div class="mt-filters" id="mt-filters"></div>
+          <button class="mt-toggle" id="mt-filters-toggle" onclick="toggleFilters()">&#9881; Filters &amp; keywords &#9656;</button>
+          <div class="mt-filters" id="mt-filters" style="display:none;"></div>
         </div>
 
-        <div class="mt-resume" id="mt-resume"></div>
+        <button class="mt-toggle" id="mt-resume-toggle" style="display:none;" onclick="toggleResume()">&#128196; Resume details &#9656;</button>
+        <div class="mt-resume" id="mt-resume" style="display:none;"></div>
 
         <div class="fetch-results" id="mt-results"></div>
       </div><!-- /view-matches -->
