@@ -16,6 +16,7 @@ Reuse note:
 import os
 import re
 import html
+import time
 import datetime as dt
 from dataclasses import dataclass
 
@@ -167,11 +168,26 @@ def fetch_adzuna_jobs(
         "content-type": "application/json",
     }
 
-    try:
-        response = requests.get(url, params=params, timeout=15)
-        response.raise_for_status()
-    except requests.RequestException as e:
-        logger.error("Adzuna request failed: %s", e)
+    # Retry on transient rate-limit / server errors (429, 5xx).
+    response = None
+    for attempt in range(3):
+        try:
+            response = requests.get(url, params=params, timeout=15)
+            if response.status_code in (429, 500, 502, 503, 504) and attempt < 2:
+                logger.warning("Adzuna %s for '%s' — retry %d",
+                               response.status_code, query, attempt + 1)
+                time.sleep(1.0 * (attempt + 1))
+                continue
+            response.raise_for_status()
+            break
+        except requests.RequestException as e:
+            if attempt < 2:
+                time.sleep(1.0 * (attempt + 1))
+                continue
+            logger.error("Adzuna request failed: %s", e)
+            return []
+
+    if response is None:
         return []
 
     data = response.json()
@@ -208,7 +224,9 @@ def fetch_adzuna_multi(
     seen: set[str] = set()
     out: list[Job] = []
 
-    for title in titles:
+    for i, title in enumerate(titles):
+        if i:
+            time.sleep(0.3)   # gentle throttle to avoid Adzuna rate-limit (503)
         for job in fetch_adzuna_jobs(
             query=title, location=location, results=per_title, country=country
         ):
