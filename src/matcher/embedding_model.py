@@ -38,41 +38,67 @@ _model = None
 
 @contextlib.contextmanager
 def _suppress_native_output():
-    """Redirect fd 1 & 2 to devnull so native/library prints are silenced."""
-    saved_out, saved_err = os.dup(1), os.dup(2)
-    devnull = os.open(os.devnull, os.O_WRONLY)
+    """
+    Best-effort: redirect fd 1 & 2 to devnull to silence native/library prints
+    (the weights bar / "LOAD REPORT"). If the fds can't be duplicated — e.g.
+    inside a server threadpool on Windows, which raised WinError 1 — this
+    yields WITHOUT redirecting so the caller still runs normally.
+    """
+    saved_out = saved_err = devnull = None
     try:
+        saved_out, saved_err = os.dup(1), os.dup(2)
+        devnull = os.open(os.devnull, os.O_WRONLY)
         os.dup2(devnull, 1)
         os.dup2(devnull, 2)
+    except OSError:
+        for fd in (devnull, saved_out, saved_err):
+            if fd is not None:
+                try:
+                    os.close(fd)
+                except OSError:
+                    pass
+        saved_out = saved_err = devnull = None
+
+    try:
         yield
     finally:
-        os.dup2(saved_out, 1)
-        os.dup2(saved_err, 2)
-        os.close(devnull)
-        os.close(saved_out)
-        os.close(saved_err)
+        try:
+            if saved_out is not None:
+                os.dup2(saved_out, 1)
+            if saved_err is not None:
+                os.dup2(saved_err, 2)
+        except OSError:
+            pass
+        for fd in (devnull, saved_out, saved_err):
+            if fd is not None:
+                try:
+                    os.close(fd)
+                except OSError:
+                    pass
 
 
 def load_model() -> SentenceTransformer:
     """
-    Load embedding model once (module-level singleton).
-    Model is downloaded on first call and cached locally by sentence-transformers.
+    Load the embedding model once (module-level singleton). Loading must never
+    fail just because output-suppression doesn't work in this environment, so
+    a failed suppressed load is retried plainly.
 
     Returns:
         SentenceTransformer: Loaded embedding model
 
     Raises:
-        RuntimeError: If model fails to load
+        RuntimeError: If the model genuinely fails to load
     """
     global _model
 
     if _model is None:
         logger.info("Loading embedding model: %s", MODEL_NAME)
         try:
-            # Silence the weights progress bar / "LOAD REPORT" the transformers
-            # loader writes straight to the stdout/stderr file descriptors
-            # (bypasses Python-level redirect), by redirecting fds 1 & 2.
-            with _suppress_native_output():
+            try:
+                with _suppress_native_output():
+                    _model = SentenceTransformer(MODEL_NAME)
+            except Exception:
+                # Suppression context interfered (e.g. WinError 1) — load plainly.
                 _model = SentenceTransformer(MODEL_NAME)
             logger.info("Embedding model loaded successfully")
         except Exception as e:
