@@ -155,14 +155,6 @@ def register_page():
           </div>
 
           <div class="mt-row" style="margin-top:14px;">
-            <label class="mt-auto">
-              <input type="checkbox" id="mt-auto" onchange="toggleAutoMatch()"/> Auto-refresh every
-            </label>
-            <select id="mt-interval" class="mt-select">
-              <option value="60">1 min</option>
-              <option value="300" selected>5 min</option>
-              <option value="900">15 min</option>
-            </select>
             <span class="mt-status" id="mt-poll-status"></span>
           </div>
 

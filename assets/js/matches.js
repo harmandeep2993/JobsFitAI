@@ -3,7 +3,6 @@
 // Arbeitnow, score each against the resume, and show a ranked list.
 // Supports auto-refresh that scores only newly-seen jobs.
 
-window._matchPoll = null;
 
 function mtEsc(s) {
   return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;')
@@ -472,28 +471,6 @@ function renderMatches(results, newIds) {
 
   box.innerHTML = ordered.map(r => window.matchCardHTML(r, newIds.has(r.id))).join('');
 }
-
-// ── Auto-refresh ──────────────────────────────────────────
-window.toggleAutoMatch = function() {
-  const on = document.getElementById('mt-auto').checked;
-  const status = document.getElementById('mt-poll-status');
-
-  if (window._matchPoll) {
-    clearInterval(window._matchPoll);
-    window._matchPoll = null;
-  }
-
-  if (on) {
-    const secs = parseInt(document.getElementById('mt-interval').value, 10) || 300;
-    runMatch();
-    window._matchPoll = setInterval(runMatch, secs * 1000);
-    status.textContent = 'Auto-refresh on (every ' + (secs / 60) + ' min)';
-    status.className = 'mt-status ok';
-  } else {
-    status.textContent = 'Auto-refresh off';
-    status.className = 'mt-status';
-  }
-};
 
 // ── Bind ──────────────────────────────────────────────────
 (function bindMatches() {
