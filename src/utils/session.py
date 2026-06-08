@@ -144,6 +144,44 @@ def has_resume() -> bool:
     return get_resume() is not None
 
 
+def _flatten_skills(skills) -> list:
+    if isinstance(skills, list):
+        return [s for s in skills if isinstance(s, str)]
+    if isinstance(skills, dict):
+        out = []
+        for v in skills.values():
+            if isinstance(v, list):
+                out.extend(s for s in v if isinstance(s, str))
+        return out
+    return []
+
+
+def resume_info() -> dict:
+    """Compact view of the stored resume for the dashboard panel."""
+    r = get_resume()
+    if not r:
+        return {}
+    return {
+        "name":        get_resume_name(),
+        "title":       (r.get("candidate") or {}).get("title", ""),
+        "total_years": (r.get("meta") or {}).get("total_experience_years", 0),
+        "skills":      _flatten_skills(r.get("skills", [])),
+        "experience": [
+            {"title": e.get("title", ""), "company": e.get("company", ""),
+             "start": e.get("start_date", ""), "end": e.get("end_date", ""),
+             "years": e.get("duration_years", 0)}
+            for e in r.get("experience_entries", []) if isinstance(e, dict)
+        ],
+        "education": [
+            {"degree": e.get("degree", ""), "field": e.get("field", ""),
+             "institution": e.get("institution", "")}
+            for e in r.get("education", []) if isinstance(e, dict)
+        ],
+        "languages":      r.get("languages", []),
+        "certifications": r.get("certifications", []),
+    }
+
+
 def provider_catalog() -> list[dict]:
     """
     Return the selectable providers for the UI.

@@ -45,11 +45,42 @@ window.loadMatchState = function() {
       if (!d.ok) return;
       setResumeStatus(d.has_resume, d.resume_name);
       renderStats(d.stats);
+      renderResume(d.resume);
       renderFilters(d.filters);
       renderMatches(d.results || [], new Set());
     })
     .catch(() => {});
 };
+
+// Uploaded resume + the info extracted from it.
+function renderResume(r) {
+  const box = document.getElementById('mt-resume');
+  if (!box) return;
+  if (!r || !r.name) { box.innerHTML = ''; return; }
+
+  const skills = (r.skills || []).slice(0, 24).map(s =>
+    '<span class="rz-chip">' + mtEsc(s) + '</span>').join('');
+  const exp = (r.experience || []).map(e =>
+    '<div class="rz-row"><span class="rz-role">' + mtEsc(e.title || '') + '</span>' +
+    '<span class="rz-co">' + mtEsc(e.company || '') + '</span>' +
+    '<span class="rz-dt">' + mtEsc(e.start || '') + '–' + mtEsc(e.end || '') +
+    ' (' + (e.years || 0) + 'y)</span></div>').join('');
+  const edu = (r.education || []).map(e =>
+    '<div class="rz-row">' + mtEsc((e.degree || '') + ' ' + (e.field || '')) +
+    ' · ' + mtEsc(e.institution || '') + '</div>').join('');
+  const langs = (r.languages || []).map(mtEsc).join(', ');
+
+  box.innerHTML =
+    '<div class="rz-head">' +
+      '<span class="rz-doc">📄 ' + mtEsc(r.name) + '</span>' +
+      '<span class="rz-meta">' + mtEsc(r.title || '') +
+        (r.total_years ? ' · ' + r.total_years + 'y total' : '') + '</span>' +
+    '</div>' +
+    (skills ? '<div class="rz-sec"><div class="rz-label">Skills</div><div class="rz-chips">' + skills + '</div></div>' : '') +
+    (exp   ? '<div class="rz-sec"><div class="rz-label">Experience</div>' + exp + '</div>' : '') +
+    (edu   ? '<div class="rz-sec"><div class="rz-label">Education</div>' + edu + '</div>' : '') +
+    (langs ? '<div class="rz-sec"><div class="rz-label">Languages</div><div class="rz-row">' + langs + '</div></div>' : '');
+}
 
 // Live metrics bar.
 function renderStats(s) {
@@ -242,6 +273,7 @@ window.matchCardHTML = function(r, isNew) {
       (matched ? '<div class="match-skills"><span class="ok">✓</span> ' + matched + '</div>' : '') +
       (missing ? '<div class="match-skills"><span class="miss">✗</span> ' + missing + '</div>' : '') +
       '<div class="match-actions">' +
+        '<button class="analyze-btn" onclick="openDetail(\'' + mtEsc(r.id) + '\')">🔍 Analyze</button>' +
         (r.url ? '<a class="job-card-link" href="' + mtEsc(r.url) +
                  '" target="_blank" rel="noopener">Open ↗</a>' : '') +
         '<button class="apply-toggle' + (applied ? ' on' : '') +
@@ -251,6 +283,89 @@ window.matchCardHTML = function(r, isNew) {
       '</div>' +
     '</div>';
 };
+
+// ── Detail / "more analysis" modal ────────────────────────
+window.openDetail = function(id) {
+  const modal = document.getElementById('detail-modal');
+  const box   = document.getElementById('detail-box');
+  if (!modal || !box) return;
+  box.innerHTML = '<div class="fetch-empty">Loading analysis…</div>';
+  modal.style.display = 'flex';
+
+  fetch('/api/match/detail?id=' + encodeURIComponent(id))
+    .then(r => r.json())
+    .then(d => {
+      if (!d.ok) { box.innerHTML = '<div class="fetch-empty">Not found.</div>'; return; }
+      box.innerHTML = renderDetail(d);
+    })
+    .catch(() => { box.innerHTML = '<div class="fetch-empty">Error loading analysis.</div>'; });
+};
+
+window.closeDetail = function(ev) {
+  // Close only when clicking the overlay or the close button.
+  if (ev && ev.target && ev.target.id !== 'detail-modal' && ev.target.id !== 'detail-close') return;
+  const modal = document.getElementById('detail-modal');
+  if (modal) modal.style.display = 'none';
+};
+
+function bar(label, val) {
+  const v = Math.round(val || 0);
+  return '<div class="dt-bar-row"><span class="dt-bar-l">' + label + '</span>' +
+    '<span class="dt-bar"><span class="dt-bar-fill ' + scoreBarClass(v) +
+    '" style="width:' + v + '%"></span></span><span class="dt-bar-v">' + v + '%</span></div>';
+}
+function scoreBarClass(v) {
+  return v >= 80 ? 'sc-exc' : v >= 60 ? 'sc-good' : v >= 40 ? 'sc-partial' : 'sc-poor';
+}
+
+function renderDetail(d) {
+  const j  = d.job || {};
+  const ss = d.section_scores || {};
+  const jd = d.jd || {};
+  const rz = d.resume || {};
+
+  const order = [
+    ['Required skills', 'required_skills'], ['Responsibilities', 'responsibilities'],
+    ['Experience', 'experience'], ['Education', 'education'],
+    ['Preferred skills', 'preferred_skills'], ['Languages', 'languages'],
+    ['Certifications', 'certifications'],
+  ];
+  const bars = order.filter(([_, k]) => k in ss).map(([l, k]) => bar(l, ss[k])).join('');
+
+  const matched = (d.matched_required || []).map(mtEsc).join(', ') || '—';
+  const missing = (d.missing_required || []).map(mtEsc).join(', ') || '—';
+  const jdReq   = (jd.required_skills || []).map(mtEsc).join(', ') || '—';
+  const jdResp  = (jd.responsibilities || []).slice(0, 8).map(x => '<li>' + mtEsc(x) + '</li>').join('');
+
+  return '' +
+    '<div class="dt-head">' +
+      '<div><div class="dt-title">' + mtEsc(j.title || '') + '</div>' +
+        '<div class="dt-sub">' + mtEsc(j.company || '') +
+        (j.location ? ' · ' + mtEsc(j.location) : '') + '</div></div>' +
+      '<div class="match-score ' + labelClass(j.label, j.score) + '">' +
+        Math.round(j.score || 0) + '<span class="match-score-pct">%</span></div>' +
+      '<button class="dt-close" id="detail-close" onclick="closeDetail(event)">✕</button>' +
+    '</div>' +
+    (d.summary ? '<div class="dt-summary">' + mtEsc(d.summary) + '</div>' : '') +
+    '<div class="dt-grid">' +
+      '<div class="dt-col">' +
+        '<div class="dt-h">Match breakdown</div>' + bars +
+        '<div class="dt-h">Skills</div>' +
+        '<div class="dt-skill"><span class="ok">✓ have:</span> ' + matched + '</div>' +
+        '<div class="dt-skill"><span class="miss">✗ missing:</span> ' + missing + '</div>' +
+      '</div>' +
+      '<div class="dt-col">' +
+        '<div class="dt-h">Job requirements</div>' +
+        '<div class="dt-skill"><b>Required:</b> ' + jdReq + '</div>' +
+        (jdResp ? '<div class="dt-h">Responsibilities</div><ul class="dt-ul">' + jdResp + '</ul>' : '') +
+        '<div class="dt-h">Your resume</div>' +
+        '<div class="dt-skill">' + mtEsc(rz.title || '') +
+          (rz.total_years ? ' · ' + rz.total_years + 'y' : '') + '</div>' +
+        '<div class="dt-skill">' + (rz.skills || []).slice(0, 18).map(mtEsc).join(', ') + '</div>' +
+      '</div>' +
+    '</div>' +
+    (j.url ? '<a class="btn-primary" href="' + mtEsc(j.url) + '" target="_blank" rel="noopener" style="margin-top:14px;">Open posting ↗</a>' : '');
+}
 
 // Toggle a job's applied state, then refresh whichever views are open.
 window.toggleApplied = function(id, applied) {

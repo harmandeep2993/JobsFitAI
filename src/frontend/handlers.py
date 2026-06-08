@@ -189,6 +189,8 @@ def register_page():
           <div class="mt-filters" id="mt-filters"></div>
         </div>
 
+        <div class="mt-resume" id="mt-resume"></div>
+
         <div class="fetch-results" id="mt-results"></div>
       </div><!-- /view-matches -->
 
@@ -247,6 +249,10 @@ def register_page():
           </div>
         </div>
       </div><!-- /view-settings -->
+
+      <div id="detail-modal" class="modal-overlay" style="display:none;" onclick="closeDetail(event)">
+        <div class="modal-box" id="detail-box"></div>
+      </div>
 
     </div>
     """)

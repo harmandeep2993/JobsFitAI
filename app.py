@@ -35,6 +35,7 @@ from src.services.job_matcher import (
     rescore_all, fetch_combined,
 )
 from src.services import match_store, role_filter, event_store, vector_store
+from src.services.summary import generate_summary
 from src.utils.config import (
     TARGET_TITLES, SEARCH_COUNTRY, SEARCH_PER_TITLE,
     ENTRY_KEYWORDS, EXCLUDE_KEYWORDS, MAX_AGE_DAYS, MAX_EXPERIENCE_YEARS,
@@ -323,6 +324,7 @@ async def api_match_state() -> JSONResponse:
         "stats":       event_store.stats(),
         "events":      event_store.recent_events(30),
         "run_status":  get_run_status(),
+        "resume":      session.resume_info(),
         "results":     match_store.get_all(),
     })
 
@@ -339,6 +341,55 @@ async def api_match_applied(request: Request) -> JSONResponse:
     if applied:
         event_store.log_event("applied", job_id)
     return JSONResponse({"ok": True, "id": job_id, "applied": applied})
+
+
+@ngapp.get("/api/match/detail")
+async def api_match_detail(request: Request) -> JSONResponse:
+    """
+    Full analysis for one job: JD, section scores, matched/missing skills,
+    a resume snapshot, and an LLM summary (generated lazily on first open,
+    then cached).
+    """
+    job_id = (request.query_params.get("id") or "").strip()
+    row = match_store.get_one(job_id)
+    if not row:
+        return JSONResponse({"ok": False, "error": "not found"}, status_code=404)
+
+    summary = row.get("summary")
+    if not summary and session.has_resume():
+        resume_json = session.get_resume()
+        results = {
+            "overall_score":   row.get("score", 0),
+            "label":           row.get("label", ""),
+            "section_scores":  row.get("section_scores", {}),
+            "matched_required": row.get("matched_required", []),
+            "missing_required": row.get("missing_required", []),
+            "matched_preferred": [], "missing_preferred": [],
+        }
+        try:
+            summary = await run_in_threadpool(
+                generate_summary, resume_json, row.get("jd_json", {}), results
+            )
+            match_store.set_summary(job_id, summary)
+        except Exception as e:
+            logger.error("summary generation failed: %s", e)
+            summary = ""
+
+    return JSONResponse({
+        "ok": True,
+        "job": {
+            "id": row["id"], "title": row["title"], "company": row["company"],
+            "location": row["location"], "url": row["url"], "language": row["language"],
+            "posted_at": row["posted_at"], "score": row["score"], "label": row["label"],
+            "applied": row.get("applied", 0),
+        },
+        "section_scores":   row.get("section_scores", {}),
+        "matched_required": row.get("matched_required", []),
+        "missing_required": row.get("missing_required", []),
+        "jd":               row.get("jd_json", {}),
+        "resume":           session.resume_info(),
+        "summary":          summary or "",
+    })
 
 
 @ngapp.post("/api/match/clear")

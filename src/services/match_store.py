@@ -36,15 +36,16 @@ def upsert(items: list[dict]) -> None:
     sql = """
         INSERT INTO matches
             (id, source, title, company, location, url, language, posted_at,
-             score, label, matched_required, missing_required, scored_at, jd_json)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+             score, label, matched_required, missing_required, scored_at,
+             jd_json, section_scores)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         ON CONFLICT(id) DO UPDATE SET
             source=excluded.source, title=excluded.title, company=excluded.company,
             location=excluded.location, url=excluded.url, language=excluded.language,
             posted_at=excluded.posted_at, score=excluded.score, label=excluded.label,
             matched_required=excluded.matched_required,
             missing_required=excluded.missing_required, scored_at=excluded.scored_at,
-            jd_json=excluded.jd_json
+            jd_json=excluded.jd_json, section_scores=excluded.section_scores
     """
     rows = [
         (
@@ -55,6 +56,7 @@ def upsert(items: list[dict]) -> None:
             json.dumps(it.get("missing_required", [])),
             it.get("scored_at"),
             json.dumps(it.get("jd_json")) if it.get("jd_json") is not None else None,
+            json.dumps(it.get("section_scores", {})),
         )
         for it in items
     ]
@@ -101,20 +103,45 @@ def rows_with_jd() -> list[dict]:
 
 
 def update_score(job_id: str, result: dict) -> None:
-    """Update only the scoring fields for a job (used when re-scoring)."""
+    """Update scoring fields for a job (used when re-scoring a new resume).
+
+    Also clears the cached summary, which is now stale for the new resume.
+    """
     with db.connect() as conn:
         conn.execute(
             """
-            UPDATE matches SET score=?, label=?, matched_required=?, missing_required=?
+            UPDATE matches SET score=?, label=?, matched_required=?,
+                missing_required=?, section_scores=?, summary=NULL
             WHERE id=?
             """,
             (
                 result.get("overall_score", 0), result.get("label", ""),
                 json.dumps(result.get("matched_required", [])),
                 json.dumps(result.get("missing_required", [])),
+                json.dumps(result.get("section_scores", {})),
                 job_id,
             ),
         )
+
+
+def get_one(job_id: str) -> dict | None:
+    """Return a single match row with jd/section_scores parsed, or None."""
+    with db.connect() as conn:
+        r = conn.execute("SELECT * FROM matches WHERE id=?", (job_id,)).fetchone()
+    if not r:
+        return None
+    d = dict(r)
+    d["matched_required"] = json.loads(d.get("matched_required") or "[]")
+    d["missing_required"] = json.loads(d.get("missing_required") or "[]")
+    d["section_scores"]   = json.loads(d.get("section_scores") or "{}")
+    d["jd_json"]          = json.loads(d["jd_json"]) if d.get("jd_json") else {}
+    return d
+
+
+def set_summary(job_id: str, summary: str) -> None:
+    """Cache a generated summary for a job."""
+    with db.connect() as conn:
+        conn.execute("UPDATE matches SET summary=? WHERE id=?", (summary, job_id))
 
 
 def set_applied(job_id: str, applied: bool) -> None:

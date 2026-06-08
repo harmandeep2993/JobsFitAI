@@ -57,6 +57,7 @@ def _score_one(job: Job, resume_json: dict) -> dict | None:
             "label":            result.get("label", ""),
             "matched_required": result.get("matched_required", []),
             "missing_required": result.get("missing_required", []),
+            "section_scores":   result.get("section_scores", {}),
             "scored_at":        datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "jd_json":          jd_json,
         }
