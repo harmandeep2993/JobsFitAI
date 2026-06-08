@@ -334,10 +334,11 @@ function pollRun() {
       const rs = d.run_status || {};
       if (rs.running) {
         status.className = 'mt-status';
-        status.textContent = rs.phase === 'fetching'
-          ? 'Fetching jobs…'
-          : 'Scoring… ' + (rs.scored || 0) + ' found · ' +
-            (rs.checked || 0) + '/' + (rs.total || 0) + ' checked';
+        status.textContent =
+          rs.phase === 'fetching'    ? 'Fetching jobs…' :
+          rs.phase === 'classifying' ? 'Filtering ' + (rs.total || 0) + ' jobs…' :
+          'Scoring… ' + (rs.scored || 0) + ' done · ' +
+            (rs.checked || 0) + '/' + (rs.total || 0);
         setTimeout(pollRun, 2000);
       } else {
         if (btn) btn.disabled = false;

@@ -115,10 +115,12 @@ def fetch_combined(titles: list[str], location: str = "",
                                        limit=arbeitnow_limit)
         arbeitnow = [j for j in arb_raw if role_filter.is_target_role(j.title, titles)]
 
-    merged, seen = [], set()
+    merged, seen_ids, seen_content = [], set(), set()
     for job in adzuna + arbeitnow:
-        if job.id and job.id not in seen:
-            seen.add(job.id)
+        ckey = (job.title or "").strip().lower() + "|" + (job.company or "").strip().lower()
+        if job.id and job.id not in seen_ids and ckey not in seen_content:
+            seen_ids.add(job.id)
+            seen_content.add(ckey)
             merged.append(job)
 
     logger.info("Combined sources (%s): %d adzuna + %d arbeitnow -> %d unique",
@@ -173,43 +175,50 @@ def discover_and_score(jobs: list[Job], entry_only: bool = True) -> dict:
 
     seen     = event_store.seen_ids()
     new_jobs = [j for j in jobs if j.id and j.id not in seen]
-    logger.info(">> Run: %d fetched, %d new to check", len(jobs), len(new_jobs))
-    _run_status.update({"phase": "scoring", "total": len(new_jobs),
+
+    # --- recency filter (free) ---
+    candidates = []
+    for job in new_jobs:
+        if role_filter.is_recent(job):
+            candidates.append(job)
+        else:
+            event_store.mark_seen(job, "stale")
+
+    logger.info(">> Run: %d fetched, %d new, %d recent", len(jobs), len(new_jobs), len(candidates))
+
+    # --- bulk LLM relevance gate (few calls, not one-per-job) ---
+    _run_status.update({"phase": "classifying", "total": len(candidates),
                         "checked": 0, "scored": 0})
+    verdicts = relevance.classify_batch(candidates)
+
+    survivors = []
+    for job in candidates:
+        v = verdicts.get(job.id, {"relevant": True, "entry_level": True})
+        if not v["relevant"]:
+            event_store.mark_seen(job, "irrelevant")
+        elif entry_only and not v["entry_level"]:
+            event_store.mark_seen(job, "not_entry")
+        else:
+            survivors.append(job)
+
+    logger.info("   %d relevant entry-level survivors", len(survivors))
+    _run_status.update({"phase": "scoring", "total": len(survivors), "checked": 0})
 
     scored = 0
     try:
-        for job in new_jobs:
+        for job in survivors:
             _run_status["checked"] += 1
             tag = f"{job.title[:42]} @ {job.company[:20]}"
 
-            # 1. recency (free)
-            if not role_filter.is_recent(job):
-                event_store.mark_seen(job, "stale")
-                logger.debug("   skip stale      | %s", tag)
-                continue
-
-            # 1b. cross-source semantic dedup (free, local embeddings)
+            # cross-source near-duplicate dedup (free, local embeddings)
             if vector_store.is_duplicate(job):
                 event_store.mark_seen(job, "duplicate")
-                logger.debug("   skip duplicate  | %s", tag)
+                logger.debug("   skip duplicate | %s", tag)
                 continue
 
-            # 2. cheap LLM relevance gate (title + snippet only)
-            verdict = relevance.classify(job.title, job.description)
-            if not verdict["relevant"]:
-                event_store.mark_seen(job, "irrelevant")
-                logger.debug("   skip irrelevant | %s", tag)
-                continue
-            if entry_only and not verdict["entry_level"]:
-                event_store.mark_seen(job, "not_entry")
-                logger.debug("   skip senior     | %s", tag)
-                continue
-
-            # 3. survivor: store metadata now (appears on dashboard), then
-            #    enrich + extract + score.
+            # store metadata now (appears on dashboard), then enrich + score
             match_store.upsert_pending(job)
-            vector_store.add(job)               # register for future dedup
+            vector_store.add(job)
 
             _enrich(job)
             item = _score_one(job, resume_json)
@@ -218,7 +227,7 @@ def discover_and_score(jobs: list[Job], entry_only: bool = True) -> dict:
 
             if item and has_jd:
                 item["status"] = "scored"
-                match_store.upsert([item])      # full result -> streams to UI
+                match_store.upsert([item])
                 scored += 1
                 _run_status["scored"] = scored
                 event_store.mark_seen(job, "scored")
@@ -226,15 +235,17 @@ def discover_and_score(jobs: list[Job], entry_only: bool = True) -> dict:
                                       f"{round(item['score'])}% · {item['title'][:40]}")
                 logger.debug("   stored %3d%% | %s", round(item["score"]), tag)
             else:
-                # JD not on Adzuna (real posting lives elsewhere) — keep the job
-                # for manual review instead of storing a fake score.
+                # JD not on Adzuna (real posting lives elsewhere) — keep for
+                # manual review instead of a fake score.
                 match_store.set_status(job.id, "jd_unavailable")
                 event_store.mark_seen(job, "jd_unavailable")
                 logger.debug("   jd-unavailable | %s", tag)
 
-        event_store.log_event("run", "", f"{len(new_jobs)} new checked, {scored} scored")
-        logger.info("== Run complete: %d checked, %d scored", len(new_jobs), scored)
+        event_store.log_event(
+            "run", "", f"{len(candidates)} checked, {len(survivors)} relevant, {scored} scored")
+        logger.info("== Run complete: %d candidates, %d survivors, %d scored",
+                    len(candidates), len(survivors), scored)
     finally:
         _run_status.update({"running": False, "phase": "idle"})
 
-    return {"checked": len(new_jobs), "scored": scored, "results": match_store.get_all()}
+    return {"checked": len(candidates), "scored": scored, "results": match_store.get_all()}
