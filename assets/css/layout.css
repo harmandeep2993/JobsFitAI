@@ -164,9 +164,21 @@ html, body {
 .topbar-l {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   flex: 1;
   min-width: 0;
+}
+
+.tb-page-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--t1);
+  letter-spacing: -0.2px;
+  white-space: nowrap;
+  padding-right: 10px;
+  border-right: 1px solid var(--bd);
+  margin-right: 2px;
+  flex-shrink: 0;
 }
 
 .topbar-r {
