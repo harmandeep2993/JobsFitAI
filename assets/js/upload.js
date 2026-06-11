@@ -9,6 +9,9 @@ window.clearResume = function() {
   window._resumeTmp  = null;
   window._resumeName = null;
 
+  // Sync the Matches tab resume status so it doesn't show stale data.
+  if (typeof window.renderResume === 'function') window.renderResume(null);
+
   const zone = document.getElementById('up-zone');
   if (zone) {
     zone.outerHTML =
@@ -24,7 +27,7 @@ window.clearResume = function() {
           '<line x1="6" y1="25" x2="15" y2="25" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>' +
         '</svg>' +
         '<div class="up-text">Drop file or <strong>browse</strong></div>' +
-        '<div class="up-hint">PDF &nbsp;&middot;&nbsp; DOCX &nbsp;&middot;&nbsp; DOC</div>' +
+        '<div class="up-hint">PDF &nbsp;&middot;&nbsp; DOCX</div>' +
       '</div>';
 
     // Rebind after DOM replacement
@@ -53,12 +56,23 @@ function updateCounter(len) {
 }
 
 // ── File upload ───────────────────────────────────────────
+var FILE_MAX_MB = 5;
+
 window.handleFileSelect = function(file) {
   if (!file) return;
 
   const ext = file.name.split('.').pop().toLowerCase();
-  if (!['pdf', 'docx', 'doc'].includes(ext)) {
-    alert('Please upload PDF, DOCX or DOC.');
+  if (ext === 'doc') {
+    alert('Legacy .doc format is not supported.\nPlease convert to .docx (File → Save As in Word) and try again.');
+    return;
+  }
+  if (!['pdf', 'docx'].includes(ext)) {
+    alert('Please upload a PDF or DOCX file.');
+    return;
+  }
+
+  if (file.size > FILE_MAX_MB * 1024 * 1024) {
+    alert('File is too large (' + (file.size / 1024 / 1024).toFixed(1) + ' MB). Maximum size is ' + FILE_MAX_MB + ' MB.');
     return;
   }
 
@@ -113,7 +127,11 @@ function bindUpload() {
 function bindCounter() {
   const jd = document.getElementById('jd-input');
   if (jd) {
-    jd.addEventListener('input', () => updateCounter(jd.value.length));
+    var _debounce;
+    jd.addEventListener('input', () => {
+      clearTimeout(_debounce);
+      _debounce = setTimeout(() => updateCounter(jd.value.length), 50);
+    });
     jd.addEventListener('paste', () => setTimeout(() => updateCounter(jd.value.length), 10));
     updateCounter(0);
   } else {

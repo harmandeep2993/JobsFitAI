@@ -64,40 +64,29 @@ def match(resume: dict, jd: dict) -> dict:
         logger.error("Invalid inputs — resume or JD is empty")
         return {}
 
-    logger.info("Starting match scoring")
-    logger.info("=" * 50)
+    logger.debug("Starting match scoring")
 
-    # --- Run all scorers ---
-
-    # Required skills — returns (score, matched, missing)
+    # --- Run all scorers (per-section detail at DEBUG) ---
     req_score, matched_required, missing_required = score_required_skills(resume, jd)
-    logger.info("Required skills   : %.1f", req_score)
+    logger.debug("Required skills   : %.1f", req_score)
 
-    # Preferred skills — returns (score, matched, missing)
     pref_score, matched_preferred, missing_preferred = score_preferred_skills(resume, jd)
-    logger.info("Preferred skills  : %.1f", pref_score)
+    logger.debug("Preferred skills  : %.1f", pref_score)
 
-    # Responsibilities — returns float
     resp_score = score_responsibilities(resume, jd)
-    logger.info("Responsibilities  : %.1f", resp_score)
+    logger.debug("Responsibilities  : %.1f", resp_score)
 
-    # Experience — returns float
     exp_score = score_experience(resume, jd)
-    logger.info("Experience        : %.1f", exp_score)
+    logger.debug("Experience        : %.1f", exp_score)
 
-    # Education — returns float
     edu_score = score_education(resume, jd)
-    logger.info("Education         : %.1f", edu_score)
+    logger.debug("Education         : %.1f", edu_score)
 
-    # Languages — returns float
     lang_score = score_languages(resume, jd)
-    logger.info("Languages         : %.1f", lang_score)
+    logger.debug("Languages         : %.1f", lang_score)
 
-    # Certifications — returns float
     cert_score = score_certifications(resume, jd)
-    logger.info("Certifications    : %.1f", cert_score)
-
-    logger.info("=" * 50)
+    logger.debug("Certifications    : %.1f", cert_score)
 
     # --- Build section scores dict ---
     section_scores = {
@@ -124,8 +113,12 @@ def match(resume: dict, jd: dict) -> dict:
 
     label = get_score_label(overall_score)
 
-    logger.info("Overall score : %.1f", overall_score)
-    logger.info("Label         : %s",   label)
+    role = (jd.get("job") or {}).get("title") or "role"
+    logger.info(
+        "Scored %.0f%% %s · %s  (skills %.0f · resp %.0f · exp %.0f · edu %.0f · lang %.0f)",
+        overall_score, label, role[:40],
+        req_score, resp_score, exp_score, edu_score, lang_score
+    )
 
     # --- Build results ---
     results = {
@@ -138,5 +131,4 @@ def match(resume: dict, jd: dict) -> dict:
         "missing_preferred": missing_preferred,
     }
 
-    logger.info("Matching complete")
     return results

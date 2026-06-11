@@ -23,6 +23,7 @@ from src.parsers.docx_parser import parse_docx
 from src.parsers.text_cleaner import clean
 from src.utils.logger import get_logger
 
+# 
 logger = get_logger(__name__)
 
 
@@ -42,7 +43,7 @@ def extract_all_text(file_path: str) -> str:
         RuntimeError      : Extraction failed
     """
     path = Path(file_path)
-    logger.info("Starting parsing pipeline for: %s", path.name)
+    logger.debug("Starting parsing pipeline for: %s", path.name)
 
     # Step 1: Validate
     validate(file_path)
@@ -57,7 +58,7 @@ def extract_all_text(file_path: str) -> str:
         raw_text = parse_docx(file_path)
 
     elif suffix == ".txt":
-        logger.info("Reading TXT file: %s", path.name)
+        logger.debug("Reading TXT file: %s", path.name)
         raw_text = path.read_text(encoding="utf-8").strip()
 
     else:
@@ -69,10 +70,6 @@ def extract_all_text(file_path: str) -> str:
     # Step 3: Clean
     cleaned_text = clean(raw_text)
 
-    logger.info(
-        "Parsing complete — %d chars extracted from %s",
-        len(cleaned_text),
-        path.name,
-    )
+    logger.info("Resume parsed: %d chars from %s", len(cleaned_text), path.name)
 
     return cleaned_text

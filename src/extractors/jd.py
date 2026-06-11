@@ -35,9 +35,49 @@ def _lowercase_all(data):
         return {k: _lowercase_all(v) for k, v in data.items()}
 
     else:
-        # Preserve numbers, booleans, None — just return as-is
-        logger.warning("Unexpected type in _lowercase_all: %s", type(data))
+        # Numbers, booleans, None — preserved as-is (expected, not an error).
         return data
+
+
+_JD_FIELD_TYPES: dict = {
+    "job":                     dict,
+    "required_skills":         list,
+    "preferred_skills":        list,
+    "responsibilities":        list,
+    "experience_requirements": list,
+    "education_requirements":  list,
+    "languages":               list,
+    "certifications":          list,
+    "job_summary":             str,
+}
+
+_JD_DEFAULTS: dict = {
+    "job":                     {},
+    "required_skills":         [],
+    "preferred_skills":        [],
+    "responsibilities":        [],
+    "experience_requirements": [],
+    "education_requirements":  [],
+    "languages":               [],
+    "certifications":          [],
+    "job_summary":             "",
+}
+
+
+def _validate_jd_schema(result: dict) -> dict:
+    """Ensure all required JD fields exist with correct types; fill gaps with safe defaults."""
+    for field, expected_type in _JD_FIELD_TYPES.items():
+        val = result.get(field)
+        if val is None:
+            logger.debug("JD field '%s' missing — using default", field)
+            result[field] = _JD_DEFAULTS[field]
+        elif not isinstance(val, expected_type):
+            logger.warning(
+                "JD field '%s' has unexpected type %s (expected %s) — using default",
+                field, type(val).__name__, expected_type.__name__,
+            )
+            result[field] = _JD_DEFAULTS[field]
+    return result
 
 
 def _is_empty(value) -> bool:
@@ -93,15 +133,14 @@ def extract_jd(jd_text: str) -> dict:
         logger.error("LLM response is not a dict: %s", result)
         raise ValueError("Invalid LLM response format")
 
+    result = _validate_jd_schema(result)
     result = _lowercase_all(result)
-    logger.info("JD lowercasing complete")
 
-    # Warn about any empty fields in the extracted result
     empty_keys = [k for k, v in result.items() if _is_empty(v)]
     if empty_keys:
-        logger.warning("Empty values for keys: %s", empty_keys)
-    else:
-        logger.info("All JD fields extracted successfully")
+        logger.debug("Empty JD fields: %s", empty_keys)
 
-    logger.info("JD extraction complete")
+    n_req  = len(result.get("required_skills", []))
+    n_resp = len(result.get("responsibilities", []))
+    logger.info("JD extracted: %d required skills, %d responsibilities", n_req, n_resp)
     return result

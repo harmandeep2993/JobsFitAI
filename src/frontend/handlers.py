@@ -4,6 +4,13 @@ import os
 import asyncio
 from pathlib import Path
 
+# Per-step timeout budgets (seconds). Keeps the spinner from hanging forever
+# if the LLM stalls, OCR loops, or the embedding model hangs on first load.
+_T_PARSE    = 60   # PDF/DOCX text extraction
+_T_EXTRACT  = 90   # LLM extraction (resume + JD, two calls)
+_T_MATCH    = 60   # semantic scoring + embedding model load
+_T_SUMMARY  = 60   # LLM summary generation
+
 from nicegui import ui
 
 from src.parsers import extract_all_text
@@ -74,7 +81,7 @@ def register_page():
       <div class="divider"></div>
 
       <div class="content-card">
-        <input type="file" id="file-input" accept=".pdf,.docx,.doc" style="display:none;"/>
+        <input type="file" id="file-input" accept=".pdf,.docx" style="display:none;"/>
         <div class="two-col">
 
           <div>
@@ -94,7 +101,7 @@ def register_page():
                 <line x1="6" y1="25" x2="15" y2="25" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
               </svg>
               <div class="up-text">Drop file or <strong>browse</strong></div>
-              <div class="up-hint">PDF &nbsp;&middot;&nbsp; DOCX &nbsp;&middot;&nbsp; DOC</div>
+              <div class="up-hint">PDF &nbsp;&middot;&nbsp; DOCX</div>
             </div>
           </div>
 
@@ -129,33 +136,16 @@ def register_page():
       <div id="jf-results" style="display:none;"></div>
       </div><!-- /view-analyzer -->
 
-      <div id="view-jobsearch" class="view" style="display:none;">
-        <div class="pg-title">Job <em>Search</em></div>
-        <div class="pg-sub">Search live job postings from Adzuna</div>
-
-        <div class="divider"></div>
-
-        <div class="content-card">
-          <div class="jd-fetch">
-            <input id="fetch-query" class="fetch-inp"
-              placeholder="Role e.g. machine learning engineer"/>
-            <input id="fetch-loc" class="fetch-inp fetch-inp-sm"
-              placeholder="Location"/>
-            <button class="btn-primary fetch-btn" id="fetch-btn" onclick="fetchJobs()">&rarr; Fetch Jobs</button>
-          </div>
-        </div>
-
-        <div class="fetch-results" id="fetch-results" style="display:none;"></div>
-      </div><!-- /view-jobsearch -->
-
       <div id="view-matches" class="view" style="display:none;">
         <div class="pg-title">Job <em>Matches</em></div>
-        <div class="pg-sub">Load your resume once, then fetch German jobs (full descriptions via Arbeitnow) and score each against it</div>
+        <div class="pg-sub">Load your resume once, then fetch German AI/ML jobs (full descriptions) and score each against it</div>
 
         <div class="divider"></div>
 
+        <div class="mt-stats" id="mt-stats"></div>
+
         <div class="content-card">
-          <input type="file" id="mt-file" accept=".pdf,.docx,.doc" style="display:none;"/>
+          <input type="file" id="mt-file" accept=".pdf,.docx" style="display:none;"/>
           <div class="mt-row">
             <button class="btn-ghost" id="mt-upload-btn"
               onclick="document.getElementById('mt-file').click()">📄 Load Resume</button>
@@ -163,26 +153,55 @@ def register_page():
           </div>
 
           <div class="jd-fetch" style="margin-top:16px;">
-            <input id="mt-query" class="fetch-inp" placeholder="Role e.g. python developer"/>
-            <input id="mt-loc" class="fetch-inp fetch-inp-sm" placeholder="Location e.g. berlin"/>
+            <input id="mt-query" class="fetch-inp" placeholder="Optional: search one role now (default = your saved titles)"/>
             <button class="btn-primary" id="mt-run-btn" onclick="runMatch()">&rarr; Fetch &amp; Score</button>
           </div>
 
-          <div class="mt-row" style="margin-top:14px;">
-            <label class="mt-auto">
-              <input type="checkbox" id="mt-auto" onchange="toggleAutoMatch()"/> Auto-refresh every
-            </label>
-            <select id="mt-interval" class="mt-select">
-              <option value="60">1 min</option>
-              <option value="300" selected>5 min</option>
-              <option value="900">15 min</option>
-            </select>
-            <span class="mt-status" id="mt-poll-status"></span>
+          <div class="mt-row" style="margin-top:12px;">
+            <label class="mt-auto"><input type="checkbox" id="mt-entry" checked/> Entry-level only</label>
           </div>
+
+          <div class="mt-row" style="margin-top:12px;">
+            <label class="mt-auto"><input type="checkbox" id="mt-sched" onchange="toggleScheduler()"/> Auto-fetch in background</label>
+            <select id="mt-sched-interval" class="mt-select" onchange="toggleScheduler()">
+              <option value="30">every 30 min</option>
+              <option value="60" selected>every 1 hr</option>
+              <option value="180">every 3 hr</option>
+              <option value="360">every 6 hr</option>
+            </select>
+            <span class="mt-status" id="mt-sched-status"></span>
+          </div>
+
+          <div class="mt-row" style="margin-top:14px;">
+            <span class="mt-status" id="mt-poll-status"></span>
+            <button class="mt-clear" onclick="clearAllMatches()">🗑 Clear all</button>
+          </div>
+
+          <button class="mt-toggle" id="mt-filters-toggle" aria-expanded="false" aria-controls="mt-filters" onclick="toggleFilters()">&#9881; Filters &amp; keywords &#9656;</button>
+          <div class="mt-filters" id="mt-filters" style="display:none;"></div>
+        </div>
+
+        <div class="mt-resume-row">
+          <button class="btn-ghost" id="mt-resume-btn" style="display:none;" onclick="openResume()">&#128196; View Resume Details</button>
         </div>
 
         <div class="fetch-results" id="mt-results"></div>
       </div><!-- /view-matches -->
+
+      <div id="view-history" class="view" style="display:none;">
+        <div class="pg-title">Match <em>History</em></div>
+        <div class="pg-sub">Every job you've scored — track which ones you've applied to</div>
+
+        <div class="divider"></div>
+
+        <div id="hist-filters" class="hist-filters">
+          <button class="hist-fbtn active" data-f="all" onclick="setHistFilter('all')">All <span class="hist-count">0</span></button>
+          <button class="hist-fbtn" data-f="open" onclick="setHistFilter('open')">Not applied <span class="hist-count">0</span></button>
+          <button class="hist-fbtn" data-f="applied" onclick="setHistFilter('applied')">Applied <span class="hist-count">0</span></button>
+        </div>
+
+        <div class="fetch-results" id="hist-results"></div>
+      </div><!-- /view-history -->
 
       <div id="view-settings" class="view" style="display:none;">
         <div class="pg-title">LLM <em>Settings</em></div>
@@ -223,11 +242,15 @@ def register_page():
         </div>
       </div><!-- /view-settings -->
 
+      <div id="detail-modal" class="modal-overlay" style="display:none;" onclick="closeDetail(event)">
+        <div class="modal-box" id="detail-box"></div>
+      </div>
+
     </div>
     """)
 
     # JS assets
-    for js in ["theme", "upload", "analysis", "fetch", "settings", "matches"]:
+    for js in ["theme", "upload", "analysis", "fetch", "settings", "matches", "history"]:
         ui.add_body_html(
             f'<script src="/assets/js/{js}.js?v={_asset_ver(f"assets/js/{js}.js")}"></script>'
         )
@@ -273,62 +296,61 @@ def register_page():
         )
 
         try:
+            loop = asyncio.get_event_loop()
+
             safe_js('document.getElementById("spin-text").innerText="Parsing resume...";')
-            resume_text = await asyncio.get_event_loop().run_in_executor(
-                None, lambda: extract_all_text(tmp_path)
-            )
+            try:
+                resume_text = await asyncio.wait_for(
+                    loop.run_in_executor(None, lambda: extract_all_text(tmp_path)),
+                    timeout=_T_PARSE,
+                )
+            except asyncio.TimeoutError:
+                safe_notify(f"Resume parsing timed out ({_T_PARSE}s) -- try a smaller or simpler file", type="negative")
+                return
 
             if not resume_text or len(resume_text) < 50:
                 safe_notify("Could not parse resume", type="negative")
                 return
 
             safe_js('document.getElementById("spin-text").innerText="Extracting information...";')
-            resume_json, jd_json = await asyncio.get_event_loop().run_in_executor(
-                None, lambda: extract_all(resume_text, jd_text)
-            )
+            try:
+                resume_json, jd_json = await asyncio.wait_for(
+                    loop.run_in_executor(None, lambda: extract_all(resume_text, jd_text)),
+                    timeout=_T_EXTRACT,
+                )
+            except asyncio.TimeoutError:
+                safe_notify(f"LLM extraction timed out ({_T_EXTRACT}s) -- the provider may be slow, try again", type="negative")
+                return
 
-            if not resume_json or not jd_json:
-                safe_notify("Extraction failed", type="negative")
+            if not resume_json and not jd_json:
+                safe_notify("Extraction failed for both resume and job description", type="negative")
+                return
+            if not resume_json:
+                safe_notify("Could not extract resume -- check the file format or try a different file", type="negative")
+                return
+            if not jd_json:
+                safe_notify("Could not extract job description -- make sure it contains enough text (50+ chars)", type="negative")
                 return
 
             safe_js('document.getElementById("spin-text").innerText="Calculating match score...";')
-            results = match(resume_json, jd_json)
+            try:
+                results = await asyncio.wait_for(
+                    loop.run_in_executor(None, lambda: match(resume_json, jd_json)),
+                    timeout=_T_MATCH,
+                )
+            except asyncio.TimeoutError:
+                safe_notify(f"Scoring timed out ({_T_MATCH}s) -- embedding model may still be loading, try again", type="negative")
+                return
 
             safe_js('document.getElementById("spin-text").innerText="Generating summary...";')
             from src.services.summary import generate_summary
-            summary = await asyncio.get_event_loop().run_in_executor(
-                None, lambda: generate_summary(resume_json, jd_json, results)
-            )
-
-            safe_js(f"""
-            var s = document.querySelector('.steps');
-            if(s) s.outerHTML = `{make_steps(4)}`;
-            """)
-
-            html = build_results_html(results, resume_json, jd_json, summary)
-            html_escaped = html.replace('\\', '\\\\').replace('`', '\\`').replace('$', '\\$')
-
-            safe_js(f"""
-            var r = document.getElementById('jf-results');
-            if(r) {{
-                r.innerHTML = `{html_escaped}`;
-                r.style.display = 'block';
-            }}
-            """)
-
-            safe_js("""
-            window.jfTab = function(el, panelId) {
-                document.querySelectorAll('#jf-tab-row .tab-item').forEach(function(t) {
-                    t.classList.remove('active');
-                });
-                document.querySelectorAll('.jf-panel').forEach(function(p) {
-                    p.style.display = 'none';
-                });
-                el.classList.add('active');
-                var panel = document.getElementById(panelId);
-                if (panel) panel.style.display = 'block';
-            };
-            """)
+            try:
+                summary = await asyncio.wait_for(
+                    loop.run_in_executor(None, lambda: generate_summary(resume_json, jd_json, results)),
+                    timeout=_T_SUMMARY,
+                )
+            except asyncio.TimeoutError:
+                summary = ""  # summary is optional -- show results without it
 
         except Exception as exc:
             print(f"[ERROR] {exc}")
