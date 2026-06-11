@@ -1,11 +1,9 @@
-// assets/js/fetch.js
-// Sidebar navigation — switches between the views and refreshes data-backed
-// tabs when opened.
+// Sidebar navigation - switches views using .active class for CSS transitions
 
 window.showView = function(name) {
-  document.querySelectorAll('.view').forEach(v => { v.style.display = 'none'; });
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   const view = document.getElementById('view-' + name);
-  if (view) view.style.display = 'block';
+  if (view) view.classList.add('active');
 
   document.querySelectorAll('.jfai-sidebar .sb-item')
     .forEach(el => el.classList.remove('active'));
