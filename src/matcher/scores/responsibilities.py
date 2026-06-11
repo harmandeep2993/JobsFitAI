@@ -23,6 +23,15 @@ from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+# Neutral score returned when the JD lists no responsibilities —
+# a missing requirement must not penalize the candidate.
+NO_REQUIREMENT_SCORE = 60.0
+
+# Minimum cosine similarity for a resume bullet to count as matching a JD
+# bullet. Below this threshold the match is treated as 0 — avoids inflating
+# the score when two unrelated sentences happen to share common words.
+MIN_MATCH_SIM = 0.35
+
 
 def score_responsibilities(resume: dict, jd: dict) -> float:
     """
@@ -69,8 +78,8 @@ def score_responsibilities(resume: dict, jd: dict) -> float:
         return 0.0
 
     if not jd_bullets:
-        logger.warning("No responsibilities found in JD")
-        return 0.0
+        logger.info("No responsibilities in JD — returning neutral %.1f", NO_REQUIREMENT_SCORE)
+        return NO_REQUIREMENT_SCORE
 
     # --- Encode ---
     model          = load_model()
@@ -88,8 +97,18 @@ def score_responsibilities(resume: dict, jd: dict) -> float:
     # --- Best resume match per JD bullet ---
     best_per_jd_bullet = sim_matrix.max(dim=1).values
 
+    # Zero out matches below the confidence threshold — they are noise.
+    best_per_jd_bullet = best_per_jd_bullet.clone()
+    best_per_jd_bullet[best_per_jd_bullet < MIN_MATCH_SIM] = 0.0
+
     logger.debug("Best match per JD bullet: %s",
                  [round(v.item(), 4) for v in best_per_jd_bullet])
+
+    # Clamp weak matches to 0 — a similarity below MIN_MATCH_SIM means no
+    # real match, not a weak one. Without this, unrelated sentences sharing
+    # common words inflate the score.
+    best_per_jd_bullet = best_per_jd_bullet.clone()
+    best_per_jd_bullet[best_per_jd_bullet < MIN_MATCH_SIM] = 0.0
 
     # --- Final score ---
     score = float(best_per_jd_bullet.mean()) * 100

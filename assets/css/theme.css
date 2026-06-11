@@ -1,81 +1,73 @@
-/* assets/css/theme.css */
-/* CSS custom properties — light and dark theme variables */
-
+/* design tokens */
 :root {
-  /* Accent */
   --accent:   #e8471a;
-  --accent-s: rgba(232, 71, 26, 0.08);
+  --accent-s: rgba(232,71,26,0.09);
   --accent-h: #d13c14;
 
-  /* Backgrounds */
-  --bg:   #eeede9;
+  --bg:   #f0efeb;
   --bg-r: #ffffff;
-  --bg-c: #ffffff;
+  --bg-c: #fafaf8;
 
-  /* Borders */
-  --bd:   #e0ded8;
-  --bd-s: #eae9e4;
+  --bd:   #e2e0da;
+  --bd-s: #eeede8;
 
-  /* Text */
-  --t1: #18181f;
-  --t2: #68667a;
-  --t3: #aeacbe;
+  --t1: #16161d;
+  --t2: #64627a;
+  --t3: #b0aec0;
 
-  /* Semantic colours */
-  --green:    #18994e;
+  --green:    #17934c;
   --green-bg: #edf8f2;
-  --green-bd: #b4e4cc;
+  --green-bd: #b0e4c8;
 
   --red:    #d42c1c;
   --red-bg: #fdf0ee;
   --red-bd: #f4bab4;
 
-  --amber:    #b87010;
+  --amber:    #b56c0c;
   --amber-bg: #fdf4e6;
-  --amber-bd: #eecca0;
+  --amber-bd: #eac89a;
 
-  --blue:    #1868c8;
+  --blue:    #1762c0;
   --blue-bg: #ecf3fd;
-  --blue-bd: #a4c4ee;
+  --blue-bd: #a0c0ee;
 
-  /* Shadows */
-  --sha:   0 1px 3px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.05);
+  --sha:   0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
   --sha-s: 0 1px 2px rgba(0,0,0,0.05);
+
+  --sidebar-w: 210px;
+  --topbar-h:  52px;
+  --radius:    14px;
+  --radius-s:  8px;
 }
 
 :root.dark {
-  /* Backgrounds */
-  --bg:   #0c0c0e;
-  --bg-r: #131316;
-  --bg-c: #1a1a1f;
+  --bg:   #0c0c0f;
+  --bg-r: #131318;
+  --bg-c: #1a1a20;
 
-  /* Borders */
-  --bd:   #252530;
-  --bd-s: #1e1e28;
+  --bd:   #24242e;
+  --bd-s: #1e1e26;
 
-  /* Text */
   --t1: #f0f0f5;
-  --t2: #7070a0;
-  --t3: #38385a;
+  --t2: #6868a0;
+  --t3: #36365a;
 
-  /* Semantic colours */
-  --green:    #32d474;
-  --green-bg: #0a2018;
-  --green-bd: #183c28;
+  --green:    #2ecc6a;
+  --green-bg: #081a10;
+  --green-bd: #143828;
 
   --red:    #f5564a;
-  --red-bg: #200c0a;
-  --red-bd: #4a1812;
+  --red-bg: #1e0a08;
+  --red-bd: #481410;
 
-  --amber:    #f0a832;
-  --amber-bg: #201408;
-  --amber-bd: #503810;
+  --amber:    #f0a830;
+  --amber-bg: #1e1206;
+  --amber-bd: #4e3608;
 
-  --blue:    #58b4f5;
-  --blue-bg: #081428;
-  --blue-bd: #183858;
+  --blue:    #56b0f4;
+  --blue-bg: #081220;
+  --blue-bd: #14325a;
 
-  /* Shadows */
-  --sha:   0 2px 8px rgba(0,0,0,0.45);
-  --sha-s: 0 1px 3px rgba(0,0,0,0.3);
+  --sha:   0 2px 8px rgba(0,0,0,0.5);
+  --sha-s: 0 1px 3px rgba(0,0,0,0.35);
 }

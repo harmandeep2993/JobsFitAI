@@ -16,6 +16,8 @@ Reuse note:
 import os
 import re
 import html
+import time
+import datetime as dt
 from dataclasses import dataclass
 
 import requests
@@ -51,8 +53,9 @@ class Job:
     url: str
     description: str
     language: str
-    id: str = ""        # stable identifier for dedupe (source-specific)
-    source: str = ""    # e.g. "adzuna", "arbeitnow"
+    id: str = ""          # stable identifier for dedupe (source-specific)
+    source: str = ""      # e.g. "adzuna", "arbeitnow"
+    posted_at: str = ""   # publication time (unix epoch as string), if known
 
 
 def _clean_html(raw: str) -> str:
@@ -72,6 +75,17 @@ def _clean_html(raw: str) -> str:
     text = html.unescape(text)
     # Collapse all runs of whitespace into single spaces.
     return " ".join(text.split())
+
+
+def _iso_to_epoch(created: str) -> str:
+    """Convert an ISO8601 timestamp (e.g. Adzuna 'created') to epoch seconds as a string."""
+    if not created:
+        return ""
+    try:
+        d = dt.datetime.fromisoformat(created.replace("Z", "+00:00"))
+        return str(int(d.timestamp()))
+    except (ValueError, TypeError):
+        return ""
 
 
 def _detect_language(text: str) -> str:
@@ -117,6 +131,7 @@ def _parse_job(raw: dict) -> Job:
         language=_detect_language(description or title),
         id=str(raw.get("id", "")),
         source="adzuna",
+        posted_at=_iso_to_epoch(raw.get("created", "")),
     )
 
 
@@ -153,11 +168,26 @@ def fetch_adzuna_jobs(
         "content-type": "application/json",
     }
 
-    try:
-        response = requests.get(url, params=params, timeout=15)
-        response.raise_for_status()
-    except requests.RequestException as e:
-        logger.error("Adzuna request failed: %s", e)
+    # Retry on transient rate-limit / server errors (429, 5xx).
+    response = None
+    for attempt in range(3):
+        try:
+            response = requests.get(url, params=params, timeout=15)
+            if response.status_code in (429, 500, 502, 503, 504) and attempt < 2:
+                logger.warning("Adzuna %s for '%s' — retry %d",
+                               response.status_code, query, attempt + 1)
+                time.sleep(1.0 * (attempt + 1))
+                continue
+            response.raise_for_status()
+            break
+        except requests.RequestException as e:
+            if attempt < 2:
+                time.sleep(1.0 * (attempt + 1))
+                continue
+            logger.error("Adzuna request failed: %s", e)
+            return []
+
+    if response is None:
         return []
 
     data = response.json()
@@ -167,6 +197,47 @@ def fetch_adzuna_jobs(
     )
 
     return [_parse_job(job) for job in raw_jobs]
+
+
+def fetch_adzuna_multi(
+    titles: list[str],
+    location: str = "",
+    country: str = "de",
+    per_title: int = 5,
+) -> list[Job]:
+    """
+    Run one Adzuna search per target title and merge the results.
+
+    Adzuna supports server-side search, so this finds far more AI/ML roles
+    than the Arbeitnow feed. Results are deduplicated by id (falling back
+    to url).
+
+    Args:
+        titles (list[str]): Role phrases to search for, one query each.
+        location (str):     Location filter.
+        country (str):      Adzuna country code.
+        per_title (int):    Results requested per title.
+
+    Returns:
+        list[Job]: Unique jobs across all title searches.
+    """
+    seen: set[str] = set()
+    out: list[Job] = []
+
+    for i, title in enumerate(titles):
+        if i:
+            time.sleep(0.3)   # gentle throttle to avoid Adzuna rate-limit (503)
+        for job in fetch_adzuna_jobs(
+            query=title, location=location, results=per_title, country=country
+        ):
+            key = job.id or job.url
+            if key and key not in seen:
+                seen.add(key)
+                out.append(job)
+
+    logger.info("Adzuna multi-title: %d unique jobs across %d titles",
+                len(out), len(titles))
+    return out
 
 
 if __name__ == "__main__":

@@ -9,6 +9,9 @@ window.clearResume = function() {
   window._resumeTmp  = null;
   window._resumeName = null;
 
+  // Sync the Matches tab resume status so it doesn't show stale data.
+  if (typeof window.renderResume === 'function') window.renderResume(null);
+
   const zone = document.getElementById('up-zone');
   if (zone) {
     zone.outerHTML =
@@ -24,7 +27,7 @@ window.clearResume = function() {
           '<line x1="6" y1="25" x2="15" y2="25" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>' +
         '</svg>' +
         '<div class="up-text">Drop file or <strong>browse</strong></div>' +
-        '<div class="up-hint">PDF &nbsp;&middot;&nbsp; DOCX &nbsp;&middot;&nbsp; DOC</div>' +
+        '<div class="up-hint">PDF &nbsp;&middot;&nbsp; DOCX</div>' +
       '</div>';
 
     // Rebind after DOM replacement
@@ -53,12 +56,23 @@ function updateCounter(len) {
 }
 
 // ── File upload ───────────────────────────────────────────
+var FILE_MAX_MB = 5;
+
 window.handleFileSelect = function(file) {
   if (!file) return;
 
   const ext = file.name.split('.').pop().toLowerCase();
-  if (!['pdf', 'docx', 'doc'].includes(ext)) {
-    alert('Please upload PDF, DOCX or DOC.');
+  if (ext === 'doc') {
+    toast('.doc not supported — convert to .docx or .pdf first.', 'warn', 5000);
+    return;
+  }
+  if (!['pdf', 'docx'].includes(ext)) {
+    toast('Please upload a PDF or DOCX file.', 'warn');
+    return;
+  }
+
+  if (file.size > FILE_MAX_MB * 1024 * 1024) {
+    toast('File too large (' + (file.size / 1024 / 1024).toFixed(1) + ' MB). Max is ' + FILE_MAX_MB + ' MB.', 'warn');
     return;
   }
 
@@ -69,7 +83,7 @@ window.handleFileSelect = function(file) {
     .then(r => r.json())
     .then(d => {
       if (!d.ok) {
-        alert('Upload failed: ' + (d.error || 'unknown'));
+        toast('Upload failed: ' + (d.error || 'unknown'), 'err');
         return;
       }
 
@@ -89,11 +103,9 @@ window.handleFileSelect = function(file) {
           '</div>';
       }
 
-      if (typeof emitEvent === 'function') {
-        emitEvent('file_uploaded', {});
-      }
+      if (typeof setStep === 'function') setStep(2);
     })
-    .catch(e => alert('Upload error: ' + e));
+    .catch(e => toast('Upload error: ' + e, 'err'));
 };
 
 // ── Bind upload zone ──────────────────────────────────────
@@ -113,7 +125,11 @@ function bindUpload() {
 function bindCounter() {
   const jd = document.getElementById('jd-input');
   if (jd) {
-    jd.addEventListener('input', () => updateCounter(jd.value.length));
+    var _debounce;
+    jd.addEventListener('input', () => {
+      clearTimeout(_debounce);
+      _debounce = setTimeout(() => updateCounter(jd.value.length), 50);
+    });
     jd.addEventListener('paste', () => setTimeout(() => updateCounter(jd.value.length), 10));
     updateCounter(0);
   } else {
