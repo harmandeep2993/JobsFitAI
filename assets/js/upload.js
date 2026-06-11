@@ -63,16 +63,16 @@ window.handleFileSelect = function(file) {
 
   const ext = file.name.split('.').pop().toLowerCase();
   if (ext === 'doc') {
-    alert('.doc files are not supported. Please convert your file to .docx or .pdf and try again.');
+    toast('.doc not supported — convert to .docx or .pdf first.', 'warn', 5000);
     return;
   }
   if (!['pdf', 'docx'].includes(ext)) {
-    alert('Please upload a PDF or DOCX file.');
+    toast('Please upload a PDF or DOCX file.', 'warn');
     return;
   }
 
   if (file.size > FILE_MAX_MB * 1024 * 1024) {
-    alert('File is too large (' + (file.size / 1024 / 1024).toFixed(1) + ' MB). Maximum size is ' + FILE_MAX_MB + ' MB.');
+    toast('File too large (' + (file.size / 1024 / 1024).toFixed(1) + ' MB). Max is ' + FILE_MAX_MB + ' MB.', 'warn');
     return;
   }
 
@@ -83,7 +83,7 @@ window.handleFileSelect = function(file) {
     .then(r => r.json())
     .then(d => {
       if (!d.ok) {
-        alert('Upload failed: ' + (d.error || 'unknown'));
+        toast('Upload failed: ' + (d.error || 'unknown'), 'err');
         return;
       }
 
@@ -105,7 +105,7 @@ window.handleFileSelect = function(file) {
 
       if (typeof setStep === 'function') setStep(2);
     })
-    .catch(e => alert('Upload error: ' + e));
+    .catch(e => toast('Upload error: ' + e, 'err'));
 };
 
 // ── Bind upload zone ──────────────────────────────────────

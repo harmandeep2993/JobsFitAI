@@ -290,6 +290,8 @@ window.runMatch = function() {
   if (btn) btn.disabled = true;
   status.textContent = 'Starting…';
   status.className = 'mt-status';
+  renderSkeletons(6);
+  setTopbarRunning(true, 'Starting…');
 
   // Snapshot current ids so everything scored this run is flagged NEW.
   fetch('/api/match/state')
@@ -325,6 +327,18 @@ window.runMatch = function() {
 var _pollAttempts = 0;
 var MAX_POLL_ATTEMPTS = 150; // 150 × 2 s = 5 minutes max
 
+function setTopbarRunning(running, label) {
+  var dot = document.getElementById('tb-run-dot');
+  var lbl = document.getElementById('tb-run-label');
+  if (dot) dot.style.display = running ? 'flex' : 'none';
+  if (lbl && label) lbl.textContent = label;
+}
+
+function setTopbarFetchTime() {
+  var el = document.getElementById('tb-fetch-time');
+  if (el) el.textContent = 'Last fetch ' + new Date().toLocaleTimeString();
+}
+
 function pollRun() {
   const status = document.getElementById('mt-poll-status');
   const btn    = document.getElementById('mt-run-btn');
@@ -334,6 +348,7 @@ function pollRun() {
     if (btn) btn.disabled = false;
     status.textContent = '✕ Timed out — run took too long. Try again.';
     status.className = 'mt-status err';
+    setTopbarRunning(false);
     return;
   }
 
@@ -349,12 +364,13 @@ function pollRun() {
 
       const rs = d.run_status || {};
       if (rs.running) {
-        status.className = 'mt-status';
-        status.textContent =
+        var phaseText =
           rs.phase === 'fetching'    ? 'Fetching jobs…' :
           rs.phase === 'classifying' ? 'Filtering ' + (rs.total || 0) + ' jobs…' :
-          'Scoring… ' + (rs.scored || 0) + ' done · ' +
-            (rs.checked || 0) + '/' + (rs.total || 0);
+          'Scoring ' + (rs.scored || 0) + '/' + (rs.total || 0) + '…';
+        status.className  = 'mt-status';
+        status.textContent = phaseText;
+        setTopbarRunning(true, phaseText);
         setTimeout(pollRun, 2000);
       } else {
         _pollAttempts = 0;
@@ -363,6 +379,9 @@ function pollRun() {
                              (d.results || []).length + ' total · ' +
                              new Date().toLocaleTimeString();
         status.className = 'mt-status ok';
+        setTopbarRunning(false);
+        setTopbarFetchTime();
+        if (newIds.size > 0) toast(newIds.size + ' new job' + (newIds.size === 1 ? '' : 's') + ' scored', 'ok', 3000);
       }
     })
     .catch(() => {
@@ -370,6 +389,7 @@ function pollRun() {
       if (btn) btn.disabled = false;
       status.textContent = '✕ Connection lost. Check server and try again.';
       status.className = 'mt-status err';
+      setTopbarRunning(false);
     });
 }
 
@@ -383,13 +403,14 @@ window.matchCardHTML = function(r, isNew) {
 
   const lc = labelClass(r.label, r.score);
 
-  // Score badge
+  // Score badge — uses data-target for count-up animation
+  const scoreVal = Math.round(r.score || 0);
   const badge = pending
     ? '<div class="jt-score sc-na">…</div>'
     : noJd
       ? '<div class="jt-score sc-na" title="JD not available">JD?</div>'
-      : '<div class="jt-score ' + lc + '">' + Math.round(r.score) +
-        '<span class="jt-score-pct">%</span></div>';
+      : '<div class="jt-score ' + lc + '"><span class="jt-score-num" data-target="' +
+        scoreVal + '">0</span><span class="jt-score-pct">%</span></div>';
 
   // Top-right label chips
   const chips =
@@ -478,11 +499,29 @@ window.deleteMatch = function(id) {
 };
 
 window.clearAllMatches = function() {
-  if (!confirm('Clear ALL matches, history, and seen-jobs? This cannot be undone.')) return;
+  // Two-click confirmation: first click arms, second fires
+  var btn = document.querySelector('.mt-clear');
+  if (!btn) return;
+  if (btn.dataset.armed !== 'yes') {
+    btn.dataset.armed = 'yes';
+    btn.textContent = '⚠ Confirm clear?';
+    btn.style.color = 'var(--red)';
+    setTimeout(function() {
+      btn.dataset.armed = '';
+      btn.textContent = '🗑 Clear all';
+      btn.style.color = '';
+    }, 3000);
+    return;
+  }
+  btn.dataset.armed = '';
+  btn.textContent = '🗑 Clear all';
+  btn.style.color = '';
   fetch('/api/match/clear', { method: 'POST' })
     .then(r => r.json())
-    .then(d => { if (d.ok) loadMatchState(); })
-    .catch(() => {});
+    .then(d => {
+      if (d.ok) { loadMatchState(); toast('All matches cleared.', 'ok'); }
+    })
+    .catch(function() { toast('Clear failed — check server.', 'err'); });
 };
 
 // ── Detail / "more analysis" modal ────────────────────────
@@ -589,6 +628,56 @@ window._mtMinScore = 0;
 window._mtLang     = '';
 window._mtAllData  = [];
 
+// ── Sort ──────────────────────────────────────────────────
+window._mtSort = 'score';
+
+window.setSort = function(s) {
+  window._mtSort = s;
+  document.querySelectorAll('.sort-btn').forEach(function(btn) {
+    btn.classList.toggle('active', btn.dataset.sort === s);
+  });
+  renderMatches(window._mtAllData, new Set());
+};
+
+// ── Skeleton loading ──────────────────────────────────────
+function renderSkeletons(n) {
+  const box = document.getElementById('mt-results');
+  if (!box) return;
+  var html = '';
+  for (var i = 0; i < (n || 6); i++) {
+    html +=
+      '<div class="sk-card">' +
+        '<div class="sk-line sk-score"></div>' +
+        '<div class="sk-line sk-title"></div>' +
+        '<div class="sk-line sk-sub"></div>' +
+        '<div class="sk-line sk-meta"></div>' +
+        '<div class="sk-line sk-tags"></div>' +
+        '<div class="sk-line sk-foot"></div>' +
+      '</div>';
+  }
+  box.innerHTML = html;
+}
+
+// ── Score count-up animation ──────────────────────────────
+function animateScores() {
+  var nums = document.querySelectorAll('.jt-score-num[data-target]');
+  nums.forEach(function(el) {
+    var target = parseInt(el.dataset.target, 10) || 0;
+    if (target === 0) { el.textContent = '0'; return; }
+    var start = 0;
+    var duration = 600;
+    var startTime = null;
+    function step(ts) {
+      if (!startTime) startTime = ts;
+      var progress = Math.min((ts - startTime) / duration, 1);
+      var eased = 1 - Math.pow(1 - progress, 3);
+      el.textContent = Math.round(eased * target);
+      if (progress < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  });
+}
+
 window.onScoreFilter = function() {
   const el  = document.getElementById('flt-score');
   const lbl = document.getElementById('flt-score-val');
@@ -619,6 +708,18 @@ function renderMatches(results, newIds) {
     return true;
   });
 
+  // Update sidebar badge — count unreviewed (unapplied, scored) jobs
+  var unreviewed = results.filter(function(r) { return !r.applied && r.status !== 'pending'; }).length;
+  var badge = document.getElementById('sb-badge-matches');
+  if (badge) {
+    badge.textContent = unreviewed > 0 ? String(unreviewed) : '';
+    badge.style.display = unreviewed > 0 ? '' : 'none';
+  }
+
+  // Show sort row when there are results
+  var sortRow = document.getElementById('sort-row');
+  if (sortRow) sortRow.style.display = filtered.length ? 'flex' : 'none';
+
   if (!filtered.length) {
     const msg = results.length
       ? 'No matches pass the current filters.'
@@ -627,15 +728,24 @@ function renderMatches(results, newIds) {
     return;
   }
 
-  // New jobs first, then by score within each group.
-  const ordered = filtered.slice().sort((a, b) => {
+  // Sort by current sort mode; new jobs float to top in all modes
+  const sort = window._mtSort || 'score';
+  const ordered = filtered.slice().sort(function(a, b) {
     const an = newIds.has(a.id) ? 1 : 0;
     const bn = newIds.has(b.id) ? 1 : 0;
     if (an !== bn) return bn - an;
-    return (b.score || 0) - (a.score || 0);
+    if (sort === 'score')   return (b.score || 0) - (a.score || 0);
+    if (sort === 'newest')  return (b.posted_at || 0) - (a.posted_at || 0);
+    if (sort === 'company') return (a.company || '').localeCompare(b.company || '');
+    return 0;
   });
 
-  box.innerHTML = ordered.map(r => window.matchCardHTML(r, newIds.has(r.id))).join('');
+  box.innerHTML = ordered.map(function(r) {
+    return window.matchCardHTML(r, newIds.has(r.id));
+  }).join('');
+
+  // Animate score badges on next frame
+  requestAnimationFrame(animateScores);
 }
 
 // ── Resume diff banner ────────────────────────────────────

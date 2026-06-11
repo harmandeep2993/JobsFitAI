@@ -172,6 +172,19 @@ async def api_analyze(request: Request) -> JSONResponse:
     })
 
 
+# ── LLM ping ──────────────────────────────────────────────
+
+@app.get("/api/llm-ping")
+async def api_llm_ping() -> JSONResponse:
+    """Quick check whether the active LLM provider is reachable."""
+    try:
+        online = await run_in_threadpool(check_llm)
+    except Exception as e:
+        logger.error("LLM ping failed: %s", e)
+        online = False
+    return JSONResponse({"ok": True, "online": online, "current": session.get_settings()})
+
+
 # ── LLM settings ──────────────────────────────────────────
 
 @app.get("/api/llm-settings")
