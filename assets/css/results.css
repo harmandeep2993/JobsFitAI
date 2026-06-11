@@ -1,8 +1,8 @@
-/* results.css – analysis result panel */
+﻿/* results.css – analysis result panel */
 
 #jf-results { margin-top: 20px; }
 
-/* ── Score hero ───────────────────────────────────── */
+/* --- Score hero --- */
 .res-hero {
   display: flex;
   align-items: center;
@@ -40,7 +40,7 @@
 .res-label { font-size: 18px; font-weight: 700; color: var(--t1); letter-spacing: -0.4px; margin-bottom: 4px; }
 .res-sub   { font-size: 12.5px; color: var(--t2); line-height: 1.6; }
 
-/* ── Result tabs ──────────────────────────────────── */
+/* --- Result tabs --- */
 .res-tabs {
   display: flex;
   gap: 0;
@@ -82,7 +82,7 @@
 .res-pane { display: none; }
 .res-pane.active { display: block; }
 
-/* ── Section score grid ───────────────────────────── */
+/* --- Section score grid --- */
 .ds-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
@@ -135,7 +135,7 @@
 
 .sc-pct { font-size: 12px; color: var(--t3); margin-left: 1px; }
 
-/* ── Skills tabs ──────────────────────────────────── */
+/* --- Skills tabs --- */
 .skills-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -164,7 +164,7 @@
 
 .skills-tags { display: flex; flex-wrap: wrap; gap: 5px; }
 
-/* ── Responsibilities table ───────────────────────── */
+/* --- Responsibilities table --- */
 .resp-table {
   width: 100%;
   border-collapse: collapse;
@@ -206,7 +206,7 @@
 .match-mid { background: var(--amber-bg); color: var(--amber); }
 .match-lo  { background: var(--red-bg);   color: var(--red); }
 
-/* ── Summary block ────────────────────────────────── */
+/* --- Summary block --- */
 .summary-block {
   background: var(--bg-r);
   border: 1px solid var(--bd);
@@ -217,7 +217,7 @@
   line-height: 1.7;
 }
 
-/* ── Detail modal body (inside .modal-box) ────────── */
+/* --- Detail modal body (inside .modal-box) --- */
 .detail-body {
   padding: 16px 20px 20px;
   display: flex;

@@ -1,6 +1,6 @@
-/* components.css – all UI components */
+﻿/* components.css – all UI components */
 
-/* ── Card ─────────────────────────────────────────── */
+/* --- Card --- */
 .card {
   background: var(--bg-r);
   border: 1px solid var(--bd);
@@ -17,7 +17,7 @@
   overflow: hidden;
 }
 
-/* ── Two column layout ────────────────────────────── */
+/* --- Two column layout --- */
 .two-col {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -25,7 +25,7 @@
 }
 @media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
 
-/* ── Buttons ──────────────────────────────────────── */
+/* --- Buttons --- */
 .btn-primary {
   display: inline-flex;
   align-items: center;
@@ -68,7 +68,7 @@
 }
 .btn-ghost:hover { border-color: var(--t3); color: var(--t1); background: var(--bg-hov); }
 
-/* ── Form controls ────────────────────────────────── */
+/* --- Form controls --- */
 .fetch-inp {
   flex: 1;
   padding: 8px 12px;
@@ -99,7 +99,7 @@
 }
 .mt-select:focus { border-color: var(--accent); }
 
-/* ── Status text ──────────────────────────────────── */
+/* --- Status text --- */
 .mt-status {
   font-size: 12px;
   color: var(--t2);
@@ -117,7 +117,7 @@
 .status-err { color: var(--red); }
 .status-dim { color: var(--t3); }
 
-/* ── Rows in control panel ────────────────────────── */
+/* --- Rows in control panel --- */
 .mt-row {
   display: flex;
   align-items: center;
@@ -131,7 +131,7 @@
   gap: 8px;
 }
 
-/* ── Stats row ────────────────────────────────────── */
+/* --- Stats row --- */
 .mt-stats {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -191,7 +191,7 @@
   letter-spacing: 0.8px;
 }
 
-/* ── Controls card ────────────────────────────────── */
+/* --- Controls card --- */
 .ctrl-card {
   background: var(--bg-r);
   border: 1px solid var(--bd);
@@ -236,7 +236,7 @@
 
 .ctrl-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
 
-/* ── Filters panel ────────────────────────────────── */
+/* --- Filters panel --- */
 .mt-toggle {
   background: none;
   border: none;
@@ -261,7 +261,7 @@
   margin-top: 4px;
 }
 
-/* ── Sort / Filter bar ────────────────────────────── */
+/* --- Sort / Filter bar --- */
 .sort-row {
   display: flex;
   align-items: center;
@@ -332,14 +332,14 @@
   white-space: nowrap;
 }
 
-/* ── Job thumbnail grid ───────────────────────────── */
+/* --- Job thumbnail grid --- */
 .fetch-results {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(284px, 1fr));
   gap: 14px;
 }
 
-/* ── Job thumbnail card ───────────────────────────── */
+/* --- Job thumbnail card --- */
 .job-thumb {
   background: var(--bg-r);
   border: 1px solid var(--bd);
@@ -530,7 +530,7 @@
   font-style: italic;
 }
 
-/* ── Skill tags ───────────────────────────────────── */
+/* --- Skill tags --- */
 .tag {
   display: inline-flex;
   align-items: center;
@@ -570,7 +570,7 @@
   color: var(--t1);
 }
 
-/* ── Job card footer actions ──────────────────────── */
+/* --- Job card footer actions --- */
 .jt-foot {
   display: flex;
   align-items: center;
@@ -624,7 +624,7 @@
 }
 .jt-del:hover { border-color: var(--red-bd); background: var(--red-bg); color: var(--red); }
 
-/* ── Section labels ───────────────────────────────── */
+/* --- Section labels --- */
 .sec-lbl-row {
   display: flex;
   align-items: center;
@@ -653,7 +653,7 @@
 }
 .clear-btn:hover { color: var(--red); }
 
-/* ── Upload zone ──────────────────────────────────── */
+/* --- Upload zone --- */
 .up-zone {
   border: 1.5px dashed var(--bd);
   border-radius: var(--radius);
@@ -670,7 +670,7 @@
 .up-text strong { color: var(--accent); }
 .up-hint { font-size: 11px; color: var(--t3); margin-top: 4px; font-family: 'DM Mono', monospace; }
 
-/* ── JD textarea ──────────────────────────────────── */
+/* --- JD textarea --- */
 .jd-wrap { position: relative; }
 .jd-box {
   width: 100%;
@@ -701,7 +701,7 @@
   pointer-events: none;
 }
 
-/* ── Analyzer steps ───────────────────────────────── */
+/* --- Analyzer steps --- */
 .steps {
   display: flex;
   align-items: center;
@@ -744,7 +744,7 @@
   min-width: 20px;
 }
 
-/* ── Skeleton loader ──────────────────────────────── */
+/* --- Skeleton loader --- */
 .sk-card {
   background: var(--bg-r);
   border: 1px solid var(--bd);
@@ -766,7 +766,7 @@
 .sk-line.w40 { width: 40%; }
 .sk-line.w80 { width: 80%; }
 
-/* ── Modal overlay ────────────────────────────────── */
+/* --- Modal overlay --- */
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -833,7 +833,7 @@
 }
 .dt-close:hover { border-color: var(--red-bd); background: var(--red-bg); color: var(--red); }
 
-/* ── JD paste modal ───────────────────────────────── */
+/* --- JD paste modal --- */
 .jd-modal-box {
   width: min(560px, 94vw);
   max-height: 90vh;
@@ -904,7 +904,7 @@
   margin-bottom: 8px;
 }
 
-/* ── Toast notifications ──────────────────────────── */
+/* --- Toast notifications --- */
 #toast-root {
   position: fixed;
   bottom: 20px;
@@ -942,7 +942,7 @@
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-/* ── Match history table ──────────────────────────── */
+/* --- Match history table --- */
 .hist-filters {
   display: flex;
   gap: 6px;
@@ -1063,7 +1063,7 @@
 .ht-apply:hover { border-color: var(--green-bd); background: var(--green-bg); color: var(--green); }
 .ht-apply.on    { border-color: var(--green-bd); background: var(--green-bg); color: var(--green); font-weight: 600; }
 
-/* ── Settings view ────────────────────────────────── */
+/* --- Settings view --- */
 .set-row {
   display: flex;
   align-items: center;
@@ -1146,7 +1146,7 @@
 .dd-opt:hover  { background: var(--bg-c); }
 .dd-opt.sel    { background: var(--accent-s); color: var(--accent); font-weight: 600; }
 
-/* ── Resume detail popup ──────────────────────────── */
+/* --- Resume detail popup --- */
 .rz-section { margin-bottom: 16px; }
 .rz-lbl {
   font-size: 11px;
@@ -1158,7 +1158,7 @@
 }
 .rz-chips { display: flex; flex-wrap: wrap; gap: 4px; }
 
-/* ── Resume diff banner ───────────────────────────── */
+/* --- Resume diff banner --- */
 .diff-banner {
   background: var(--amber-bg);
   border: 1px solid var(--amber-bd);
@@ -1169,7 +1169,7 @@
   color: var(--amber);
 }
 
-/* ── Misc ─────────────────────────────────────────── */
+/* --- Misc --- */
 .fetch-empty {
   padding: 60px 0;
   text-align: center;

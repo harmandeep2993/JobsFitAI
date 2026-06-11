@@ -1,4 +1,4 @@
-/* ── Design tokens ── */
+﻿/* --- Design tokens --- */
 :root {
   /* Brand */
   --accent:   #e8471a;
@@ -56,7 +56,7 @@
   --radius-xs: 6px;
 }
 
-/* ── Dark mode ── */
+/* --- Dark mode --- */
 :root.dark {
   --bg:     #0a0a0c;
   --bg-r:   #131316;
