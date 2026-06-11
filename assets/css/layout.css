@@ -2,267 +2,320 @@
 /* Shell, topbar, sidebar, main content area */
 
 /* ── Reset & base ── */
-*,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
 
-html, body { height: 100%; }
+html,
+body {
+  height: 100%;
+}
 
 body {
-  background:   var(--bg) !important;
-  color:        var(--t1) !important;
-  font-family:  'Instrument Sans', sans-serif !important;
-  transition:   background .25s, color .25s;
+  background: var(--bg) !important;
+  color: var(--t1) !important;
+  font-family: "Instrument Sans", sans-serif !important;
+  transition:
+    background 0.25s,
+    color 0.25s;
 }
 
 .nicegui-content,
 .q-page {
-  padding:    0 !important;
-  margin:     0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
   background: var(--bg) !important;
   min-height: 100vh !important;
 }
 
-.q-header { display: none !important; }
+.q-header {
+  display: none !important;
+}
 
 /* ── Outer page ── */
 .jfai-page {
-  min-height:  100vh;
-  background:  var(--bg);
-  display:     block;
-  padding:     16px;
-  transition:  background .25s;
+  min-height: 100vh;
+  background: var(--bg);
+  display: block;
+  padding: 16px;
+  transition: background 0.25s;
 }
 
 /* ── App shell card ── */
 .jfai-shell {
-  width:         100%;
-  max-width:     100%;
-  margin:        0 auto;
-  background:    var(--bg-r);
-  border:        1px solid var(--bd);
+  width: 100%;
+  max-width: 100%;
+  margin: 0 auto;
+  background: var(--bg-r);
+  border: 1px solid var(--bd);
   border-radius: 16px;
-  overflow:      hidden;
-  box-shadow:    0 4px 32px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.06);
-  display:       flex;
+  overflow: hidden;
+  box-shadow:
+    0 4px 32px rgba(0, 0, 0, 0.09),
+    0 1px 4px rgba(0, 0, 0, 0.06);
+  display: flex;
   flex-direction: column;
-  transition:    background .25s, border-color .25s;
+  transition:
+    background 0.25s,
+    border-color 0.25s;
 }
 
 /* ── Topbar ── */
 .jfai-topbar {
-  height:        52px;
-  background:    var(--bg-r);
+  height: 52px;
+  background: var(--bg-r);
   border-bottom: 1px solid var(--bd);
-  display:       flex;
-  align-items:   center;
-  padding:       0 20px;
-  gap:           12px;
-  flex-shrink:   0;
-  transition:    background .25s, border-color .25s;
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  gap: 12px;
+  flex-shrink: 0;
+  transition:
+    background 0.25s,
+    border-color 0.25s;
 }
 
 .logo-mark {
-  width:           30px;
-  height:          30px;
-  background:      var(--accent);
-  border-radius:   8px;
-  display:         flex;
-  align-items:     center;
+  width: 30px;
+  height: 30px;
+  background: var(--accent);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
   justify-content: center;
-  font-size:       13px;
-  font-weight:     800;
-  color:           #fff;
-  flex-shrink:     0;
+  font-size: 13px;
+  font-weight: 800;
+  color: #fff;
+  flex-shrink: 0;
 }
 
 .logo-name {
-  font-size:   15px;
+  font-size: 15px;
   font-weight: 700;
-  color:       var(--t1);
-  letter-spacing: -.3px;
+  color: var(--t1);
+  letter-spacing: -0.3px;
 }
 
 .logo-name em {
-  color:      var(--accent);
+  color: var(--accent);
   font-style: normal;
 }
 
 .topbar-r {
   margin-left: auto;
-  display:     flex;
+  display: flex;
   align-items: center;
-  gap:         8px;
+  gap: 8px;
 }
 
 .t-chip {
-  padding:       4px 11px;
+  padding: 4px 11px;
   border-radius: 99px;
-  font-size:     11px;
-  font-weight:   500;
-  font-family:   'DM Mono', monospace;
-  background:    var(--bg-c);
-  border:        1px solid var(--bd);
-  color:         var(--t2);
-  display:       flex;
-  align-items:   center;
-  gap:           5px;
-  transition:    background .25s, border-color .25s;
+  font-size: 11px;
+  font-weight: 500;
+  font-family: "DM Mono", monospace;
+  background: var(--bg-c);
+  border: 1px solid var(--bd);
+  color: var(--t2);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition:
+    background 0.25s,
+    border-color 0.25s;
 }
 
 .t-bead {
-  width:         6px;
-  height:        6px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
-  flex-shrink:   0;
+  flex-shrink: 0;
 }
 
-.bon  { background: var(--green); box-shadow: 0 0 5px var(--green); }
-.boff { background: var(--red);   box-shadow: 0 0 5px var(--red);   }
+.bon {
+  background: var(--green);
+  box-shadow: 0 0 5px var(--green);
+}
+.boff {
+  background: var(--red);
+  box-shadow: 0 0 5px var(--red);
+}
 
 .theme-btn {
-  width:           34px;
-  height:          34px;
-  border-radius:   8px;
-  border:          1px solid var(--bd);
-  background:      var(--bg-c);
-  display:         flex;
-  align-items:     center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid var(--bd);
+  background: var(--bg-c);
+  display: flex;
+  align-items: center;
   justify-content: center;
-  font-size:       15px;
-  cursor:          pointer;
-  transition:      all .2s;
+  font-size: 15px;
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
 .theme-btn:hover {
   border-color: var(--accent);
-  background:   var(--accent-s);
+  background: var(--accent-s);
 }
 
 /* ── Body row ── */
 .jfai-body {
-  display:    flex;
-  flex:       1;
+  display: flex;
+  flex: 1;
   min-height: 680px;
 }
 
 /* ── Sidebar ── */
 .jfai-sidebar {
-  width:       200px;
-  min-width:   200px;
+  width: 200px;
+  min-width: 200px;
   flex-shrink: 0;
-  background:  var(--bg-r);
+  background: var(--bg-r);
   border-right: 1px solid var(--bd);
-  padding:     20px 10px;
-  display:     flex;
+  padding: 20px 10px;
+  display: flex;
   flex-direction: column;
-  transition:  background .25s, border-color .25s;
+  transition:
+    background 0.25s,
+    border-color 0.25s;
 }
 
 .sb-sec {
-  font-size:      10px;
-  font-weight:    600;
+  font-size: 10px;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 1.2px;
-  padding:        4px 10px 8px;
-  color:          var(--t3);
-  font-family:    'DM Mono', monospace;
+  padding: 4px 10px 8px;
+  color: var(--t3);
+  font-family: "DM Mono", monospace;
 }
 
 .sb-item {
-  padding:       8px 10px;
+  padding: 8px 10px;
   border-radius: 7px;
-  font-size:     13px;
-  font-weight:   500;
-  color:         var(--t2);
-  cursor:        pointer;
-  display:       flex;
-  align-items:   center;
-  gap:           8px;
-  transition:    all .15s;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--t2);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.15s;
   margin-bottom: 2px;
 }
 
-.sb-item:hover  { background: var(--bd-s);    color: var(--t1); }
-.sb-item.active { background: var(--accent-s); color: var(--accent); font-weight: 600; }
+.sb-item:hover {
+  background: var(--bd-s);
+  color: var(--t1);
+}
+.sb-item.active {
+  background: var(--accent-s);
+  color: var(--accent);
+  font-weight: 600;
+}
 
 .sb-rule {
-  height:     1px;
+  height: 1px;
   background: var(--bd);
-  margin:     10px 0;
+  margin: 10px 0;
 }
 
 .sb-meta {
-  font-size:   11px;
-  color:       var(--t3);
-  padding:     6px 10px;
-  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: var(--t3);
+  padding: 6px 10px;
+  font-family: "DM Mono", monospace;
   line-height: 1.7;
 }
 
 .sb-foot {
-  margin-top:    auto;
-  padding:       10px;
-  border-top:    1px solid var(--bd);
-  font-size:     10px;
-  color:         var(--t3);
-  font-family:   'DM Mono', monospace;
+  margin-top: auto;
+  padding: 10px;
+  border-top: 1px solid var(--bd);
+  font-size: 10px;
+  color: var(--t3);
+  font-family: "DM Mono", monospace;
 }
 
 /* ── Main content ── */
 .jfai-main {
-  flex:       1;
-  min-width:  0;
+  flex: 1;
+  min-width: 0;
   background: var(--bg);
   overflow-y: auto;
-  transition: background .25s;
+  transition: background 0.25s;
 }
 
 #ng-main-content {
-  padding:   36px 44px;
-  width:     100%;
+  padding: 36px 44px;
+  width: 100%;
   min-width: 0;
 }
 
 /* ── Page title ── */
 .pg-title {
-  font-size:      28px;
-  font-weight:    700;
-  color:          var(--t1);
-  letter-spacing: -.5px;
-  margin-bottom:  6px;
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--t1);
+  letter-spacing: -0.5px;
+  margin-bottom: 6px;
 }
 
-.pg-title em { color: var(--accent); font-style: normal; }
+.pg-title em {
+  color: var(--accent);
+  font-style: normal;
+}
 
 .pg-sub {
-  font-size:     14px;
-  color:         var(--t2);
+  font-size: 14px;
+  color: var(--t2);
   margin-bottom: 32px;
 }
 
 .divider {
-  height:     1px;
+  height: 1px;
   background: var(--bd);
-  margin:     24px 0;
+  margin: 24px 0;
 }
 
 .sec-lbl {
-  font-size:      11px;
-  font-weight:    600;
+  font-size: 11px;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 1.2px;
-  color:          var(--t3);
-  margin-bottom:  12px;
-  font-family:    'DM Mono', monospace;
+  color: var(--t3);
+  margin-bottom: 12px;
+  font-family: "DM Mono", monospace;
 }
 
 /* ── Animations ── */
 @keyframes fadeUp {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0);   }
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-.fade-in { animation: fadeUp .3s ease forwards; }
+.fade-in {
+  animation: fadeUp 0.3s ease forwards;
+}
 
 /* ── Scrollbar ── */
-::-webkit-scrollbar       { width: 5px; height: 5px; }
-::-webkit-scrollbar-thumb { background: var(--bd); border-radius: 99px; }
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--bd);
+  border-radius: 99px;
+}
