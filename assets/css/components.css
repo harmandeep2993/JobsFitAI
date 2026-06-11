@@ -102,6 +102,20 @@
 .sort-btn:hover  { border-color: var(--t3); color: var(--t1); }
 .sort-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 
+.sort-sep {
+  width: 1px;
+  height: 18px;
+  background: var(--bd);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+.sort-count {
+  margin-left: auto;
+  font-size:   11px;
+  font-family: 'DM Mono', monospace;
+  color:       var(--t3);
+}
+
 /* ── Sidebar badges ──────────────────────────────────────── */
 .sb-badge {
   display: inline-flex;
@@ -954,6 +968,13 @@
   font-family: "DM Mono", monospace;
   letter-spacing: .3px;
 }
+.jt-fetched {
+  font-size: 10px;
+  color: var(--t3);
+  font-family: "DM Mono", monospace;
+  opacity: .7;
+  margin-top: 1px;
+}
 .jt-skills {
   display: flex;
   flex-wrap: wrap;
@@ -1016,6 +1037,47 @@
 /* keep old names for analyze-btn / apply-toggle used elsewhere */
 .analyze-btn  { }
 .apply-toggle { }
+
+/* JD paste modal */
+.jd-modal-box {
+  width: min(560px, 94vw);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px;
+  overflow: hidden;
+}
+.jd-modal-hint {
+  font-size: 12px;
+  color: var(--t3);
+  margin: 0;
+  line-height: 1.5;
+}
+.jd-modal-ta {
+  flex: 1;
+  min-height: 220px;
+  max-height: 340px;
+  resize: vertical;
+  font-size: 12px;
+  font-family: 'DM Mono', monospace;
+  line-height: 1.5;
+  padding: 10px 12px;
+  border: 1px solid var(--bd);
+  border-radius: var(--radius);
+  background: var(--bg-c);
+  color: var(--t1);
+  width: 100%;
+  box-sizing: border-box;
+  outline: none;
+}
+.jd-modal-ta:focus { border-color: var(--accent); }
+.jd-modal-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.mt-status.err { color: var(--red); }
 .del-btn      { }
 .src-tag      { background: var(--bd-s); padding: 1px 6px; border-radius: 99px; font-size: 10px; color: var(--t3); }
 

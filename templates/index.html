@@ -121,7 +121,7 @@
 
           </div>
           <div style="margin-top:24px;">
-            <button class="btn-primary" id="analyse-btn">&rarr; Analyse Match</button>
+            <button class="btn-primary" id="analyse-btn">Analyse Match</button>
           </div>
         </div>
 
@@ -150,7 +150,7 @@
 
           <div class="jd-fetch" style="margin-top:16px;">
             <input id="mt-query" class="fetch-inp" placeholder="Optional: search one role now (default = your saved titles)"/>
-            <button class="btn-primary" id="mt-run-btn" onclick="runMatch()">&rarr; Fetch &amp; Score</button>
+            <button class="btn-primary" id="mt-run-btn" onclick="runMatch()">Fetch &amp; Score</button>
           </div>
 
           <div class="mt-row" style="margin-top:12px;">
@@ -174,11 +174,8 @@
             <a class="btn-ghost" href="/api/match/export" download style="margin-left:8px;">&#8595; CSV</a>
           </div>
 
-          <div class="mt-row" style="margin-top:12px;gap:16px;flex-wrap:wrap;">
-            <label class="set-lbl" style="min-width:unset;">Min score</label>
-            <input type="range" id="flt-score" min="0" max="100" value="0" step="5" oninput="onScoreFilter()" style="flex:1;max-width:160px;"/>
-            <span id="flt-score-val" style="font-size:12px;opacity:.7;min-width:32px;">0%+</span>
-            <label class="set-lbl" style="min-width:unset;margin-left:8px;">Lang</label>
+          <div class="mt-row" style="margin-top:12px;gap:12px;">
+            <label class="set-lbl" style="min-width:unset;">Lang</label>
             <select id="flt-lang" class="mt-select" onchange="onLangFilter()">
               <option value="">All</option>
               <option value="en">EN</option>
@@ -195,12 +192,32 @@
           <button class="btn-ghost" id="mt-resume-btn" style="display:none;" onclick="openResume()">&#128196; View Resume</button>
         </div>
 
-        <!-- sort controls -->
+        <!-- sort + filter controls -->
         <div class="sort-row" id="sort-row" style="display:none;">
           <span class="sort-lbl">Sort</span>
-          <button class="sort-btn active" data-sort="score"   onclick="setSort('score')">Score ↓</button>
-          <button class="sort-btn"        data-sort="newest"  onclick="setSort('newest')">Newest</button>
-          <button class="sort-btn"        data-sort="company" onclick="setSort('company')">Company A–Z</button>
+          <button class="sort-btn active" data-sort="score"   onclick="setSort('score')">Score &#8595;</button>
+          <button class="sort-btn"        data-sort="fetched" onclick="setSort('fetched')">Fetched</button>
+          <span class="sort-sep"></span>
+          <span class="sort-lbl">Score</span>
+          <button class="sort-btn active" data-score="0"  onclick="setMtScore(0)">All</button>
+          <button class="sort-btn"        data-score="40" onclick="setMtScore(40)">40+</button>
+          <button class="sort-btn"        data-score="60" onclick="setMtScore(60)">60+</button>
+          <button class="sort-btn"        data-score="80" onclick="setMtScore(80)">80+</button>
+          <span class="sort-sep"></span>
+          <span class="sort-lbl">Source</span>
+          <button class="sort-btn active" data-src="all"       onclick="setMtSource('all')">All</button>
+          <button class="sort-btn"        data-src="adzuna"    onclick="setMtSource('adzuna')">Adzuna</button>
+          <button class="sort-btn"        data-src="arbeitnow" onclick="setMtSource('arbeitnow')">Arbeitnow</button>
+          <span class="sort-sep"></span>
+          <span class="sort-lbl">Published</span>
+          <button class="sort-btn active" data-age="all" onclick="setMtAge('all')">All</button>
+          <button class="sort-btn"        data-age="1"   onclick="setMtAge(1)">Today</button>
+          <button class="sort-btn"        data-age="7"   onclick="setMtAge(7)">7 days</button>
+          <button class="sort-btn"        data-age="14"  onclick="setMtAge(14)">14 days</button>
+          <span class="sort-sep"></span>
+          <button class="sort-btn" id="mt-fn-btn" onclick="toggleMtNew()">&#10024; New</button>
+          <button class="sort-btn" id="mt-fa-btn" onclick="toggleMtApplied()">Hide applied</button>
+          <span class="sort-count" id="mt-result-count"></span>
         </div>
 
         <div class="fetch-results" id="mt-results"></div>
@@ -271,6 +288,26 @@
 <!-- detail modal -->
 <div id="detail-modal" class="modal-overlay" style="display:none;" onclick="closeDetail(event)">
   <div class="modal-box" id="detail-box"></div>
+</div>
+
+<!-- JD paste modal (for jd_unavailable jobs) -->
+<div id="jd-modal" class="modal-overlay" style="display:none;" onclick="closeJdModal(event)">
+  <div class="modal-box jd-modal-box">
+    <div class="dt-head">
+      <div>
+        <div class="dt-title" id="jd-modal-title">Paste Job Description</div>
+        <div class="dt-sub"   id="jd-modal-sub"></div>
+      </div>
+      <button class="dt-close" onclick="closeJdModal()">&#10005;</button>
+    </div>
+    <p class="jd-modal-hint">The full JD wasn&rsquo;t available on Adzuna. Paste it here and we&rsquo;ll score your resume against it.</p>
+    <textarea id="jd-modal-input" class="jd-box jd-modal-ta"
+      placeholder="Paste the full job description here&hellip;"></textarea>
+    <div class="jd-modal-foot">
+      <button class="btn-primary" id="jd-modal-btn" onclick="submitJd()">Score this job</button>
+      <span class="mt-status" id="jd-modal-status"></span>
+    </div>
+  </div>
 </div>
 
 <script src="/assets/js/toast.js"></script>
