@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="/assets/css/layout.css"/>
   <link rel="stylesheet" href="/assets/css/components.css"/>
   <link rel="stylesheet" href="/assets/css/results.css"/>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 </head>
 <body>
 
@@ -17,27 +17,40 @@
   <!-- sidebar -->
   <nav class="jfai-sidebar">
     <div class="sidebar-logo">
-      <div class="logo-mark">J</div>
+      <div class="logo-mark">JF</div>
       <span class="logo-name">Job<em>Fit</em>AI</span>
     </div>
-    <div class="sb-sec">Navigation</div>
-    <div class="sb-item active" id="nav-analyzer" onclick="showView('analyzer')">
-      <span>🎯</span><span>Analyzer</span>
+    <div class="sb-nav">
+      <div class="sb-item active" id="nav-analyzer" onclick="showView('analyzer')">
+        <svg class="sb-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="7" cy="7" r="5"/><path d="M11 11l3 3"/>
+        </svg>
+        <span>Analyzer</span>
+      </div>
+      <div class="sb-item" id="nav-matches" onclick="showView('matches')">
+        <svg class="sb-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="5" width="12" height="9" rx="1.5"/>
+          <path d="M5 5V3.5A1.5 1.5 0 016.5 2h3A1.5 1.5 0 0111 3.5V5"/>
+        </svg>
+        <span>Job Matches</span>
+        <span class="sb-badge" id="sb-badge-matches"></span>
+      </div>
+      <div class="sb-item" id="nav-history" onclick="showView('history')">
+        <svg class="sb-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 2"/>
+        </svg>
+        <span>History</span>
+      </div>
+      <div class="sb-rule"></div>
+      <div class="sb-item" id="nav-settings" onclick="showView('settings')">
+        <svg class="sb-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="8" cy="8" r="2"/>
+          <path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.22 3.22l1.42 1.42M11.36 11.36l1.42 1.42M3.22 12.78l1.42-1.42M11.36 4.64l1.42-1.42"/>
+        </svg>
+        <span>Settings</span>
+      </div>
     </div>
-    <div class="sb-item" id="nav-matches" onclick="showView('matches')">
-      <span>📈</span><span>Job Matches</span>
-      <span class="sb-badge" id="sb-badge-matches"></span>
-    </div>
-    <div class="sb-item" id="nav-history" onclick="showView('history')">
-      <span>📊</span><span>History</span>
-    </div>
-    <div class="sb-item" id="nav-settings" onclick="showView('settings')">
-      <span>⚙️</span><span>Settings</span>
-    </div>
-    <div class="sb-rule"></div>
-    <div class="sb-sec">About</div>
-    <div class="sb-meta">Resume match scoring<br>via local LLM +<br>semantic similarity</div>
-    <div class="sb-foot">v1.0.0 &middot; local</div>
+    <div class="sb-foot">v1.0 &middot; local</div>
   </nav>
 
   <!-- right workspace -->
@@ -48,7 +61,7 @@
       <div class="topbar-l">
         <div class="tb-run-dot" id="tb-run-dot" style="display:none;">
           <span class="run-pulse"></span>
-          <span class="run-label" id="tb-run-label">Scoring…</span>
+          <span class="run-label" id="tb-run-label">Running…</span>
         </div>
         <span class="tb-fetch-time" id="tb-fetch-time"></span>
       </div>
@@ -58,7 +71,7 @@
           <span id="tb-provider">loading&hellip;</span>
         </div>
         <div class="t-chip" id="tb-model"></div>
-        <button class="theme-btn" id="themechange" title="Toggle theme">&#9728;&#65039;</button>
+        <button class="theme-btn" id="themechange" title="Toggle theme">&#9728;</button>
       </div>
     </header>
 
@@ -140,25 +153,42 @@
 
         <div class="mt-stats" id="mt-stats"></div>
 
-        <div class="card">
+        <div class="ctrl-card">
           <input type="file" id="mt-file" accept=".pdf,.docx" style="display:none;"/>
-          <div class="mt-row">
+
+          <!-- resume + run row -->
+          <div class="ctrl-row">
             <button class="btn-ghost" id="mt-upload-btn"
-              onclick="document.getElementById('mt-file').click()">&#128196; Load Resume</button>
+              onclick="document.getElementById('mt-file').click()">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+                <path d="M2 14h12M8 2v9M5 5l3-3 3 3"/>
+              </svg>
+              Load Resume
+            </button>
             <span class="mt-status" id="mt-resume-status">No resume loaded</span>
+            <div class="ctrl-right">
+              <button class="btn-ghost" id="mt-resume-btn" style="display:none;" onclick="openResume()">View Resume</button>
+            </div>
           </div>
 
-          <div class="jd-fetch" style="margin-top:16px;">
-            <input id="mt-query" class="fetch-inp" placeholder="Optional: search one role now (default = your saved titles)"/>
+          <div class="ctrl-divider"></div>
+
+          <!-- fetch row -->
+          <div class="ctrl-row">
+            <input id="mt-query" class="fetch-inp" placeholder="Optional: search one role (default = saved titles)"/>
             <button class="btn-primary" id="mt-run-btn" onclick="runMatch()">Fetch &amp; Score</button>
           </div>
 
-          <div class="mt-row" style="margin-top:12px;">
-            <label><input type="checkbox" id="mt-entry" checked/> Entry-level only</label>
-          </div>
-
-          <div class="mt-row" style="margin-top:12px;">
-            <label><input type="checkbox" id="mt-sched" onchange="toggleScheduler()"/> Auto-fetch</label>
+          <!-- options row -->
+          <div class="ctrl-row">
+            <label class="ctrl-check">
+              <input type="checkbox" id="mt-entry" checked/>
+              Entry-level only
+            </label>
+            <label class="ctrl-check">
+              <input type="checkbox" id="mt-sched" onchange="toggleScheduler()"/>
+              Auto-fetch
+            </label>
             <select id="mt-sched-interval" class="mt-select" onchange="toggleScheduler()">
               <option value="30">every 30 min</option>
               <option value="60" selected>every 1 hr</option>
@@ -166,30 +196,26 @@
               <option value="360">every 6 hr</option>
             </select>
             <span class="mt-status" id="mt-sched-status"></span>
+            <div class="ctrl-right">
+              <span class="mt-status" id="mt-poll-status"></span>
+              <a class="btn-ghost" href="/api/match/export" download>&#8595; CSV</a>
+              <button class="mt-clear" onclick="clearAllMatches()">Clear all</button>
+            </div>
           </div>
 
-          <div class="mt-row" style="margin-top:14px;">
-            <span class="mt-status" id="mt-poll-status"></span>
-            <button class="mt-clear" onclick="clearAllMatches()">&#128465; Clear all</button>
-            <a class="btn-ghost" href="/api/match/export" download style="margin-left:8px;">&#8595; CSV</a>
-          </div>
-
-          <div class="mt-row" style="margin-top:12px;gap:12px;">
-            <label class="set-lbl" style="min-width:unset;">Lang</label>
+          <!-- lang filter + search settings -->
+          <div class="ctrl-row">
+            <span style="font-size:12px;color:var(--t2);font-weight:500;">Lang</span>
             <select id="flt-lang" class="mt-select" onchange="onLangFilter()">
               <option value="">All</option>
               <option value="en">EN</option>
               <option value="de">DE</option>
             </select>
+            <button class="mt-toggle" id="mt-filters-toggle" aria-expanded="false"
+              aria-controls="mt-filters" onclick="toggleFilters()">Search settings &#9656;</button>
           </div>
 
-          <button class="mt-toggle" id="mt-filters-toggle" aria-expanded="false"
-            aria-controls="mt-filters" onclick="toggleFilters()">&#9881; Search settings &#9656;</button>
           <div class="mt-filters" id="mt-filters" style="display:none;"></div>
-        </div>
-
-        <div class="mt-resume-row" style="margin-top:12px;">
-          <button class="btn-ghost" id="mt-resume-btn" style="display:none;" onclick="openResume()">&#128196; View Resume</button>
         </div>
 
         <!-- sort + filter controls -->
