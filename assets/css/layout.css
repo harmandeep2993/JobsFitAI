@@ -17,8 +17,9 @@ html, body {
 #app {
   display: grid;
   grid-template-columns: var(--sidebar-w) 1fr;
-  grid-template-rows: 1fr;
+  grid-template-rows: 100vh;
   height: 100vh;
+  max-height: 100vh;
   overflow: hidden;
   background: var(--bg);
 }
@@ -26,6 +27,7 @@ html, body {
 /* sidebar */
 .jfai-sidebar {
   grid-row: 1;
+  min-height: 0;
   background: var(--bg-r);
   border-right: 1px solid var(--bd);
   display: flex;
@@ -115,6 +117,8 @@ html, body {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
+  height: 100vh;
   overflow: hidden;
 }
 
@@ -178,7 +182,8 @@ html, body {
 
 /* scrollable main content */
 #main-scroll {
-  flex: 1;
+  flex: 1 1 0;
+  min-height: 0;
   overflow-y: auto;
   background: var(--bg);
   transition: background .2s;
