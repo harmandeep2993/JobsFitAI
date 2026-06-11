@@ -94,7 +94,7 @@ html, body {
   white-space: nowrap;
 }
 .sb-item:hover  { background: var(--bg-hov); color: var(--t1); }
-.sb-item.active { background: var(--accent-s); color: var(--accent); font-weight: 600; }
+.sb-item.active { background: var(--accent-s); color: var(--accent); font-weight: 600; box-shadow: inset 3px 0 0 var(--accent); }
 
 .sb-icon {
   width: 15px;
