@@ -495,10 +495,8 @@ window.matchCardHTML = function(r, isNew) {
 
       '<div class="jt-body">' +
         '<div class="jt-title">' + mtEsc(r.title || '') + '</div>' +
-        '<div class="jt-company">' +
-          mtEsc(r.company || 'Unknown') +
-          (r.location ? ' &middot; ' + mtEsc(r.location) : '') +
-        '</div>' +
+        (r.location ? '<div class="jt-loc">&#128205; ' + mtEsc(r.location) + '</div>' : '') +
+        '<div class="jt-company">' + mtEsc(r.company || 'Unknown') + '</div>' +
         (metaParts.length
           ? '<div class="jt-meta">' + metaParts.join(' &middot; ') + '</div>'
           : '') +
