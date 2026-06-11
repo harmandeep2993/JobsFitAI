@@ -88,25 +88,41 @@ def match(resume: dict, jd: dict) -> dict:
     cert_score = score_certifications(resume, jd)
     logger.debug("Certifications    : %.1f", cert_score)
 
-    # --- Build section scores dict ---
+    # --- Build section scores dict (clamp each to 0-100) ---
+    def _clamp(v: float) -> float:
+        return round(max(0.0, min(100.0, float(v))), 1)
+
     section_scores = {
-        "required_skills":  req_score,
-        "preferred_skills": pref_score,
-        "responsibilities": resp_score,
-        "experience":       exp_score,
-        "education":        edu_score,
-        "languages":        lang_score,
-        "certifications":   cert_score,
+        "required_skills":  _clamp(req_score),
+        "preferred_skills": _clamp(pref_score),
+        "responsibilities": _clamp(resp_score),
+        "experience":       _clamp(exp_score),
+        "education":        _clamp(edu_score),
+        "languages":        _clamp(lang_score),
+        "certifications":   _clamp(cert_score),
     }
 
     # --- Compute weighted overall score ---
-    overall_score = round(
-        sum(
-            section_scores[section] * WEIGHTS.get(section, 0)
-            for section in section_scores
-        ),
-        1
+    # Sections that returned the neutral score because the JD had no data for
+    # them are excluded from the weighted sum and their weight is redistributed
+    # to the remaining sections. This prevents absent JD sections from silently
+    # pulling the overall score toward 60 regardless of the candidate's fit.
+    NEUTRAL = 60.0
+    active_weight_total = sum(
+        WEIGHTS[s] for s in section_scores if section_scores[s] != NEUTRAL
     )
+
+    if active_weight_total > 0:
+        overall_score = round(
+            sum(
+                section_scores[s] * WEIGHTS.get(s, 0) / active_weight_total
+                for s in section_scores
+                if section_scores[s] != NEUTRAL
+            ),
+            1,
+        )
+    else:
+        overall_score = NEUTRAL
 
     # Clamp to 0-100
     overall_score = max(0.0, min(100.0, overall_score))
