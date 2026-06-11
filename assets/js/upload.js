@@ -63,7 +63,7 @@ window.handleFileSelect = function(file) {
 
   const ext = file.name.split('.').pop().toLowerCase();
   if (ext === 'doc') {
-    alert('.doc files are not supported. Please convert your file to .docx or .pdf and try again.');
+    alert('Legacy .doc format is not supported.\nPlease convert to .docx (File → Save As in Word) and try again.');
     return;
   }
   if (!['pdf', 'docx'].includes(ext)) {

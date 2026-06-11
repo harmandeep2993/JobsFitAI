@@ -4,6 +4,13 @@ import os
 import asyncio
 from pathlib import Path
 
+# Per-step timeout budgets (seconds). Keeps the spinner from hanging forever
+# if the LLM stalls, OCR loops, or the embedding model hangs on first load.
+_T_PARSE    = 60   # PDF/DOCX text extraction
+_T_EXTRACT  = 90   # LLM extraction (resume + JD, two calls)
+_T_MATCH    = 60   # semantic scoring + embedding model load
+_T_SUMMARY  = 60   # LLM summary generation
+
 from nicegui import ui
 
 from src.parsers import extract_all_text
@@ -289,68 +296,61 @@ def register_page():
         )
 
         try:
+            loop = asyncio.get_event_loop()
+
             safe_js('document.getElementById("spin-text").innerText="Parsing resume...";')
-            resume_text = await asyncio.get_event_loop().run_in_executor(
-                None, lambda: extract_all_text(tmp_path)
-            )
+            try:
+                resume_text = await asyncio.wait_for(
+                    loop.run_in_executor(None, lambda: extract_all_text(tmp_path)),
+                    timeout=_T_PARSE,
+                )
+            except asyncio.TimeoutError:
+                safe_notify(f"Resume parsing timed out ({_T_PARSE}s) -- try a smaller or simpler file", type="negative")
+                return
 
             if not resume_text or len(resume_text) < 50:
                 safe_notify("Could not parse resume", type="negative")
                 return
 
             safe_js('document.getElementById("spin-text").innerText="Extracting information...";')
-            resume_json, jd_json = await asyncio.get_event_loop().run_in_executor(
-                None, lambda: extract_all(resume_text, jd_text)
-            )
+            try:
+                resume_json, jd_json = await asyncio.wait_for(
+                    loop.run_in_executor(None, lambda: extract_all(resume_text, jd_text)),
+                    timeout=_T_EXTRACT,
+                )
+            except asyncio.TimeoutError:
+                safe_notify(f"LLM extraction timed out ({_T_EXTRACT}s) -- the provider may be slow, try again", type="negative")
+                return
 
             if not resume_json and not jd_json:
                 safe_notify("Extraction failed for both resume and job description", type="negative")
                 return
             if not resume_json:
-                safe_notify("Could not extract resume — check the file format or try a different file", type="negative")
+                safe_notify("Could not extract resume -- check the file format or try a different file", type="negative")
                 return
             if not jd_json:
-                safe_notify("Could not extract job description — make sure it contains enough text (50+ chars)", type="negative")
+                safe_notify("Could not extract job description -- make sure it contains enough text (50+ chars)", type="negative")
                 return
 
             safe_js('document.getElementById("spin-text").innerText="Calculating match score...";')
-            results = match(resume_json, jd_json)
+            try:
+                results = await asyncio.wait_for(
+                    loop.run_in_executor(None, lambda: match(resume_json, jd_json)),
+                    timeout=_T_MATCH,
+                )
+            except asyncio.TimeoutError:
+                safe_notify(f"Scoring timed out ({_T_MATCH}s) -- embedding model may still be loading, try again", type="negative")
+                return
 
             safe_js('document.getElementById("spin-text").innerText="Generating summary...";')
             from src.services.summary import generate_summary
-            summary = await asyncio.get_event_loop().run_in_executor(
-                None, lambda: generate_summary(resume_json, jd_json, results)
-            )
-
-            safe_js(f"""
-            var s = document.querySelector('.steps');
-            if(s) s.outerHTML = `{make_steps(4)}`;
-            """)
-
-            html = build_results_html(results, resume_json, jd_json, summary)
-            html_escaped = html.replace('\\', '\\\\').replace('`', '\\`').replace('$', '\\$')
-
-            safe_js(f"""
-            var r = document.getElementById('jf-results');
-            if(r) {{
-                r.innerHTML = `{html_escaped}`;
-                r.style.display = 'block';
-            }}
-            """)
-
-            safe_js("""
-            window.jfTab = function(el, panelId) {
-                document.querySelectorAll('#jf-tab-row .tab-item').forEach(function(t) {
-                    t.classList.remove('active');
-                });
-                document.querySelectorAll('.jf-panel').forEach(function(p) {
-                    p.style.display = 'none';
-                });
-                el.classList.add('active');
-                var panel = document.getElementById(panelId);
-                if (panel) panel.style.display = 'block';
-            };
-            """)
+            try:
+                summary = await asyncio.wait_for(
+                    loop.run_in_executor(None, lambda: generate_summary(resume_json, jd_json, results)),
+                    timeout=_T_SUMMARY,
+                )
+            except asyncio.TimeoutError:
+                summary = ""  # summary is optional -- show results without it
 
         except Exception as exc:
             print(f"[ERROR] {exc}")
