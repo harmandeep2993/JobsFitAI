@@ -10,16 +10,19 @@ Responsibilities:
 - Start the FastAPI/uvicorn server
 """
 
+import csv
+import io
 import os
 import time
 import asyncio
 import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Set
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from starlette.requests import Request
 from starlette.concurrency import run_in_threadpool
 
@@ -200,6 +203,49 @@ async def api_set_llm_settings(request: Request) -> JSONResponse:
     })
 
 
+# ── Resume diff ───────────────────────────────────────────
+
+def _resume_diff(old: dict, new: dict) -> dict:
+    """Compare two extracted resume dicts and return what changed."""
+    def flat_skills(r):
+        s = r.get("skills", [])
+        if isinstance(s, list):
+            return {x.lower().strip() for x in s if isinstance(x, str)}
+        if isinstance(s, dict):
+            out = set()
+            for v in s.values():
+                if isinstance(v, list):
+                    out.update(x.lower().strip() for x in v if isinstance(x, str))
+            return out
+        return set()
+
+    old_skills = flat_skills(old)
+    new_skills = flat_skills(new)
+
+    old_exp = {
+        (e.get("title", "") + "|" + e.get("company", "")).lower()
+        for e in old.get("experience_entries", [])
+    }
+    new_exp = {
+        (e.get("title", "") + "|" + e.get("company", "")).lower()
+        for e in new.get("experience_entries", [])
+    }
+
+    old_yrs = (old.get("meta") or {}).get("total_experience_years", 0)
+    new_yrs = (new.get("meta") or {}).get("total_experience_years", 0)
+
+    return {
+        "skills_added":   sorted(new_skills - old_skills),
+        "skills_removed": sorted(old_skills - new_skills),
+        "exp_added":      sorted(new_exp - old_exp),
+        "exp_removed":    sorted(old_exp - new_exp),
+        "years_before":   old_yrs,
+        "years_after":    new_yrs,
+        "languages_before": old.get("languages", []),
+        "languages_after":  new.get("languages", []),
+    }
+
+
 # ── Job matches ───────────────────────────────────────────
 
 @app.post("/api/match/resume")
@@ -228,6 +274,9 @@ async def api_match_resume(request: Request) -> JSONResponse:
     if not resume_json:
         return JSONResponse({"ok": False, "error": "could not parse resume"}, status_code=422)
 
+    prev_resume = session.get_resume()
+    diff = _resume_diff(prev_resume, resume_json) if prev_resume else None
+
     session.set_resume(resume_json, name)
 
     rescored = await run_in_threadpool(rescore_all)
@@ -235,7 +284,13 @@ async def api_match_resume(request: Request) -> JSONResponse:
         event_store.log_event("rescore", "", f"{rescored} jobs re-scored vs {name}")
 
     years = resume_json.get("meta", {}).get("total_experience_years", 0)
-    return JSONResponse({"ok": True, "name": name, "experience_years": years, "rescored": rescored})
+    return JSONResponse({
+        "ok": True,
+        "name": name,
+        "experience_years": years,
+        "rescored": rescored,
+        "diff": diff,
+    })
 
 
 @app.get("/api/match/run")
@@ -415,6 +470,45 @@ async def api_match_clear() -> JSONResponse:
     event_store.clear()
     vector_store.clear()
     return JSONResponse({"ok": True})
+
+
+@app.get("/api/match/export")
+async def api_match_export() -> StreamingResponse:
+    """Download all scored matches as a CSV file."""
+    rows = match_store.get_all()
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow([
+        "title", "company", "location", "score", "label",
+        "language", "posted_at", "applied", "url",
+    ])
+    for r in rows:
+        posted = r.get("posted_at") or ""
+        if posted and posted.isdigit():
+            try:
+                posted = datetime.fromtimestamp(int(posted), tz=timezone.utc).strftime("%Y-%m-%d")
+            except (OSError, OverflowError):
+                pass
+        writer.writerow([
+            r.get("title", ""),
+            r.get("company", ""),
+            r.get("location", ""),
+            r.get("score", ""),
+            r.get("label", ""),
+            r.get("language", ""),
+            posted,
+            "yes" if r.get("applied") else "no",
+            r.get("url", ""),
+        ])
+
+    buf.seek(0)
+    filename = "jobfitai_matches.csv"
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
 
 
 # ── Background scheduler ──────────────────────────────────
