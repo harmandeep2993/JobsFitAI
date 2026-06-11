@@ -27,6 +27,9 @@ logger = get_logger(__name__)
 # a missing requirement must not penalize the candidate.
 NO_REQUIREMENT_SCORE = 60.0
 
+# Similarity below this is noise — treated as no match.
+MIN_MATCH_SIM = 0.35
+
 
 def score_responsibilities(resume: dict, jd: dict) -> float:
     """
@@ -91,6 +94,10 @@ def score_responsibilities(resume: dict, jd: dict) -> float:
 
     # --- Best resume match per JD bullet ---
     best_per_jd_bullet = sim_matrix.max(dim=1).values
+
+    # Zero out matches below the confidence threshold — they are noise.
+    best_per_jd_bullet = best_per_jd_bullet.clone()
+    best_per_jd_bullet[best_per_jd_bullet < MIN_MATCH_SIM] = 0.0
 
     logger.debug("Best match per JD bullet: %s",
                  [round(v.item(), 4) for v in best_per_jd_bullet])
