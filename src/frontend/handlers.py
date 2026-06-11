@@ -74,7 +74,7 @@ def register_page():
       <div class="divider"></div>
 
       <div class="content-card">
-        <input type="file" id="file-input" accept=".pdf,.docx,.doc" style="display:none;"/>
+        <input type="file" id="file-input" accept=".pdf,.docx" style="display:none;"/>
         <div class="two-col">
 
           <div>
@@ -94,7 +94,7 @@ def register_page():
                 <line x1="6" y1="25" x2="15" y2="25" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
               </svg>
               <div class="up-text">Drop file or <strong>browse</strong></div>
-              <div class="up-hint">PDF &nbsp;&middot;&nbsp; DOCX &nbsp;&middot;&nbsp; DOC</div>
+              <div class="up-hint">PDF &nbsp;&middot;&nbsp; DOCX</div>
             </div>
           </div>
 
@@ -138,7 +138,7 @@ def register_page():
         <div class="mt-stats" id="mt-stats"></div>
 
         <div class="content-card">
-          <input type="file" id="mt-file" accept=".pdf,.docx,.doc" style="display:none;"/>
+          <input type="file" id="mt-file" accept=".pdf,.docx" style="display:none;"/>
           <div class="mt-row">
             <button class="btn-ghost" id="mt-upload-btn"
               onclick="document.getElementById('mt-file').click()">📄 Load Resume</button>

@@ -46,7 +46,7 @@ ngapp.add_static_files("/assets", "assets")
 
 # Set Configuration
 # Allowed resume file extensions
-ALLOWED_EXTENSIONS: Set[str] = {".pdf", ".docx", ".doc"}
+ALLOWED_EXTENSIONS: Set[str] = {".pdf", ".docx"}
 
 # Maximum allowed upload size (MB)
 MAX_FILE_MB: int = 5

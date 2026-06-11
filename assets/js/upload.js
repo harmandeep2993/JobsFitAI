@@ -27,7 +27,7 @@ window.clearResume = function() {
           '<line x1="6" y1="25" x2="15" y2="25" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>' +
         '</svg>' +
         '<div class="up-text">Drop file or <strong>browse</strong></div>' +
-        '<div class="up-hint">PDF &nbsp;&middot;&nbsp; DOCX &nbsp;&middot;&nbsp; DOC</div>' +
+        '<div class="up-hint">PDF &nbsp;&middot;&nbsp; DOCX</div>' +
       '</div>';
 
     // Rebind after DOM replacement
@@ -62,8 +62,12 @@ window.handleFileSelect = function(file) {
   if (!file) return;
 
   const ext = file.name.split('.').pop().toLowerCase();
-  if (!['pdf', 'docx', 'doc'].includes(ext)) {
-    alert('Please upload PDF, DOCX or DOC.');
+  if (ext === 'doc') {
+    alert('.doc files are not supported. Please convert your file to .docx or .pdf and try again.');
+    return;
+  }
+  if (!['pdf', 'docx'].includes(ext)) {
+    alert('Please upload a PDF or DOCX file.');
     return;
   }
 
