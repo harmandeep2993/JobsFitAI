@@ -23,6 +23,10 @@ from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+# Neutral score returned when the JD lists no responsibilities —
+# a missing requirement must not penalize the candidate.
+NO_REQUIREMENT_SCORE = 60.0
+
 
 def score_responsibilities(resume: dict, jd: dict) -> float:
     """
@@ -69,8 +73,8 @@ def score_responsibilities(resume: dict, jd: dict) -> float:
         return 0.0
 
     if not jd_bullets:
-        logger.warning("No responsibilities found in JD")
-        return 0.0
+        logger.info("No responsibilities in JD — returning neutral %.1f", NO_REQUIREMENT_SCORE)
+        return NO_REQUIREMENT_SCORE
 
     # --- Encode ---
     model          = load_model()

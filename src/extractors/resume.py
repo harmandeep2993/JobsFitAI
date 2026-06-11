@@ -151,28 +151,61 @@ def _compute_experience_durations(result: dict) -> dict:
     return result
 
 
-def _lowercase_all(data):
-    """
-    Recursively convert all string values in a nested structure to lowercase.
+# Only these list fields are lowercased — they feed exact-match comparisons.
+# All other fields (candidate name, titles, company names, etc.) keep original casing
+# so the UI displays them correctly.
+_COMPARISON_LIST_FIELDS = ("skills", "languages", "certifications")
 
-    Args:
-        data: dict, list, or str — any nested combination
 
-    Returns:
-        Same structure with all strings lowercased and stripped
-    """
-    if isinstance(data, str):
-        return data.lower().strip()
+def _lowercase_comparison_fields(data: dict) -> dict:
+    """Lowercase only list fields used for text comparison; preserve all display fields."""
+    for key in _COMPARISON_LIST_FIELDS:
+        val = data.get(key)
+        if isinstance(val, list):
+            data[key] = [
+                v.lower().strip() if isinstance(v, str) else v
+                for v in val
+            ]
+    return data
 
-    elif isinstance(data, list):
-        return [_lowercase_all(v) for v in data]
 
-    elif isinstance(data, dict):
-        return {k: _lowercase_all(v) for k, v in data.items()}
+_RESUME_FIELD_TYPES: dict = {
+    "candidate":          dict,
+    "experience_entries": list,
+    "projects":           list,
+    "education":          list,
+    "skills":             list,
+    "languages":          list,
+    "certifications":     list,
+    "meta":               dict,
+}
 
-    else:
-        # Numbers, booleans, None — preserved as-is (expected, not an error).
-        return data
+_RESUME_DEFAULTS: dict = {
+    "candidate":          {},
+    "experience_entries": [],
+    "projects":           [],
+    "education":          [],
+    "skills":             [],
+    "languages":          [],
+    "certifications":     [],
+    "meta":               {},
+}
+
+
+def _validate_resume_schema(result: dict) -> dict:
+    """Ensure all required resume fields exist with correct types; fill gaps with safe defaults."""
+    for field, expected_type in _RESUME_FIELD_TYPES.items():
+        val = result.get(field)
+        if val is None:
+            logger.debug("Resume field '%s' missing — using default", field)
+            result[field] = _RESUME_DEFAULTS[field]
+        elif not isinstance(val, expected_type):
+            logger.warning(
+                "Resume field '%s' has unexpected type %s (expected %s) — using default",
+                field, type(val).__name__, expected_type.__name__,
+            )
+            result[field] = _RESUME_DEFAULTS[field]
+    return result
 
 
 def _is_empty(value) -> bool:
@@ -228,9 +261,10 @@ def extract_resume(resume_text: str) -> dict:
         logger.error("LLM response is not a dict: %s", result)
         raise ValueError("Invalid LLM response format")
 
+    result = _validate_resume_schema(result)
     # Durations are computed here (deterministically), not by the LLM.
     result = _compute_experience_durations(result)
-    result = _lowercase_all(result)
+    result = _lowercase_comparison_fields(result)
 
     empty_keys = [k for k, v in result.items() if _is_empty(v)]
     if empty_keys:

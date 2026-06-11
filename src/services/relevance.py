@@ -52,9 +52,11 @@ def _classify_chunk(chunk: list) -> dict:
     prompt = _BATCH_PROMPT.format(count=len(chunk), jobs="\n".join(lines))
 
     out: dict = {}
+    llm_ok = False
     try:
         data = parse_json_response(call_llm(prompt))
         if isinstance(data, list):
+            llm_ok = True
             for obj in data:
                 n = obj.get("n") if isinstance(obj, dict) else None
                 if isinstance(n, int) and 1 <= n <= len(chunk):
@@ -65,9 +67,18 @@ def _classify_chunk(chunk: list) -> dict:
     except Exception as e:
         logger.error("batch classify failed: %s", e)
 
-    # Fail open for anything the model skipped — don't silently drop jobs.
-    for j in chunk:
-        out.setdefault(j.id, {"relevant": True, "entry_level": True})
+    if llm_ok:
+        # LLM responded but may have skipped some jobs — fail open for those only.
+        for j in chunk:
+            out.setdefault(j.id, {"relevant": True, "entry_level": True})
+    else:
+        # LLM call crashed entirely — fail closed so junk doesn't flood the scorer.
+        logger.warning(
+            "LLM classify failed for entire batch of %d — defaulting all to relevant=False",
+            len(chunk),
+        )
+        for j in chunk:
+            out.setdefault(j.id, {"relevant": False, "entry_level": False})
     return out
 
 
@@ -104,5 +115,5 @@ def classify(title: str, snippet: str) -> dict:
     except Exception as e:
         logger.error("Relevance classify failed for '%s': %s", title[:40], e)
 
-    logger.warning("Relevance classify unusable for '%s' — failing open", title[:40])
-    return {"relevant": True, "entry_level": True, "reason": "classify failed"}
+    logger.warning("Relevance classify unusable for '%s' — failing closed", title[:40])
+    return {"relevant": False, "entry_level": False, "reason": "classify failed"}

@@ -100,8 +100,16 @@ def get_all() -> list[dict]:
     out = []
     for r in rows:
         d = dict(r)
-        d["matched_required"] = json.loads(d.get("matched_required") or "[]")
-        d["missing_required"] = json.loads(d.get("missing_required") or "[]")
+        try:
+            d["matched_required"] = json.loads(d.get("matched_required") or "[]")
+        except (ValueError, TypeError):
+            logger.warning("Corrupt matched_required for job %s — using []", d.get("id"))
+            d["matched_required"] = []
+        try:
+            d["missing_required"] = json.loads(d.get("missing_required") or "[]")
+        except (ValueError, TypeError):
+            logger.warning("Corrupt missing_required for job %s — using []", d.get("id"))
+            d["missing_required"] = []
         out.append(d)
     return out
 
@@ -150,10 +158,21 @@ def get_one(job_id: str) -> dict | None:
     if not r:
         return None
     d = dict(r)
-    d["matched_required"] = json.loads(d.get("matched_required") or "[]")
-    d["missing_required"] = json.loads(d.get("missing_required") or "[]")
-    d["section_scores"]   = json.loads(d.get("section_scores") or "{}")
-    d["jd_json"]          = json.loads(d["jd_json"]) if d.get("jd_json") else {}
+    for field, default, raw in (
+        ("matched_required", [], d.get("matched_required") or "[]"),
+        ("missing_required", [], d.get("missing_required") or "[]"),
+        ("section_scores",   {}, d.get("section_scores")   or "{}"),
+    ):
+        try:
+            d[field] = json.loads(raw)
+        except (ValueError, TypeError):
+            logger.warning("Corrupt %s for job %s — using default", field, d.get("id"))
+            d[field] = default
+    try:
+        d["jd_json"] = json.loads(d["jd_json"]) if d.get("jd_json") else {}
+    except (ValueError, TypeError):
+        logger.warning("Corrupt jd_json for job %s — using {}", d.get("id"))
+        d["jd_json"] = {}
     return d
 
 

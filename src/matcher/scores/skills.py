@@ -49,8 +49,8 @@ def score_required_skills(resume: dict, jd: dict) -> tuple[float, list, list]:
 
     # Edge cases
     if not required:
-        logger.warning("No required skills found in JD")
-        return 0.0, [], []
+        logger.info("No required skills in JD — returning neutral %.1f", NO_REQUIREMENT_SCORE)
+        return NO_REQUIREMENT_SCORE, [], []
 
     if not candidate:
         logger.warning("No skills found in resume")

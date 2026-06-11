@@ -39,6 +39,47 @@ def _lowercase_all(data):
         return data
 
 
+_JD_FIELD_TYPES: dict = {
+    "job":                     dict,
+    "required_skills":         list,
+    "preferred_skills":        list,
+    "responsibilities":        list,
+    "experience_requirements": list,
+    "education_requirements":  list,
+    "languages":               list,
+    "certifications":          list,
+    "job_summary":             str,
+}
+
+_JD_DEFAULTS: dict = {
+    "job":                     {},
+    "required_skills":         [],
+    "preferred_skills":        [],
+    "responsibilities":        [],
+    "experience_requirements": [],
+    "education_requirements":  [],
+    "languages":               [],
+    "certifications":          [],
+    "job_summary":             "",
+}
+
+
+def _validate_jd_schema(result: dict) -> dict:
+    """Ensure all required JD fields exist with correct types; fill gaps with safe defaults."""
+    for field, expected_type in _JD_FIELD_TYPES.items():
+        val = result.get(field)
+        if val is None:
+            logger.debug("JD field '%s' missing — using default", field)
+            result[field] = _JD_DEFAULTS[field]
+        elif not isinstance(val, expected_type):
+            logger.warning(
+                "JD field '%s' has unexpected type %s (expected %s) — using default",
+                field, type(val).__name__, expected_type.__name__,
+            )
+            result[field] = _JD_DEFAULTS[field]
+    return result
+
+
 def _is_empty(value) -> bool:
     """
     Check if a value is considered empty.
@@ -92,6 +133,7 @@ def extract_jd(jd_text: str) -> dict:
         logger.error("LLM response is not a dict: %s", result)
         raise ValueError("Invalid LLM response format")
 
+    result = _validate_jd_schema(result)
     result = _lowercase_all(result)
 
     empty_keys = [k for k, v in result.items() if _is_empty(v)]
