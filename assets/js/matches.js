@@ -54,11 +54,11 @@ window.loadMatchState = function() {
 
 // Uploaded resume + the info extracted from it.
 // Store the resume and just show/hide the "View Resume Details" button.
-function renderResume(r) {
+window.renderResume = function renderResume(r) {
   const btn = document.getElementById('mt-resume-btn');
   window._resumeInfo = (r && r.name) ? r : null;
   if (btn) btn.style.display = window._resumeInfo ? 'inline-flex' : 'none';
-}
+};
 
 function resumeHTML(r) {
   const skills = (r.skills || []).slice(0, 30).map(s =>
@@ -222,7 +222,10 @@ window.toggleFilters = function() {
   const t = document.getElementById('mt-filters-toggle');
   const show = p.style.display === 'none';
   p.style.display = show ? 'block' : 'none';
-  if (t) t.innerHTML = '⚙ Filters &amp; keywords ' + (show ? '▾' : '▸');
+  if (t) {
+    t.innerHTML = '⚙ Filters &amp; keywords ' + (show ? '▾' : '▸');
+    t.setAttribute('aria-expanded', show ? 'true' : 'false');
+  }
 };
 
 function setResumeStatus(has, name) {
@@ -307,6 +310,7 @@ window.runMatch = function() {
         status.className = 'mt-status err';
         return;
       }
+      _pollAttempts = 0;
       pollRun();   // results stream in as the funnel scores them
     })
     .catch(e => {
@@ -317,9 +321,21 @@ window.runMatch = function() {
 };
 
 // Poll run progress and re-render; new jobs appear (highlighted) as scored.
+// Stops after MAX_POLL_ATTEMPTS to prevent infinite loops if backend stalls.
+var _pollAttempts = 0;
+var MAX_POLL_ATTEMPTS = 150; // 150 × 2 s = 5 minutes max
+
 function pollRun() {
   const status = document.getElementById('mt-poll-status');
   const btn    = document.getElementById('mt-run-btn');
+
+  _pollAttempts++;
+  if (_pollAttempts > MAX_POLL_ATTEMPTS) {
+    if (btn) btn.disabled = false;
+    status.textContent = '✕ Timed out — run took too long. Try again.';
+    status.className = 'mt-status err';
+    return;
+  }
 
   fetch('/api/match/state')
     .then(r => r.json())
@@ -341,6 +357,7 @@ function pollRun() {
             (rs.checked || 0) + '/' + (rs.total || 0);
         setTimeout(pollRun, 2000);
       } else {
+        _pollAttempts = 0;
         if (btn) btn.disabled = false;
         status.textContent = '✓ ' + newIds.size + ' new · ' +
                              (d.results || []).length + ' total · ' +
@@ -348,7 +365,12 @@ function pollRun() {
         status.className = 'mt-status ok';
       }
     })
-    .catch(() => { if (btn) btn.disabled = false; });
+    .catch(() => {
+      _pollAttempts = 0;
+      if (btn) btn.disabled = false;
+      status.textContent = '✕ Connection lost. Check server and try again.';
+      status.className = 'mt-status err';
+    });
 }
 
 // ── Render ranked matches ─────────────────────────────────

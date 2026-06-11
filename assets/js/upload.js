@@ -9,6 +9,9 @@ window.clearResume = function() {
   window._resumeTmp  = null;
   window._resumeName = null;
 
+  // Sync the Matches tab resume status so it doesn't show stale data.
+  if (typeof window.renderResume === 'function') window.renderResume(null);
+
   const zone = document.getElementById('up-zone');
   if (zone) {
     zone.outerHTML =
@@ -53,12 +56,19 @@ function updateCounter(len) {
 }
 
 // ── File upload ───────────────────────────────────────────
+var FILE_MAX_MB = 5;
+
 window.handleFileSelect = function(file) {
   if (!file) return;
 
   const ext = file.name.split('.').pop().toLowerCase();
   if (!['pdf', 'docx', 'doc'].includes(ext)) {
     alert('Please upload PDF, DOCX or DOC.');
+    return;
+  }
+
+  if (file.size > FILE_MAX_MB * 1024 * 1024) {
+    alert('File is too large (' + (file.size / 1024 / 1024).toFixed(1) + ' MB). Maximum size is ' + FILE_MAX_MB + ' MB.');
     return;
   }
 
@@ -113,7 +123,11 @@ function bindUpload() {
 function bindCounter() {
   const jd = document.getElementById('jd-input');
   if (jd) {
-    jd.addEventListener('input', () => updateCounter(jd.value.length));
+    var _debounce;
+    jd.addEventListener('input', () => {
+      clearTimeout(_debounce);
+      _debounce = setTimeout(() => updateCounter(jd.value.length), 50);
+    });
     jd.addEventListener('paste', () => setTimeout(() => updateCounter(jd.value.length), 10));
     updateCounter(0);
   } else {

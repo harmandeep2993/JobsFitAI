@@ -170,7 +170,7 @@ def register_page():
             <button class="mt-clear" onclick="clearAllMatches()">🗑 Clear all</button>
           </div>
 
-          <button class="mt-toggle" id="mt-filters-toggle" onclick="toggleFilters()">&#9881; Filters &amp; keywords &#9656;</button>
+          <button class="mt-toggle" id="mt-filters-toggle" aria-expanded="false" aria-controls="mt-filters" onclick="toggleFilters()">&#9881; Filters &amp; keywords &#9656;</button>
           <div class="mt-filters" id="mt-filters" style="display:none;"></div>
         </div>
 
@@ -303,8 +303,14 @@ def register_page():
                 None, lambda: extract_all(resume_text, jd_text)
             )
 
-            if not resume_json or not jd_json:
-                safe_notify("Extraction failed", type="negative")
+            if not resume_json and not jd_json:
+                safe_notify("Extraction failed for both resume and job description", type="negative")
+                return
+            if not resume_json:
+                safe_notify("Could not extract resume — check the file format or try a different file", type="negative")
+                return
+            if not jd_json:
+                safe_notify("Could not extract job description — make sure it contains enough text (50+ chars)", type="negative")
                 return
 
             safe_js('document.getElementById("spin-text").innerText="Calculating match score...";')
