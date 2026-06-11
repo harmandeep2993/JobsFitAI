@@ -291,57 +291,51 @@
   white-space: nowrap;
 }
 
-/* ── Job list container ───────────────────────────── */
+/* ── Job thumbnail grid ───────────────────────────── */
 .fetch-results {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+  gap: 12px;
+}
+
+/* ── Job thumbnail card ───────────────────────────── */
+.job-thumb {
   background: var(--bg-r);
   border: 1px solid var(--bd);
   border-radius: var(--radius);
   box-shadow: var(--sha-s);
-  overflow: hidden;
-}
-
-/* ── Job row card (row-list style) ───────────────── */
-.job-thumb {
-  display: grid;
-  grid-template-columns: 58px 1fr auto;
-  align-items: center;
-  gap: 14px;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--bd-s);
-  transition: background .1s;
-  position: relative;
-}
-.job-thumb:last-child  { border-bottom: none; }
-.job-thumb:hover       { background: var(--bg-c); }
-.job-thumb.is-applied  { opacity: .7; }
-.job-thumb.is-new::before {
-  content: '';
-  position: absolute;
-  left: 0; top: 0; bottom: 0;
-  width: 3px;
-  background: var(--accent);
-  border-radius: 0 2px 2px 0;
-}
-
-/* score badge column */
-.jt-head {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
+  overflow: hidden;
+  transition: box-shadow .15s, transform .12s, border-color .15s;
+  position: relative;
+}
+.job-thumb:hover {
+  box-shadow: var(--sha);
+  transform: translateY(-2px);
+  border-color: rgba(0,0,0,0.13);
+}
+.job-thumb.is-applied { opacity: .65; }
+.job-thumb.is-new { border-top: 2px solid var(--accent); }
+
+/* card header: score badge left, chips right */
+.jt-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 14px 14px 0;
 }
 
 .jt-score {
-  width: 46px;
-  height: 46px;
+  width: 52px;
+  height: 52px;
   border-radius: 50%;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   font-family: 'DM Mono', monospace;
-  border: 1.5px solid;
+  border: 2px solid;
   flex-shrink: 0;
 }
 
@@ -349,68 +343,71 @@
 .sc-good    { background: var(--blue-bg);  color: var(--blue);  border-color: var(--blue-bd); }
 .sc-partial { background: var(--amber-bg); color: var(--amber); border-color: var(--amber-bd); }
 .sc-poor    { background: var(--red-bg);   color: var(--red);   border-color: var(--red-bd); }
-.sc-na      { background: var(--bg-c);     color: var(--t3);    border-color: var(--bd); }
+.sc-na      { background: var(--bg-c);     color: var(--t3);    border-color: var(--bd); font-size: 11px; }
 
-.jt-score-num { font-size: 13px; font-weight: 700; line-height: 1; }
-.jt-score-pct { font-size: 9px; opacity: .75; line-height: 1.2; }
+.jt-score-num { font-size: 15px; font-weight: 700; line-height: 1; }
+.jt-score-pct { font-size: 9px; opacity: .7; line-height: 1.3; }
 
-/* chips below the score circle */
+/* chips (NEW / manual / Applied) stacked top-right */
 .jt-chips {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  align-items: center;
+  align-items: flex-end;
+  gap: 3px;
 }
 
 .match-new {
-  font-size: 9px;
+  font-size: 9.5px;
   font-weight: 700;
-  letter-spacing: 0.5px;
-  padding: 1px 5px;
-  border-radius: 3px;
+  letter-spacing: 0.4px;
+  padding: 2px 7px;
+  border-radius: 4px;
   background: var(--accent);
   color: #fff;
-  line-height: 1.6;
+  line-height: 1.5;
 }
 
 .match-na-tag {
-  font-size: 9px;
+  font-size: 9.5px;
   font-weight: 600;
-  padding: 1px 5px;
-  border-radius: 3px;
+  padding: 2px 7px;
+  border-radius: 4px;
   background: var(--amber-bg);
   color: var(--amber);
   border: 1px solid var(--amber-bd);
-  line-height: 1.6;
+  line-height: 1.5;
 }
 
 .match-applied-tag {
-  font-size: 9px;
+  font-size: 9.5px;
   font-weight: 600;
-  padding: 1px 5px;
-  border-radius: 3px;
+  padding: 2px 7px;
+  border-radius: 4px;
   background: var(--green-bg);
   color: var(--green);
   border: 1px solid var(--green-bd);
-  line-height: 1.6;
+  line-height: 1.5;
 }
 
-/* job info column */
+/* card body: title, sub, meta, skills */
 .jt-body {
-  min-width: 0;
+  flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 5px;
+  padding: 10px 14px 12px;
+  min-width: 0;
 }
 
 .jt-title {
   font-size: 13.5px;
   font-weight: 600;
   color: var(--t1);
-  white-space: nowrap;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  line-height: 1.3;
 }
 
 .jt-sub {
@@ -424,7 +421,7 @@
 .jt-meta {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   flex-wrap: wrap;
   font-size: 11px;
   color: var(--t3);
@@ -444,10 +441,9 @@
 }
 
 .jt-na-hint {
-  font-size: 11px;
+  font-size: 11.5px;
   color: var(--t3);
   font-style: italic;
-  margin-top: 1px;
 }
 
 /* ── Skill tags ───────────────────────────────────── */
@@ -490,11 +486,14 @@
   color: var(--t1);
 }
 
-/* ── Job footer actions ───────────────────────────── */
+/* ── Job card footer actions ──────────────────────── */
 .jt-foot {
   display: flex;
   align-items: center;
   gap: 5px;
+  padding: 9px 10px;
+  border-top: 1px solid var(--bd-s);
+  background: var(--bg-c);
   flex-shrink: 0;
 }
 
