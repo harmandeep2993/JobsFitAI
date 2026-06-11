@@ -374,71 +374,95 @@ function pollRun() {
 }
 
 // ── Render ranked matches ─────────────────────────────────
-// Shared match-card builder, reused by the Matches and History views.
+// Shared thumbnail card builder, reused by Matches and History views.
 window.matchCardHTML = function(r, isNew) {
-  const matched = (r.matched_required || []).slice(0, 5).map(mtEsc).join(', ');
-  const missing = (r.missing_required || []).slice(0, 5).map(mtEsc).join(', ');
   const posted  = relTime(r.posted_at);
   const applied = !!r.applied;
   const pending = r.status === 'pending';
   const noJd    = r.status === 'jd_unavailable';
 
-  // Score badge: real score, or a state marker for pending / jd-unavailable.
-  const badge = pending
-    ? '<div class="match-score sc-na">…</div>'
-    : noJd
-      ? '<div class="match-score sc-na" title="JD not on Adzuna">JD?</div>'
-      : '<div class="match-score ' + labelClass(r.label, r.score) + '">' +
-          Math.round(r.score) + '<span class="match-score-pct">%</span></div>';
+  const lc = labelClass(r.label, r.score);
 
-  let body;
-  if (noJd) {
-    body = '<div class="match-na">JD not available on Adzuna — open the posting to read it, then score it on the Analyzer tab.</div>';
-  } else if (pending) {
-    body = '<div class="match-na">Scoring…</div>';
+  // Score badge
+  const badge = pending
+    ? '<div class="jt-score sc-na">…</div>'
+    : noJd
+      ? '<div class="jt-score sc-na" title="JD not available">JD?</div>'
+      : '<div class="jt-score ' + lc + '">' + Math.round(r.score) +
+        '<span class="jt-score-pct">%</span></div>';
+
+  // Top-right label chips
+  const chips =
+    (isNew  ? '<span class="match-new">NEW</span>' : '') +
+    (noJd   ? '<span class="match-na-tag">manual</span>' : '') +
+    (applied? '<span class="match-applied-tag">Applied</span>' : '');
+
+  // Skill tags — 4 matched (green) + 4 missing (red), rest hidden
+  let skillsHTML = '';
+  if (!noJd && !pending) {
+    const mTags = (r.matched_required || []).slice(0, 4)
+      .map(s => '<span class="tag tg">' + mtEsc(s) + '</span>').join('');
+    const xTags = (r.missing_required || []).slice(0, 4)
+      .map(s => '<span class="tag tr">' + mtEsc(s) + '</span>').join('');
+    skillsHTML = mTags + xTags;
+  } else if (noJd) {
+    skillsHTML = '<span class="jt-na-hint">Open posting to read JD, then score in Analyzer</span>';
   } else {
-    body =
-      (matched ? '<div class="match-skills"><span class="ok">✓</span> ' + matched + '</div>' : '') +
-      (missing ? '<div class="match-skills"><span class="miss">✗</span> ' + missing + '</div>' : '');
+    skillsHTML = '<span class="jt-na-hint">Scoring…</span>';
   }
 
-  const actions =
-    '<div class="match-actions">' +
-      (noJd
-        ? '<button class="analyze-btn" onclick="showView(\'analyzer\')">📝 Score in Analyzer</button>'
-        : '<button class="analyze-btn" onclick="openDetail(\'' + mtEsc(r.id) + '\')">🔍 Analyze</button>') +
-      (r.url ? '<a class="job-card-link" href="' + mtEsc(r.url) +
-               '" target="_blank" rel="noopener">Open ↗</a>' : '') +
-      '<button class="apply-toggle' + (applied ? ' on' : '') +
-        '" onclick="toggleApplied(\'' + mtEsc(r.id) + '\',' + (applied ? 1 : 0) + ')">' +
-        (applied ? 'Applied ✓' : 'Mark applied') +
-      '</button>' +
-      '<button class="del-btn" onclick="deleteMatch(\'' + mtEsc(r.id) +
-        '\')" title="Delete &amp; never show again">🗑</button>' +
-    '</div>';
+  // Meta line
+  const metaParts = [
+    posted ? posted : null,
+    r.language || null,
+    r.source   ? r.source : null,
+  ].filter(Boolean);
+
+  // Footer actions
+  const detailBtn = noJd
+    ? '<button class="jt-btn jt-btn-primary" onclick="showView(\'analyzer\')">Score it</button>'
+    : '<button class="jt-btn jt-btn-primary" onclick="openDetail(\'' + mtEsc(r.id) + '\')">Analyze</button>';
+
+  const openBtn = r.url
+    ? '<a class="jt-btn" href="' + mtEsc(r.url) + '" target="_blank" rel="noopener">Open ↗</a>'
+    : '';
+
+  const applyBtn =
+    '<button class="jt-btn jt-apply' + (applied ? ' on' : '') +
+    '" onclick="toggleApplied(\'' + mtEsc(r.id) + '\',' + (applied ? 1 : 0) + ')">' +
+    (applied ? '✓ Applied' : 'Applied?') + '</button>';
+
+  const delBtn =
+    '<button class="jt-del" onclick="deleteMatch(\'' + mtEsc(r.id) + '\')" title="Remove">✕</button>';
 
   return '' +
-    '<div class="match-card' + (isNew ? ' is-new' : '') + (applied ? ' is-applied' : '') +
-        (noJd ? ' is-na' : '') + '">' +
-      '<div class="match-top">' +
+    '<div class="job-thumb' +
+        (isNew    ? ' is-new'    : '') +
+        (applied  ? ' is-applied': '') +
+        (noJd     ? ' is-na'     : '') + '">' +
+
+      '<div class="jt-head">' +
         badge +
-        (isNew ? '<span class="match-new">✨ NEW</span>' : '') +
-        (noJd ? '<span class="match-na-tag">manual</span>' : '') +
-        (applied ? '<span class="match-applied-tag">✓ Applied</span>' : '') +
+        '<div class="jt-chips">' + chips + '</div>' +
       '</div>' +
-      '<div class="match-title">' + mtEsc(r.title) + '</div>' +
-      '<div class="match-meta">' +
-        mtEsc(r.company || 'Unknown') +
-        (r.location ? ' · ' + mtEsc(r.location) : '') +
+
+      '<div class="jt-body">' +
+        '<div class="jt-title">' + mtEsc(r.title || '') + '</div>' +
+        '<div class="jt-company">' +
+          mtEsc(r.company || 'Unknown') +
+          (r.location ? ' &middot; ' + mtEsc(r.location) : '') +
+        '</div>' +
+        (metaParts.length
+          ? '<div class="jt-meta">' + metaParts.map(mtEsc).join(' &middot; ') + '</div>'
+          : '') +
+        '<div class="jt-skills">' + skillsHTML + '</div>' +
       '</div>' +
-      '<div class="match-sub">' +
-        (posted ? '🕒 ' + posted : '') +
-        (posted && r.language ? ' · ' : '') +
-        (r.language ? mtEsc(r.language) : '') +
-        (r.source ? ' · <span class="src-tag">' + mtEsc(r.source) + '</span>' : '') +
+
+      '<div class="jt-foot">' +
+        detailBtn + openBtn + applyBtn +
+        '<div class="jt-foot-r">' + delBtn + '</div>' +
       '</div>' +
-      body +
-      actions +
+
     '</div>';
 };
 
