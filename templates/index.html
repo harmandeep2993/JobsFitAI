@@ -157,9 +157,23 @@
             <div class="mt-row" style="margin-top:14px;">
               <span class="mt-status" id="mt-poll-status"></span>
               <button class="mt-clear" onclick="clearAllMatches()">🗑 Clear all</button>
+              <a class="btn-ghost" id="mt-export-btn" href="/api/match/export" download style="margin-left:8px;">&#8595; Export CSV</a>
             </div>
 
-            <button class="mt-toggle" id="mt-filters-toggle" aria-expanded="false" aria-controls="mt-filters" onclick="toggleFilters()">&#9881; Filters &amp; keywords &#9656;</button>
+            <div class="mt-row" style="margin-top:12px;gap:16px;flex-wrap:wrap;">
+              <label class="set-lbl" style="min-width:unset;">Min score</label>
+              <input type="range" id="flt-score" min="0" max="100" value="0" step="5"
+                oninput="onScoreFilter()" style="flex:1;max-width:180px;"/>
+              <span id="flt-score-val" style="font-size:12px;opacity:.7;">0%+</span>
+              <label class="set-lbl" style="min-width:unset;margin-left:12px;">Language</label>
+              <select id="flt-lang" class="mt-select" onchange="onLangFilter()">
+                <option value="">All</option>
+                <option value="en">English</option>
+                <option value="de">German</option>
+              </select>
+            </div>
+
+            <button class="mt-toggle" id="mt-filters-toggle" aria-expanded="false" aria-controls="mt-filters" onclick="toggleFilters()">&#9881; Search settings &#9656;</button>
             <div class="mt-filters" id="mt-filters" style="display:none;"></div>
           </div>
 

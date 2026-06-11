@@ -265,13 +265,13 @@ function uploadMatchResume(file) {
     .then(d => {
       if (!d.ok) throw new Error(d.error || 'extraction failed');
       setResumeStatus(true, d.name + ' · ' + d.experience_years + 'y exp');
-      // New resume re-scores existing jobs — refresh the list to show it.
       if (typeof loadMatchState === 'function') loadMatchState();
       const poll = document.getElementById('mt-poll-status');
       if (poll && d.rescored) {
         poll.textContent = '✓ re-scored ' + d.rescored + ' jobs against the new resume';
         poll.className = 'mt-status ok';
       }
+      if (d.diff) renderResumeDiff(d.diff);
     })
     .catch(e => {
       status.textContent = '✕ ' + e.message;
@@ -560,18 +560,51 @@ window.toggleApplied = function(id, applied) {
     .catch(() => {});
 };
 
+// Active client-side filters (updated by onScoreFilter / onLangFilter).
+window._mtMinScore = 0;
+window._mtLang     = '';
+window._mtAllData  = [];
+
+window.onScoreFilter = function() {
+  const el  = document.getElementById('flt-score');
+  const lbl = document.getElementById('flt-score-val');
+  window._mtMinScore = parseInt(el.value, 10) || 0;
+  if (lbl) lbl.textContent = window._mtMinScore + '%+';
+  renderMatches(window._mtAllData, new Set());
+};
+
+window.onLangFilter = function() {
+  const el = document.getElementById('flt-lang');
+  window._mtLang = el ? el.value : '';
+  renderMatches(window._mtAllData, new Set());
+};
+
 function renderMatches(results, newIds) {
+  window._mtAllData = results;
   const box = document.getElementById('mt-results');
   if (!box) return;
   newIds = newIds || new Set();
 
-  if (!results.length) {
-    box.innerHTML = '<div class="fetch-empty">No matches yet. Load a resume and click Fetch &amp; Score.</div>';
+  // Apply client-side score + language filters.
+  const minScore = window._mtMinScore || 0;
+  const lang     = window._mtLang || '';
+  const filtered = results.filter(function(r) {
+    if (r.status === 'jd_unavailable') return true;
+    if ((r.score || 0) < minScore) return false;
+    if (lang && (r.language || '') !== lang) return false;
+    return true;
+  });
+
+  if (!filtered.length) {
+    const msg = results.length
+      ? 'No matches pass the current filters.'
+      : 'No matches yet. Load a resume and click Fetch &amp; Score.';
+    box.innerHTML = '<div class="fetch-empty">' + msg + '</div>';
     return;
   }
 
   // New jobs first, then by score within each group.
-  const ordered = results.slice().sort((a, b) => {
+  const ordered = filtered.slice().sort((a, b) => {
     const an = newIds.has(a.id) ? 1 : 0;
     const bn = newIds.has(b.id) ? 1 : 0;
     if (an !== bn) return bn - an;
@@ -579,6 +612,50 @@ function renderMatches(results, newIds) {
   });
 
   box.innerHTML = ordered.map(r => window.matchCardHTML(r, newIds.has(r.id))).join('');
+}
+
+// ── Resume diff banner ────────────────────────────────────
+function renderResumeDiff(diff) {
+  if (!diff) return;
+
+  const added   = diff.skills_added   || [];
+  const removed = diff.skills_removed || [];
+  const expAdd  = diff.exp_added      || [];
+  const expRem  = diff.exp_removed    || [];
+  const yrBefore = diff.years_before  || 0;
+  const yrAfter  = diff.years_after   || 0;
+
+  if (!added.length && !removed.length && !expAdd.length && !expRem.length && yrBefore === yrAfter) return;
+
+  const chip = function(text, cls) {
+    return '<span class="tag ' + cls + '" style="font-size:11px;">' + mtEsc(text) + '</span>';
+  };
+
+  var rows = [];
+
+  if (added.length)
+    rows.push('<div><strong>Skills added:</strong> ' + added.map(s => chip(s, 'tg')).join(' ') + '</div>');
+  if (removed.length)
+    rows.push('<div><strong>Skills removed:</strong> ' + removed.map(s => chip(s, 'tr')).join(' ') + '</div>');
+  if (expAdd.length)
+    rows.push('<div><strong>Experience added:</strong> ' + expAdd.map(function(e) {
+      return chip(e.replace('|', ' @ '), 'tg'); }).join(' ') + '</div>');
+  if (expRem.length)
+    rows.push('<div><strong>Experience removed:</strong> ' + expRem.map(function(e) {
+      return chip(e.replace('|', ' @ '), 'tr'); }).join(' ') + '</div>');
+  if (yrBefore !== yrAfter)
+    rows.push('<div><strong>Experience years:</strong> ' + yrBefore + 'y &rarr; ' + yrAfter + 'y</div>');
+
+  const banner = document.createElement('div');
+  banner.className = 'content-card';
+  banner.style.cssText = 'margin-bottom:12px;border-left:3px solid var(--blue);padding:12px 16px;font-size:13px;';
+  banner.innerHTML =
+    '<div style="font-weight:600;margin-bottom:8px;">Resume updated - what changed</div>' +
+    rows.join('') +
+    '<button onclick="this.parentElement.remove()" style="margin-top:8px;font-size:11px;background:none;border:none;cursor:pointer;opacity:.6;">dismiss</button>';
+
+  const results = document.getElementById('mt-results');
+  if (results) results.before(banner);
 }
 
 // ── Bind ──────────────────────────────────────────────────
