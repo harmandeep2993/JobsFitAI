@@ -895,8 +895,11 @@ window.openJdModal = function(id) {
 
 window.closeJdModal = function(ev) {
   if (ev && ev.target && ev.target.id !== 'jd-modal') return;
-  var modal = document.getElementById('jd-modal');
-  if (modal) modal.style.display = 'none';
+  document.getElementById('jd-modal').style.display = 'none';
+};
+
+window.confirmJdModal = function() {
+  document.getElementById('jd-modal').style.display = 'none';
 };
 
 window.submitJd = function() {
@@ -921,15 +924,27 @@ window.submitJd = function() {
   })
     .then(function(r) { return r.json(); })
     .then(function(d) {
-      if (btn) { btn.disabled = false; btn.textContent = 'Score this job'; }
       if (!d.ok) {
+        if (btn) { btn.disabled = false; btn.textContent = 'Score this job'; }
         var msg = d.error === 'no_resume' ? 'Load a resume first.' : (d.error || 'Scoring failed.');
         if (status) { status.textContent = '✕ ' + msg; status.className = 'mt-status err'; }
         return;
       }
-      var modal = document.getElementById('jd-modal');
-      if (modal) modal.style.display = 'none';
-      toast(Math.round(d.score) + '% — ' + d.label, 'ok', 4000);
+      // Show result panel; OK button will close the modal
+      var score = Math.round(d.score || 0);
+      var badge = document.getElementById('jd-res-badge');
+      var lbl   = document.getElementById('jd-res-label');
+      var res   = document.getElementById('jd-modal-result');
+      var hint  = document.getElementById('jd-modal-hint');
+      if (badge) badge.textContent = score + '%';
+      if (lbl)   lbl.textContent   = d.label || '';
+      // colour-code the badge using existing label classes
+      if (badge) badge.className = 'jd-res-badge ' + labelClass(d.label, d.score);
+      // hide the form, show the result
+      if (document.getElementById('jd-modal-input')) document.getElementById('jd-modal-input').style.display = 'none';
+      if (document.getElementById('jd-modal-foot'))  document.getElementById('jd-modal-foot').style.display  = 'none';
+      if (hint) hint.style.display = 'none';
+      if (res)  res.style.display  = 'flex';
       loadMatchState();
     })
     .catch(function(e) {

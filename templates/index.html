@@ -300,12 +300,17 @@
       </div>
       <button class="dt-close" onclick="closeJdModal()">&#10005;</button>
     </div>
-    <p class="jd-modal-hint">The full JD wasn&rsquo;t available on Adzuna. Paste it here and we&rsquo;ll score your resume against it.</p>
+    <p class="jd-modal-hint" id="jd-modal-hint">The full JD wasn&rsquo;t available on Adzuna. Paste it here and we&rsquo;ll score your resume against it.</p>
     <textarea id="jd-modal-input" class="jd-box jd-modal-ta"
       placeholder="Paste the full job description here&hellip;"></textarea>
     <div class="jd-modal-foot">
       <button class="btn-primary" id="jd-modal-btn" onclick="submitJd()">Score this job</button>
       <span class="mt-status" id="jd-modal-status"></span>
+    </div>
+    <div id="jd-modal-result" class="jd-modal-result" style="display:none;">
+      <div class="jd-res-badge" id="jd-res-badge"></div>
+      <div class="jd-res-label" id="jd-res-label"></div>
+      <button class="btn-primary" onclick="confirmJdModal()">OK</button>
     </div>
   </div>
 </div>

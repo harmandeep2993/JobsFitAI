@@ -1079,6 +1079,32 @@
 }
 .mt-status.err { color: var(--red); }
 .del-btn      { }
+
+/* JD modal result panel */
+.jd-modal-result {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px 0 8px;
+}
+.jd-res-badge {
+  font-size: 48px;
+  font-weight: 700;
+  font-family: 'DM Mono', monospace;
+  line-height: 1;
+}
+.jd-res-badge.sc-exc     { color: var(--green); }
+.jd-res-badge.sc-good    { color: var(--green); }
+.jd-res-badge.sc-partial { color: var(--amber); }
+.jd-res-badge.sc-poor    { color: var(--red); }
+.jd-res-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--t2);
+  margin-bottom: 8px;
+}
 .src-tag      { background: var(--bd-s); padding: 1px 6px; border-radius: 99px; font-size: 10px; color: var(--t3); }
 
 /* stats bar (renderStats) */
