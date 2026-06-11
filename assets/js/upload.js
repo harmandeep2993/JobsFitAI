@@ -103,9 +103,7 @@ window.handleFileSelect = function(file) {
           '</div>';
       }
 
-      if (typeof emitEvent === 'function') {
-        emitEvent('file_uploaded', {});
-      }
+      if (typeof setStep === 'function') setStep(2);
     })
     .catch(e => alert('Upload error: ' + e));
 };
