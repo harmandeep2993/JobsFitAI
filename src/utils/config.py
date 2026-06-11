@@ -99,6 +99,13 @@ SUPPORTED_EXTENSIONS = set(config["validator"]["supported_extensions"])
 WEIGHTS = config["matcher"]["weights"]
 THRESHOLDS = config["matcher"]["thresholds"]
 
+_weight_sum = round(sum(WEIGHTS.values()), 6)
+if abs(_weight_sum - 1.0) > 0.001:
+    raise ValueError(
+        f"matcher.weights in config.yaml must sum to 1.0, got {_weight_sum}. "
+        f"Current weights: {WEIGHTS}"
+    )
+
 # Job search — target roles + entry-level filtering
 _job_search = config.get("job_search", {})
 SEARCH_COUNTRY        = _job_search.get("default_country", "de")
