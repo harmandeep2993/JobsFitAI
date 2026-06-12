@@ -105,6 +105,22 @@ def init() -> None:
         conn.execute(
             "CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)"
         )
+        # Stored resumes (survive restarts; user_id='local' for single-user mode).
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS resumes (
+                id            TEXT PRIMARY KEY,
+                user_id       TEXT NOT NULL DEFAULT 'local',
+                slot          INTEGER NOT NULL DEFAULT 0,
+                label         TEXT NOT NULL DEFAULT 'Base Resume',
+                original_name TEXT NOT NULL,
+                file_path     TEXT NOT NULL,
+                mime_type     TEXT NOT NULL,
+                file_size_kb  REAL NOT NULL DEFAULT 0,
+                uploaded_at   TEXT NOT NULL
+            )
+            """
+        )
     logger.info("SQLite ready at %s", DB_PATH)
 
 
