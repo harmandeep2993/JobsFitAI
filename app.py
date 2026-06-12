@@ -46,7 +46,7 @@ from src.services.job_matcher import (
     rescore_all,
     fetch_combined,
 )
-from src.services import match_store, event_store, vector_store, settings_store
+from src.services import match_store, event_store, vector_store, settings_store, resume_store
 from src.services.summary import generate_summary
 from src.utils.config import SEARCH_PER_TITLE, MAX_AGE_DAYS
 
@@ -109,6 +109,70 @@ async def api_upload(request: Request) -> JSONResponse:
     })
 
 
+# ── Stored resume endpoints ───────────────────────────────
+
+_USER = "local"  # single-user mode; swap for session user_id at launch
+
+@app.post("/api/resumes/upload")
+async def api_resumes_upload(request: Request) -> JSONResponse:
+    """Upload a resume into a persistent slot (0=Base, 1=Tailored 1, 2=Tailored 2)."""
+    form   = await request.form()
+    upload = form.get("file")
+    slot   = int(form.get("slot", 0))
+
+    if upload is None:
+        return JSONResponse({"ok": False, "error": "no file"}, status_code=400)
+    if slot not in range(resume_store.MAX_SLOTS):
+        return JSONResponse({"ok": False, "error": "invalid slot"}, status_code=400)
+
+    data     = await upload.read()
+    filename = upload.filename or "resume"
+    suffix   = Path(filename).suffix.lower()
+
+    if len(data) > MAX_FILE_MB * 1024 * 1024:
+        return JSONResponse({"ok": False, "error": "file too large"}, status_code=400)
+    if suffix not in ALLOWED_EXTENSIONS:
+        return JSONResponse({"ok": False, "error": "unsupported file type"}, status_code=400)
+
+    mime = _PREVIEW_TYPES.get(suffix, "application/octet-stream")
+    record = resume_store.save(_USER, slot, filename, data, suffix, mime)
+    return JSONResponse({"ok": True, **record})
+
+
+@app.get("/api/resumes")
+async def api_resumes_list() -> JSONResponse:
+    """List all stored resumes for the current user."""
+    resumes = resume_store.list_all(_USER)
+    return JSONResponse({"ok": True, "resumes": resumes})
+
+
+@app.delete("/api/resumes/{resume_id}")
+async def api_resumes_delete(resume_id: str) -> JSONResponse:
+    deleted = resume_store.delete(_USER, resume_id)
+    if not deleted:
+        return JSONResponse({"ok": False, "error": "not found"}, status_code=404)
+    return JSONResponse({"ok": True})
+
+
+@app.get("/api/resumes/{resume_id}/file")
+async def api_resumes_file(resume_id: str) -> FileResponse:
+    """Serve the raw file for preview."""
+    row = resume_store.get(_USER, resume_id)
+    if not row or not os.path.exists(row["file_path"]):
+        return JSONResponse({"ok": False, "error": "not found"}, status_code=404)
+    return FileResponse(row["file_path"], media_type=row["mime_type"])
+
+
+@app.post("/api/resumes/{resume_id}/label")
+async def api_resumes_label(resume_id: str, request: Request) -> JSONResponse:
+    body  = await request.json()
+    label = (body.get("label") or "").strip()
+    if not label:
+        return JSONResponse({"ok": False, "error": "label required"}, status_code=400)
+    resume_store.set_label(_USER, resume_id, label)
+    return JSONResponse({"ok": True})
+
+
 # ── Serve original resume file ────────────────────────────
 
 _PREVIEW_TYPES = {
@@ -131,10 +195,18 @@ async def api_resume_file(tmp: str) -> FileResponse:
 
 @app.post("/api/resume-preview")
 async def api_resume_preview(request: Request) -> JSONResponse:
-    body = await request.json()
-    tmp  = (body.get("tmp") or "").strip()
-    if not tmp or not os.path.exists(tmp):
+    body      = await request.json()
+    tmp       = (body.get("tmp")       or "").strip()
+    resume_id = (body.get("resume_id") or "").strip()
+
+    if resume_id:
+        row = resume_store.get(_USER, resume_id)
+        if not row or not os.path.exists(row["file_path"]):
+            return JSONResponse({"ok": False, "error": "file not found"}, status_code=404)
+        tmp = row["file_path"]
+    elif not tmp or not os.path.exists(tmp):
         return JSONResponse({"ok": False, "error": "file not found"}, status_code=400)
+
     text = await run_in_threadpool(lambda: extract_all_text(tmp))
     if not text:
         return JSONResponse({"ok": False, "error": "could not extract text"}, status_code=422)
@@ -151,11 +223,18 @@ async def api_analyze(request: Request) -> JSONResponse:
     Body: {"tmp": <temp path from /api/upload>, "jd": <job description text>}
     Returns: {"ok": true, "score": float, "label": str, "html": str}
     """
-    body    = await request.json()
-    tmp     = (body.get("tmp") or "").strip()
-    jd_text = (body.get("jd")  or "").strip()
+    body      = await request.json()
+    tmp       = (body.get("tmp")       or "").strip()
+    resume_id = (body.get("resume_id") or "").strip()
+    jd_text   = (body.get("jd")        or "").strip()
 
-    if not tmp or not os.path.exists(tmp):
+    # Resolve file path: stored resume takes priority over temp path.
+    if resume_id:
+        row = resume_store.get(_USER, resume_id)
+        if not row or not os.path.exists(row["file_path"]):
+            return JSONResponse({"ok": False, "error": "resume file not found"}, status_code=400)
+        tmp = row["file_path"]
+    elif not tmp or not os.path.exists(tmp):
         return JSONResponse({"ok": False, "error": "resume file not found"}, status_code=400)
     if len(jd_text) < 50:
         return JSONResponse({"ok": False, "error": "job description too short"}, status_code=400)

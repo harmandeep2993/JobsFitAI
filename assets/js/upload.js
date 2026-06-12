@@ -72,8 +72,10 @@ window.handleFileSelect = function(file) {
   // Stable fingerprint — survives page refresh for the same physical file
   window._resumeFingerprint = file.name + '|' + file.size + '|' + (file.lastModified || 0);
 
-  const fd = new FormData();
+  // Upload directly to the persistent store (slot 0 = base, or next free slot).
+  const fd   = new FormData();
   fd.append('file', file);
+  fd.append('slot', '0');
 
   const zone = document.getElementById('up-zone');
   if (zone) {
@@ -83,53 +85,17 @@ window.handleFileSelect = function(file) {
       '<div class="up-text">Uploading&hellip;</div>';
   }
 
-  fetch('/api/upload', { method: 'POST', body: fd })
+  fetch('/api/resumes/upload', { method: 'POST', body: fd })
     .then(r => r.json())
     .then(d => {
       if (!d.ok) {
-        if (zone) {
-          zone.classList.remove('uploading');
-          zone.innerHTML =
-            '<svg width="28" height="34" viewBox="0 0 36 44" fill="none" style="opacity:0.3;">' +
-              '<rect x="1" y="1" width="26" height="34" rx="3" stroke="currentColor" stroke-width="2" fill="none"/>' +
-              '<path d="M27 1l8 8h-8V1z" stroke="currentColor" stroke-width="2" fill="none"/>' +
-              '<line x1="6" y1="13" x2="22" y2="13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>' +
-              '<line x1="6" y1="19" x2="22" y2="19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>' +
-              '<line x1="6" y1="25" x2="15" y2="25" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>' +
-            '</svg>' +
-            '<div class="up-text">Drop or <strong>browse</strong></div>' +
-            '<div class="up-hint">PDF &nbsp;&middot;&nbsp; DOCX</div>';
-        }
+        if (zone) zone.classList.remove('uploading');
         toast('Upload failed: ' + (d.error || 'unknown'), 'err');
         return;
       }
-
-      window._resumeTmp  = d.tmp;
-      window._resumeName = d.name;
-      // fingerprint already set before the fetch — intentionally not cleared here
-
-      if (zone) {
-        zone.classList.remove('uploading');
-        zone.classList.add('has-file');
-        zone.innerHTML =
-          '<svg width="26" height="32" viewBox="0 0 36 44" fill="none" style="opacity:0.6;flex-shrink:0;">' +
-            '<rect x="1" y="1" width="26" height="34" rx="3" stroke="var(--accent)" stroke-width="2" fill="none"/>' +
-            '<path d="M27 1l8 8h-8V1z" stroke="var(--accent)" stroke-width="2" fill="none"/>' +
-            '<line x1="6" y1="13" x2="22" y2="13" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"/>' +
-            '<line x1="6" y1="19" x2="22" y2="19" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"/>' +
-            '<line x1="6" y1="25" x2="15" y2="25" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"/>' +
-          '</svg>' +
-          '<div class="up-fc-name" title="' + d.name + '">' + d.name + '</div>' +
-          '<div class="up-fc-meta">' + d.kb + ' KB &middot; ' + d.ext.toUpperCase() + '</div>' +
-          '<button class="up-preview-btn" onclick="event.stopPropagation();previewResume()" title="Preview extracted text">' +
-            '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">' +
-              '<ellipse cx="8" cy="8" rx="7" ry="5"/><circle cx="8" cy="8" r="2" fill="currentColor" stroke="none"/>' +
-            '</svg>' +
-            'Preview' +
-          '</button>' +
-          '<div class="up-fc-hint">Click zone to replace</div>';
-      }
-
+      // Refresh picker then auto-select the new resume
+      if (typeof rvLoad === 'function') rvLoad();
+      if (typeof rvSelect === 'function') rvSelect(d.id, d.name);
       if (typeof setStep === 'function') setStep(2);
     })
     .catch(e => {
