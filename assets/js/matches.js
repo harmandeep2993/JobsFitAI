@@ -429,22 +429,22 @@ window.matchCardHTML = function(r, isNew) {
 
   const lc = labelClass(r.label, r.score);
 
-  // Score badge — uses data-target for count-up animation
+  // Compact inline score ring
   const scoreVal = Math.round(r.score || 0);
   const badge = pending
-    ? '<div class="jt-score sc-na">…</div>'
+    ? '<div class="jt-score sc-na"><span class="jt-score-num">…</span></div>'
     : noJd
-      ? '<div class="jt-score sc-na" title="JD not available">JD?</div>'
+      ? '<div class="jt-score sc-na" title="JD not available"><span class="jt-score-num" style="font-size:9px;letter-spacing:0">JD?</span></div>'
       : '<div class="jt-score ' + lc + '"><span class="jt-score-num" data-target="' +
         scoreVal + '">0</span><span class="jt-score-pct">%</span></div>';
 
-  // Top-right label chips
+  // Inline chips next to company name
   const chips =
-    (isNew  ? '<span class="match-new">NEW</span>' : '') +
-    (noJd   ? '<span class="match-na-tag">manual</span>' : '') +
-    (applied? '<span class="match-applied-tag">Applied</span>' : '');
+    (isNew   ? '<span class="match-new">NEW</span>' : '') +
+    (noJd    ? '<span class="match-na-tag">manual</span>' : '') +
+    (applied ? '<span class="match-applied-tag">Applied</span>' : '');
 
-  // Skill tags — 4 matched (green) + 4 missing (red), rest hidden
+  // Skill tags — 4 matched (green) + 4 missing (red)
   let skillsHTML = '';
   if (!noJd && !pending) {
     const mTags = (r.matched_required || []).slice(0, 4)
@@ -453,21 +453,21 @@ window.matchCardHTML = function(r, isNew) {
       .map(s => '<span class="tag tr">' + mtEsc(s) + '</span>').join('');
     skillsHTML = mTags + xTags;
   } else if (noJd) {
-    skillsHTML = '<span class="jt-na-hint">Open posting to read JD, then score in Analyzer</span>';
+    skillsHTML = '<span class="jt-na-hint">Paste JD to score</span>';
   } else {
     skillsHTML = '<span class="jt-na-hint">Scoring…</span>';
   }
 
-  // Meta line: published date + language + source
+  // Single meta line: date · lang · source
   const metaParts = [
-    posted   ? '📅 ' + posted : null,
+    posted     ? posted        : null,
     r.language || null,
-    r.source   ? r.source : null,
+    r.source   || null,
   ].filter(Boolean);
 
   // Footer actions
   const detailBtn = noJd
-    ? '<button class="jt-btn jt-btn-primary" onclick="openJdModal(\'' + mtEsc(r.id) + '\')">&#128203; Paste JD</button>'
+    ? '<button class="jt-btn jt-btn-primary" onclick="openJdModal(\'' + mtEsc(r.id) + '\')">Paste JD</button>'
     : '<button class="jt-btn jt-btn-primary" onclick="openDetail(\'' + mtEsc(r.id) + '\')">Analyze</button>';
 
   const openBtn = r.url
@@ -488,19 +488,19 @@ window.matchCardHTML = function(r, isNew) {
         (applied  ? ' is-applied': '') +
         (noJd     ? ' is-na'     : '') + '">' +
 
-      '<div class="jt-head">' +
-        badge +
-        '<div class="jt-chips">' + chips + '</div>' +
-      '</div>' +
-
       '<div class="jt-body">' +
-        '<div class="jt-title">' + mtEsc(r.title || '') + '</div>' +
+        '<div class="jt-title-row">' +
+          '<div class="jt-title">' + mtEsc(r.title || '') + '</div>' +
+          badge +
+        '</div>' +
         (r.location ? '<div class="jt-loc">&#128205; ' + mtEsc(r.location) + '</div>' : '') +
-        '<div class="jt-company">' + mtEsc(r.company || 'Unknown') + '</div>' +
+        '<div class="jt-company-row">' +
+          '<span class="jt-company">' + mtEsc(r.company || 'Unknown') + '</span>' +
+          (chips ? '<span class="jt-chips">' + chips + '</span>' : '') +
+        '</div>' +
         (metaParts.length
           ? '<div class="jt-meta">' + metaParts.join(' &middot; ') + '</div>'
           : '') +
-        (fetched ? '<div class="jt-fetched">📥 Fetched ' + mtEsc(fetched) + '</div>' : '') +
         '<div class="jt-skills">' + skillsHTML + '</div>' +
       '</div>' +
 
