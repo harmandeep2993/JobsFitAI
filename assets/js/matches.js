@@ -36,6 +36,21 @@ function relTime(posted) {
   return months + (months === 1 ? ' month ago' : ' months ago');
 }
 
+// Human-friendly "time since fetched" from an ISO timestamp string (scored_at).
+function fetchedAgo(scored_at) {
+  if (!scored_at) return '';
+  const d = new Date(scored_at);
+  if (isNaN(d.getTime())) return '';
+  const mins = Math.floor((Date.now() - d.getTime()) / 60000);
+  if (mins < 1)   return 'just now';
+  if (mins < 60)  return mins + 'm ago';
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24)   return hrs + 'h ago';
+  const days = Math.floor(hrs / 24);
+  if (days < 7)   return days + 'd ago';
+  return Math.floor(days / 7) + 'w ago';
+}
+
 // ── Load current state (resume + stored results) ──────────
 window.loadMatchState = function() {
   fetch('/api/match/state')
@@ -47,7 +62,14 @@ window.loadMatchState = function() {
       renderResume(d.resume);
       renderScheduler(d.scheduler);
       renderFilters(d.filters);
-      renderMatches(d.results || [], new Set());
+      // Restore "New" highlights from the last fetch run (survives page reload).
+      var threshold = localStorage.getItem('jfa_run_threshold') || '';
+      var newIds = threshold
+        ? new Set((d.results || []).filter(function(r) {
+            return r.scored_at && r.scored_at > threshold;
+          }).map(function(r) { return r.id; }))
+        : new Set();
+      renderMatches(d.results || [], newIds);
     })
     .catch(() => {});
 };
@@ -293,6 +315,9 @@ window.runMatch = function() {
   renderSkeletons(6);
   setTopbarRunning(true, 'Starting…');
 
+  // Record run start — scored_at values after this are flagged "New" even after reload.
+  localStorage.setItem('jfa_run_threshold', new Date(Date.now() - 3000).toISOString().slice(0, 19));
+
   // Snapshot current ids so everything scored this run is flagged NEW.
   fetch('/api/match/state')
     .then(r => r.json())
@@ -397,6 +422,7 @@ function pollRun() {
 // Shared thumbnail card builder, reused by Matches and History views.
 window.matchCardHTML = function(r, isNew) {
   const posted  = relTime(r.posted_at);
+  const fetched = fetchedAgo(r.scored_at);
   const applied = !!r.applied;
   const pending = r.status === 'pending';
   const noJd    = r.status === 'jd_unavailable';
@@ -432,16 +458,16 @@ window.matchCardHTML = function(r, isNew) {
     skillsHTML = '<span class="jt-na-hint">Scoring…</span>';
   }
 
-  // Meta line
+  // Meta line: published date + language + source
   const metaParts = [
-    posted ? posted : null,
+    posted   ? '📅 ' + posted : null,
     r.language || null,
     r.source   ? r.source : null,
   ].filter(Boolean);
 
   // Footer actions
   const detailBtn = noJd
-    ? '<button class="jt-btn jt-btn-primary" onclick="showView(\'analyzer\')">Score it</button>'
+    ? '<button class="jt-btn jt-btn-primary" onclick="openJdModal(\'' + mtEsc(r.id) + '\')">&#128203; Paste JD</button>'
     : '<button class="jt-btn jt-btn-primary" onclick="openDetail(\'' + mtEsc(r.id) + '\')">Analyze</button>';
 
   const openBtn = r.url
@@ -469,13 +495,12 @@ window.matchCardHTML = function(r, isNew) {
 
       '<div class="jt-body">' +
         '<div class="jt-title">' + mtEsc(r.title || '') + '</div>' +
-        '<div class="jt-company">' +
-          mtEsc(r.company || 'Unknown') +
-          (r.location ? ' &middot; ' + mtEsc(r.location) : '') +
-        '</div>' +
+        (r.location ? '<div class="jt-loc">&#128205; ' + mtEsc(r.location) + '</div>' : '') +
+        '<div class="jt-company">' + mtEsc(r.company || 'Unknown') + '</div>' +
         (metaParts.length
-          ? '<div class="jt-meta">' + metaParts.map(mtEsc).join(' &middot; ') + '</div>'
+          ? '<div class="jt-meta">' + metaParts.join(' &middot; ') + '</div>'
           : '') +
+        (fetched ? '<div class="jt-fetched">📥 Fetched ' + mtEsc(fetched) + '</div>' : '') +
         '<div class="jt-skills">' + skillsHTML + '</div>' +
       '</div>' +
 
@@ -624,19 +649,61 @@ window.toggleApplied = function(id, applied) {
 };
 
 // Active client-side filters (updated by onScoreFilter / onLangFilter).
-window._mtMinScore = 0;
-window._mtLang     = '';
-window._mtAllData  = [];
+window._mtMinScore   = 0;
+window._mtLang       = '';
+window._mtAllData    = [];
+window._mtShowNew     = false;   // show only "New" jobs
+window._mtHideApplied = false;   // hide applied jobs
+window._mtMaxAge      = 'all';   // published within N days ('all' = no limit)
+window._mtSource      = 'all';   // job source ('all', 'adzuna', 'arbeitnow')
 
 // ── Sort ──────────────────────────────────────────────────
 window._mtSort = 'score';
 
 window.setSort = function(s) {
   window._mtSort = s;
-  document.querySelectorAll('.sort-btn').forEach(function(btn) {
+  document.querySelectorAll('.sort-btn[data-sort]').forEach(function(btn) {
     btn.classList.toggle('active', btn.dataset.sort === s);
   });
-  renderMatches(window._mtAllData, new Set());
+  renderMatches(window._mtAllData, window._mtLastNewIds || new Set());
+};
+
+window.setMtAge = function(days) {
+  window._mtMaxAge = days;
+  document.querySelectorAll('.sort-btn[data-age]').forEach(function(btn) {
+    btn.classList.toggle('active', btn.dataset.age === String(days));
+  });
+  renderMatches(window._mtAllData, window._mtLastNewIds || new Set());
+};
+
+window.setMtScore = function(min) {
+  window._mtMinScore = min;
+  document.querySelectorAll('.sort-btn[data-score]').forEach(function(btn) {
+    btn.classList.toggle('active', btn.dataset.score === String(min));
+  });
+  renderMatches(window._mtAllData, window._mtLastNewIds || new Set());
+};
+
+window.setMtSource = function(src) {
+  window._mtSource = src;
+  document.querySelectorAll('.sort-btn[data-src]').forEach(function(btn) {
+    btn.classList.toggle('active', btn.dataset.src === src);
+  });
+  renderMatches(window._mtAllData, window._mtLastNewIds || new Set());
+};
+
+window.toggleMtNew = function() {
+  window._mtShowNew = !window._mtShowNew;
+  var btn = document.getElementById('mt-fn-btn');
+  if (btn) btn.classList.toggle('active', window._mtShowNew);
+  renderMatches(window._mtAllData, window._mtLastNewIds || new Set());
+};
+
+window.toggleMtApplied = function() {
+  window._mtHideApplied = !window._mtHideApplied;
+  var btn = document.getElementById('mt-fa-btn');
+  if (btn) btn.classList.toggle('active', window._mtHideApplied);
+  renderMatches(window._mtAllData, window._mtLastNewIds || new Set());
 };
 
 // ── Skeleton loading ──────────────────────────────────────
@@ -678,37 +745,43 @@ function animateScores() {
   });
 }
 
-window.onScoreFilter = function() {
-  const el  = document.getElementById('flt-score');
-  const lbl = document.getElementById('flt-score-val');
-  window._mtMinScore = parseInt(el.value, 10) || 0;
-  if (lbl) lbl.textContent = window._mtMinScore + '%+';
-  renderMatches(window._mtAllData, new Set());
-};
-
 window.onLangFilter = function() {
   const el = document.getElementById('flt-lang');
   window._mtLang = el ? el.value : '';
-  renderMatches(window._mtAllData, new Set());
+  renderMatches(window._mtAllData, window._mtLastNewIds || new Set());
 };
 
 function renderMatches(results, newIds) {
-  window._mtAllData = results;
+  window._mtAllData    = results;
+  window._mtLastNewIds = newIds;
   const box = document.getElementById('mt-results');
   if (!box) return;
   newIds = newIds || new Set();
 
-  // Apply client-side score + language filters.
-  const minScore = window._mtMinScore || 0;
-  const lang     = window._mtLang || '';
+  // Apply all client-side filters.
+  const minScore    = window._mtMinScore   || 0;
+  const lang        = window._mtLang       || '';
+  const showNew     = window._mtShowNew;
+  const hideApplied = window._mtHideApplied;
+  const maxAge      = window._mtMaxAge;
+  const source      = window._mtSource     || 'all';
+  const nowSec      = Date.now() / 1000;
+
   const filtered = results.filter(function(r) {
     if (r.status === 'jd_unavailable') return true;
     if ((r.score || 0) < minScore) return false;
     if (lang && (r.language || '') !== lang) return false;
+    if (showNew && !newIds.has(r.id)) return false;
+    if (hideApplied && r.applied) return false;
+    if (source !== 'all' && (r.source || '') !== source) return false;
+    if (maxAge !== 'all') {
+      var ts = parseInt(r.posted_at, 10) || 0;
+      if (ts && (nowSec - ts) > maxAge * 86400) return false;
+    }
     return true;
   });
 
-  // Update sidebar badge — count unreviewed (unapplied, scored) jobs
+  // Update sidebar badge — unreviewed (unapplied, scored) jobs
   var unreviewed = results.filter(function(r) { return !r.applied && r.status !== 'pending'; }).length;
   var badge = document.getElementById('sb-badge-matches');
   if (badge) {
@@ -716,27 +789,34 @@ function renderMatches(results, newIds) {
     badge.style.display = unreviewed > 0 ? '' : 'none';
   }
 
-  // Show sort row when there are results
+  // Show sort row when there are any results
   var sortRow = document.getElementById('sort-row');
-  if (sortRow) sortRow.style.display = filtered.length ? 'flex' : 'none';
+  if (sortRow) sortRow.style.display = results.length ? 'flex' : 'none';
+
+  // Update result count
+  var countEl = document.getElementById('mt-result-count');
+  if (countEl) {
+    countEl.textContent = filtered.length < results.length
+      ? filtered.length + ' of ' + results.length
+      : results.length + ' jobs';
+  }
 
   if (!filtered.length) {
     const msg = results.length
-      ? 'No matches pass the current filters.'
+      ? 'No jobs match the current filters.'
       : 'No matches yet. Load a resume and click Fetch &amp; Score.';
     box.innerHTML = '<div class="fetch-empty">' + msg + '</div>';
     return;
   }
 
-  // Sort by current sort mode; new jobs float to top in all modes
+  // Sort — new jobs always float to top in score mode
   const sort = window._mtSort || 'score';
   const ordered = filtered.slice().sort(function(a, b) {
     const an = newIds.has(a.id) ? 1 : 0;
     const bn = newIds.has(b.id) ? 1 : 0;
-    if (an !== bn) return bn - an;
+    if (sort === 'score' && an !== bn) return bn - an;
     if (sort === 'score')   return (b.score || 0) - (a.score || 0);
-    if (sort === 'newest')  return (b.posted_at || 0) - (a.posted_at || 0);
-    if (sort === 'company') return (a.company || '').localeCompare(b.company || '');
+    if (sort === 'fetched') return (b.scored_at || '').localeCompare(a.scored_at || '');
     return 0;
   });
 
@@ -744,7 +824,6 @@ function renderMatches(results, newIds) {
     return window.matchCardHTML(r, newIds.has(r.id));
   }).join('');
 
-  // Animate score badges on next frame
   requestAnimationFrame(animateScores);
 }
 
@@ -791,6 +870,86 @@ function renderResumeDiff(diff) {
   const results = document.getElementById('mt-results');
   if (results) results.before(banner);
 }
+
+// ── JD paste modal (for jd_unavailable cards) ────────────
+window.openJdModal = function(id) {
+  var job    = (window._mtAllData || []).find(function(r) { return r.id === id; }) || {};
+  var modal  = document.getElementById('jd-modal');
+  var title  = document.getElementById('jd-modal-title');
+  var sub    = document.getElementById('jd-modal-sub');
+  var input  = document.getElementById('jd-modal-input');
+  var status = document.getElementById('jd-modal-status');
+  var btn    = document.getElementById('jd-modal-btn');
+  if (!modal) return;
+  window._jdModalId = id;
+  if (title)  title.textContent  = job.title   || 'Paste Job Description';
+  if (sub)    sub.textContent    = job.company  || '';
+  if (input)  input.value        = '';
+  if (status) { status.textContent = ''; status.className = 'mt-status'; }
+  if (btn)    { btn.disabled = false; btn.textContent = 'Score this job'; }
+  modal.style.display = 'flex';
+  setTimeout(function() { if (input) input.focus(); }, 60);
+};
+
+window.closeJdModal = function(ev) {
+  if (ev && ev.target && ev.target.id !== 'jd-modal') return;
+  document.getElementById('jd-modal').style.display = 'none';
+};
+
+window.confirmJdModal = function() {
+  document.getElementById('jd-modal').style.display = 'none';
+};
+
+window.submitJd = function() {
+  var id     = window._jdModalId;
+  var input  = document.getElementById('jd-modal-input');
+  var btn    = document.getElementById('jd-modal-btn');
+  var status = document.getElementById('jd-modal-status');
+  var text   = (input ? input.value : '').trim();
+
+  if (text.length < 50) {
+    if (status) { status.textContent = 'Too short — paste the full job description.'; status.className = 'mt-status err'; }
+    return;
+  }
+
+  if (btn)    { btn.disabled = true; btn.textContent = 'Scoring…'; }
+  if (status) { status.textContent = ''; status.className = 'mt-status'; }
+
+  fetch('/api/match/score-jd', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ id: id, jd_text: text }),
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (!d.ok) {
+        if (btn) { btn.disabled = false; btn.textContent = 'Score this job'; }
+        var msg = d.error === 'no_resume' ? 'Load a resume first.' : (d.error || 'Scoring failed.');
+        if (status) { status.textContent = '✕ ' + msg; status.className = 'mt-status err'; }
+        return;
+      }
+      // Show result panel; OK button will close the modal
+      var score = Math.round(d.score || 0);
+      var badge = document.getElementById('jd-res-badge');
+      var lbl   = document.getElementById('jd-res-label');
+      var res   = document.getElementById('jd-modal-result');
+      var hint  = document.getElementById('jd-modal-hint');
+      if (badge) badge.textContent = score + '%';
+      if (lbl)   lbl.textContent   = d.label || '';
+      // colour-code the badge using existing label classes
+      if (badge) badge.className = 'jd-res-badge ' + labelClass(d.label, d.score);
+      // hide the form, show the result
+      if (document.getElementById('jd-modal-input')) document.getElementById('jd-modal-input').style.display = 'none';
+      if (document.getElementById('jd-modal-foot'))  document.getElementById('jd-modal-foot').style.display  = 'none';
+      if (hint) hint.style.display = 'none';
+      if (res)  res.style.display  = 'flex';
+      loadMatchState();
+    })
+    .catch(function(e) {
+      if (btn) { btn.disabled = false; btn.textContent = 'Score this job'; }
+      if (status) { status.textContent = '✕ ' + e; status.className = 'mt-status err'; }
+    });
+};
 
 // ── Bind ──────────────────────────────────────────────────
 (function bindMatches() {

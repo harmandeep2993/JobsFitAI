@@ -35,6 +35,7 @@ from src.utils.router import check_llm
 from src.parsers import extract_all_text
 from src.extractors import extract_all
 from src.extractors.resume import extract_resume
+from src.extractors.jd import extract_jd
 from src.matcher.matcher import match
 from src.frontend.results import build_results_html
 from src.services.job_matcher import (
@@ -446,6 +447,68 @@ async def api_match_filters(request: Request) -> JSONResponse:
         "target_titles": settings_store.get_titles(),
         "countries":     settings_store.country_names(),
         "location":      settings_store.get_location(),
+    })
+
+
+@app.post("/api/match/score-jd")
+async def api_score_jd(request: Request) -> JSONResponse:
+    """Score a jd_unavailable job using a manually pasted JD."""
+    body   = await request.json()
+    job_id = (body.get("id") or "").strip()
+    jd_text = (body.get("jd_text") or "").strip()
+
+    if not job_id:
+        return JSONResponse({"ok": False, "error": "id required"}, status_code=400)
+    if len(jd_text) < 50:
+        return JSONResponse({"ok": False, "error": "jd_text too short"}, status_code=400)
+    if not session.has_resume():
+        return JSONResponse({"ok": False, "error": "no_resume"}, status_code=400)
+
+    row = match_store.get_one(job_id)
+    if not row:
+        return JSONResponse({"ok": False, "error": "job not found"}, status_code=404)
+
+    def _score():
+        try:
+            jd_json = extract_jd(jd_text)
+        except Exception as exc:
+            logger.warning("extract_jd failed: %s", exc)
+            return None, None
+        if not jd_json:
+            return None, None
+        try:
+            return jd_json, match(session.get_resume(), jd_json)
+        except Exception as exc:
+            logger.exception("match() failed in score-jd: %s", exc)
+            return None, None
+
+    jd_json, result = await run_in_threadpool(_score)
+    if not result:
+        return JSONResponse({"ok": False, "error": "could not parse JD"}, status_code=422)
+
+    match_store.upsert([{
+        "id":               job_id,
+        "source":           row["source"],
+        "title":            row["title"],
+        "company":          row["company"],
+        "location":         row["location"],
+        "url":              row["url"],
+        "language":         row["language"],
+        "posted_at":        row["posted_at"],
+        "score":            result.get("overall_score", 0),
+        "label":            result.get("label", ""),
+        "matched_required": result.get("matched_required", []),
+        "missing_required": result.get("missing_required", []),
+        "section_scores":   result.get("section_scores", {}),
+        "scored_at":        datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "jd_json":          jd_json,
+        "status":           "scored",
+    }])
+
+    return JSONResponse({
+        "ok":    True,
+        "score": result.get("overall_score", 0),
+        "label": result.get("label", ""),
     })
 
 
