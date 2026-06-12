@@ -163,8 +163,6 @@ window.startAnalysis = function() {
     })
     .finally(function() {
       if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
-      window._resumeTmp  = null;
-      window._resumeName = null;
     });
 };
 
