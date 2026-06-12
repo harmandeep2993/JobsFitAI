@@ -34,33 +34,39 @@ var AZ_TIMINGS = [0, 1800, 3600, 5800];
 function renderProgress() {
   var box = document.getElementById('spinner');
   if (!box) return;
+  var dots = AZ_STEPS.map(function(_, i) {
+    return '<span class="az-dot' + (i === 0 ? ' active' : '') + '" id="az-dot-' + i + '"></span>';
+  }).join('');
   box.innerHTML =
-    '<div class="az-progress">' +
-    AZ_STEPS.map(function(s, i) {
-      return '<div class="az-step pending" id="az-step-' + i + '">' +
-        '<div class="az-step-icon"><span class="az-step-num">' + (i + 1) + '</span></div>' +
-        '<div class="az-step-body">' +
-          '<div class="az-step-label">' + s.label + '</div>' +
-          '<div class="az-step-sub">' + s.sub + '</div>' +
-        '</div>' +
-      '</div>';
-    }).join('') +
+    '<div class="az-progress-inner">' +
+      '<div class="az-spin-ring" id="az-spin-ring"></div>' +
+      '<div class="az-status-label" id="az-status-label">' + AZ_STEPS[0].label + '&hellip;</div>' +
+      '<div class="az-status-sub"   id="az-status-sub">'   + AZ_STEPS[0].sub   + '</div>' +
+      '<div class="az-stage-dots">' + dots + '</div>' +
     '</div>';
-  box.style.display = 'block';
+  box.style.display = 'flex';
+}
+
+function _fadeText(el, text) {
+  if (!el) return;
+  el.style.opacity = '0';
+  setTimeout(function() {
+    el.textContent = text;
+    el.style.opacity = '1';
+  }, 150);
 }
 
 function setAzStep(i, state) {
-  var el = document.getElementById('az-step-' + i);
-  if (!el) return;
-  el.className = 'az-step ' + state;
-  var icon = el.querySelector('.az-step-icon');
-  var sub  = el.querySelector('.az-step-sub');
-  if (state === 'active') {
-    if (icon) icon.innerHTML = '<span class="az-step-num">' + (i + 1) + '</span>';
-    if (sub)  sub.textContent = AZ_STEPS[i].sub;
-  } else if (state === 'done') {
-    if (icon) icon.innerHTML = '<span class="az-step-check">&#10003;</span>';
-    if (sub)  sub.textContent = 'Done';
+  if (state !== 'active') return;
+  var labelEl = document.getElementById('az-status-label');
+  var subEl   = document.getElementById('az-status-sub');
+  var countEl = document.getElementById('az-step-count');
+  _fadeText(labelEl, AZ_STEPS[i].label + '…');
+  _fadeText(subEl,   AZ_STEPS[i].sub);
+  if (countEl) countEl.textContent = (i + 1) + ' / ' + AZ_STEPS.length;
+  for (var j = 0; j < AZ_STEPS.length; j++) {
+    var dot = document.getElementById('az-dot-' + j);
+    if (dot) dot.className = 'az-dot' + (j === i ? ' active' : (j < i ? ' done' : ''));
   }
 }
 
@@ -68,11 +74,9 @@ function startProgress() {
   _azTimers.forEach(clearTimeout);
   _azTimers = [];
   renderProgress();
-  setAzStep(0, 'active');
   for (var i = 1; i < AZ_STEPS.length; i++) {
     (function(idx) {
       _azTimers.push(setTimeout(function() {
-        setAzStep(idx - 1, 'done');
         setAzStep(idx, 'active');
       }, AZ_TIMINGS[idx]));
     })(i);
@@ -82,26 +86,31 @@ function startProgress() {
 function completeProgress(cb) {
   _azTimers.forEach(clearTimeout);
   _azTimers = [];
-  // Snap all remaining steps to done in quick succession for visual satisfaction
-  var delay = 0;
+  var labelEl = document.getElementById('az-status-label');
+  var subEl   = document.getElementById('az-status-sub');
+  var ring    = document.getElementById('az-spin-ring');
   for (var i = 0; i < AZ_STEPS.length; i++) {
-    (function(idx, d) {
-      setTimeout(function() { setAzStep(idx, 'done'); }, d);
-    })(i, delay);
-    delay += 120;
+    var dot = document.getElementById('az-dot-' + i);
+    if (dot) dot.className = 'az-dot done';
   }
+  _fadeText(labelEl, 'Analysis complete');
+  _fadeText(subEl,   'Building your results…');
+  if (ring) ring.classList.add('az-spin-done');
   setTimeout(function() {
     var box = document.getElementById('spinner');
-    if (box) box.style.display = 'none';
-    if (cb) cb();
-  }, delay + 300);
+    if (box) { box.style.opacity = '0'; box.style.transition = 'opacity .2s ease'; }
+    setTimeout(function() {
+      if (box) box.style.display = 'none';
+      if (cb) cb();
+    }, 220);
+  }, 650);
 }
 
 function hideProgress() {
   _azTimers.forEach(clearTimeout);
   _azTimers = [];
   var box = document.getElementById('spinner');
-  if (box) box.style.display = 'none';
+  if (box) { box.style.opacity = ''; box.style.transition = ''; box.style.display = 'none'; }
 }
 
 // ── JD validation ─────────────────────────────────────────
@@ -115,6 +124,40 @@ function checkJD() {
   }
 }
 
+// ── Persistent result cache (localStorage, survives refresh) ─
+var _CACHE_LS_KEY = 'jfai_cache';
+var _CACHE_MAX    = 5;
+
+function _cacheGet(key) {
+  try {
+    var store = JSON.parse(localStorage.getItem(_CACHE_LS_KEY) || 'null');
+    return (store && store[key]) ? store[key] : null;
+  } catch(e) { return null; }
+}
+
+function _cacheSet(key, html) {
+  try {
+    var store = JSON.parse(localStorage.getItem(_CACHE_LS_KEY) || 'null') || {};
+    var keys  = Object.keys(store);
+    while (keys.length >= _CACHE_MAX) { delete store[keys.shift()]; }
+    store[key] = html;
+    localStorage.setItem(_CACHE_LS_KEY, JSON.stringify(store));
+  } catch(e) {}
+}
+
+// ── Results placeholder HTML (restored by runAgain) ──────
+var RES_PLACEHOLDER =
+  '<div class="res-placeholder">' +
+  '<div class="res-empty-body">' +
+  '<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">' +
+  '<rect x="3" y="12" width="4" height="9" rx="1"/>' +
+  '<rect x="10" y="5" width="4" height="16" rx="1"/>' +
+  '<rect x="17" y="8" width="4" height="13" rx="1"/>' +
+  '</svg>' +
+  '<p>Upload your resume and paste a job description,<br>then click <strong>Analyse Match</strong> to see your results</p>' +
+  '</div>' +
+  '</div>';
+
 // ── Analysis trigger ──────────────────────────────────────
 window.startAnalysis = function() {
   var jdEl = document.getElementById('jd-input');
@@ -123,11 +166,25 @@ window.startAnalysis = function() {
   if (jd.length < 50)        { toast('Paste a job description (at least 50 characters).', 'warn'); return; }
   if (!window._resumeTmp)    { toast('Upload a resume file first.', 'warn'); return; }
 
+  // Cache hit — keyed on stable file fingerprint so it survives page refresh
+  var fingerprint = window._resumeFingerprint || window._resumeTmp || '';
+  var cacheKey    = fingerprint + '::' + jd;
+  var cached      = _cacheGet(cacheKey);
+  if (cached) {
+    var resultsEl = document.getElementById('jf-results');
+    if (resultsEl) {
+      resultsEl.innerHTML = cached;
+      animateResRing();
+      animateBdRings();
+    }
+    toast('Showing cached result — inputs unchanged', 'info', 3000);
+    return;
+  }
+
   var btn = document.getElementById('analyse-btn');
   if (btn) { btn.disabled = true; btn.style.opacity = '.45'; }
 
   var resultsEl = document.getElementById('jf-results');
-  if (resultsEl) { resultsEl.style.display = 'none'; }
 
   setStep(3);
   startProgress();
@@ -153,7 +210,12 @@ window.startAnalysis = function() {
 
       completeProgress(function() {
         setStep(4);
-        if (resultsEl) { resultsEl.innerHTML = d.html; resultsEl.style.display = 'block'; }
+        if (resultsEl) {
+          resultsEl.innerHTML = d.html;
+          animateResRing();
+          animateBdRings();
+          _cacheSet(cacheKey, d.html);
+        }
         toast('Analysis complete — ' + Math.round(d.score) + '% match (' + d.label + ')', 'ok', 4000);
       });
     })
@@ -164,6 +226,87 @@ window.startAnalysis = function() {
     .finally(function() {
       if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
     });
+};
+
+// ── Results tab switching ─────────────────────────────────
+window.jfTab = function(el, panelId) {
+  document.querySelectorAll('#jf-tab-row .tab-item').forEach(function(t) {
+    t.classList.remove('active');
+  });
+  document.querySelectorAll('.jf-panel').forEach(function(p) {
+    p.style.display = 'none';
+  });
+  el.classList.add('active');
+  var panel = document.getElementById(panelId);
+  if (panel) panel.style.display = 'block';
+};
+
+// ── Ring animations (sidebar score + breakdown rings) ─────
+function animateResRing() { animateBdRings(); }
+
+function animateBdRings() {
+  var circ = 106.81;
+  function ease(t) { return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2, 3)/2; }
+  document.querySelectorAll('#jf-summary .jt-gauge-arc[data-offset], #jf-breakdown .jt-gauge-arc[data-offset]').forEach(function(arc) {
+    var target = parseFloat(arc.getAttribute('data-offset'));
+    var start  = null, dur = 750;
+    (function animate(ts) {
+      if (!start) start = ts;
+      var p = Math.min((ts - start) / dur, 1);
+      arc.style.strokeDashoffset = circ - (circ - target) * ease(p);
+      if (p < 1) requestAnimationFrame(animate);
+    })(performance.now());
+  });
+}
+
+// ── Breakdown accordion toggles ───────────────────────────
+window.bdToggle = function(item) {
+  if (!item) return;
+  var open = item.getAttribute('data-open') === 'true';
+  item.setAttribute('data-open', open ? 'false' : 'true');
+  // sync expand-all button label
+  var panel = item.closest('#jf-breakdown');
+  if (panel) {
+    var btn   = panel.querySelector('.bd-expand-all');
+    var items = panel.querySelectorAll('.bd-item');
+    var anyOpen = Array.from(items).some(function(i) {
+      return i.getAttribute('data-open') === 'true';
+    });
+    if (btn) btn.textContent = anyOpen ? 'Collapse all' : 'Expand all';
+  }
+};
+
+window.bdToggleAll = function(btn) {
+  var list    = btn.closest('#jf-breakdown');
+  if (!list) return;
+  var items   = list.querySelectorAll('.bd-item');
+  var anyOpen = Array.from(items).some(function(i) {
+    return i.getAttribute('data-open') === 'true';
+  });
+  items.forEach(function(item) {
+    item.setAttribute('data-open', anyOpen ? 'false' : 'true');
+  });
+  btn.textContent = anyOpen ? 'Expand all' : 'Collapse all';
+};
+
+// ── Run Again (keep resume, clear JD + results) ──────────
+window.runAgain = function() {
+  _azTimers.forEach(clearTimeout);
+  _azTimers = [];
+  var jdEl    = document.getElementById('jd-input');
+  var results = document.getElementById('jf-results');
+  var spinner = document.getElementById('spinner');
+  var btn     = document.getElementById('analyse-btn');
+
+  if (jdEl)    { jdEl.value = ''; jdEl.classList.remove('success'); }
+  if (results) { results.innerHTML = RES_PLACEHOLDER; }
+  if (spinner) { spinner.style.display = 'none'; }
+  if (btn)     { btn.disabled = false; btn.style.opacity = '1'; }
+  if (typeof updateCounter === 'function') updateCounter(0);
+
+  var card = document.querySelector('.az-workspace, .card');
+  if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  if (jdEl) setTimeout(function() { jdEl.focus(); }, 350);
 };
 
 // ── Bindings ──────────────────────────────────────────────
@@ -180,3 +323,10 @@ window.startAnalysis = function() {
   if (btn) { btn.addEventListener('click', startAnalysis); }
   else { setTimeout(bindAnalyse, 50); }
 })();
+
+document.addEventListener('keydown', function(e) {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    var v = document.getElementById('view-analyzer');
+    if (v && v.classList.contains('active')) startAnalysis();
+  }
+});

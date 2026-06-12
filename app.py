@@ -22,7 +22,7 @@ from typing import Set
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse, FileResponse
 from starlette.requests import Request
 from starlette.concurrency import run_in_threadpool
 
@@ -109,6 +109,38 @@ async def api_upload(request: Request) -> JSONResponse:
     })
 
 
+# ── Serve original resume file ────────────────────────────
+
+_PREVIEW_TYPES = {
+    ".pdf":  "application/pdf",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+}
+
+@app.get("/api/resume-file")
+async def api_resume_file(tmp: str) -> FileResponse:
+    tmp = tmp.strip()
+    if not tmp or not os.path.exists(tmp):
+        return JSONResponse({"ok": False, "error": "file not found"}, status_code=404)
+    suffix = Path(tmp).suffix.lower()
+    if suffix not in _PREVIEW_TYPES:
+        return JSONResponse({"ok": False, "error": "unsupported type"}, status_code=400)
+    return FileResponse(tmp, media_type=_PREVIEW_TYPES[suffix])
+
+
+# ── Resume text preview (no LLM) ─────────────────────────
+
+@app.post("/api/resume-preview")
+async def api_resume_preview(request: Request) -> JSONResponse:
+    body = await request.json()
+    tmp  = (body.get("tmp") or "").strip()
+    if not tmp or not os.path.exists(tmp):
+        return JSONResponse({"ok": False, "error": "file not found"}, status_code=400)
+    text = await run_in_threadpool(lambda: extract_all_text(tmp))
+    if not text:
+        return JSONResponse({"ok": False, "error": "could not extract text"}, status_code=422)
+    return JSONResponse({"ok": True, "text": text[:3000], "total_chars": len(text)})
+
+
 # ── Analyzer ──────────────────────────────────────────────
 
 @app.post("/api/analyze")
@@ -149,11 +181,7 @@ async def api_analyze(request: Request) -> JSONResponse:
         logger.error("analyze failed: %s", e)
         return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
     finally:
-        try:
-            if tmp and os.path.exists(tmp):
-                os.unlink(tmp)
-        except OSError:
-            pass
+        pass  # temp file kept so the same resume can be re-analysed without re-uploading
 
     if not resume_json and not jd_json:
         return JSONResponse({"ok": False, "error": "could not parse resume"}, status_code=422)
@@ -279,11 +307,6 @@ async def api_match_resume(request: Request) -> JSONResponse:
         return extract_resume(text)
 
     resume_json = await run_in_threadpool(_process)
-    try:
-        if os.path.exists(tmp):
-            os.unlink(tmp)
-    except OSError:
-        pass
 
     if not resume_json:
         return JSONResponse({"ok": False, "error": "could not parse resume"}, status_code=422)
