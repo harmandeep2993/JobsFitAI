@@ -163,11 +163,11 @@ window.startAnalysis = function() {
   var jdEl = document.getElementById('jd-input');
   var jd   = jdEl ? jdEl.value.trim() : '';
 
-  if (jd.length < 50)        { toast('Paste a job description (at least 50 characters).', 'warn'); return; }
-  if (!window._resumeTmp)    { toast('Upload a resume file first.', 'warn'); return; }
+  if (jd.length < 50)                             { toast('Paste a job description (at least 50 characters).', 'warn'); return; }
+  if (!window._resumeId && !window._resumeTmp)    { toast('Select or upload a resume first.', 'warn'); return; }
 
   // Cache hit — keyed on stable file fingerprint so it survives page refresh
-  var fingerprint = window._resumeFingerprint || window._resumeTmp || '';
+  var fingerprint = window._resumeFingerprint || window._resumeId || window._resumeTmp || '';
   var cacheKey    = fingerprint + '::' + jd;
   var cached      = _cacheGet(cacheKey);
   if (cached) {
@@ -189,10 +189,15 @@ window.startAnalysis = function() {
   setStep(3);
   startProgress();
 
+  // Send resume_id (persistent store) or fall back to tmp (legacy temp path)
+  var resumePayload = window._resumeId
+    ? { resume_id: window._resumeId }
+    : { tmp: window._resumeTmp };
+
   fetch('/api/analyze', {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ tmp: window._resumeTmp, jd: jd }),
+    body:    JSON.stringify(Object.assign({ jd: jd }, resumePayload)),
   })
     .then(function(r) { return r.json(); })
     .then(function(d) {
