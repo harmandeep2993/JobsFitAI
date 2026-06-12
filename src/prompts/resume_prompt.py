@@ -13,7 +13,7 @@ from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-RESUME_SCHEMA_PATH = Path("schemas/resume_schema.json")
+RESUME_SCHEMA_PATH = Path(__file__).parent.parent.parent / "schemas" / "resume_schema.json"
 
 
 def _get_resume_schema() -> str:

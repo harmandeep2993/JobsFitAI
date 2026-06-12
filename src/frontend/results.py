@@ -4,8 +4,6 @@ Renders full results view.
 Called after match() returns results dict.
 """
 
-from nicegui import ui
-
 from src.utils import session
 from src.frontend.components import score_col, make_prog, make_tags, safe_html
 
@@ -381,18 +379,3 @@ def build_results_html(results: dict, resume_json: dict, jd_json: dict, summary:
     )
 
 
-def render_results(container, results, resume_json, jd_json, summary=""):
-    """
-    Render results into a NiceGUI container element.
-    Alternative to JS injection — used if NiceGUI element available.
-
-    Args:
-        container   : NiceGUI container element
-        results     (dict): match() output
-        resume_json (dict): Extracted resume data
-        jd_json     (dict): Extracted JD data
-        summary     (str):  LLM generated summary
-    """
-    container.clear()
-    with container:
-        ui.html(build_results_html(results, resume_json, jd_json, summary))

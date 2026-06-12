@@ -13,8 +13,8 @@ from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-# Module-level constant — schema path
-JD_SCHEMA_PATH = Path("schemas/jd_schema.json")
+# Absolute path so it resolves correctly regardless of working directory
+JD_SCHEMA_PATH = Path(__file__).parent.parent.parent / "schemas" / "jd_schema.json"
 
 
 def _get_jd_schema() -> str:

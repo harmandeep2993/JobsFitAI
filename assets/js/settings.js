@@ -147,6 +147,46 @@ function updateTopbar(current, online) {
   if (bead)  bead.className     = 't-bead ' + (online ? 'bon' : 'boff');
 }
 
+// ── Test connection ───────────────────────────────────────
+window.testConnection = function() {
+  var btn    = document.getElementById('set-test');
+  var status = document.getElementById('set-status');
+  var orig   = btn ? btn.textContent : 'Test connection';
+
+  if (btn) { btn.disabled = true; btn.textContent = 'Testing…'; }
+  if (status) { status.textContent = 'Checking…'; status.className = 'set-status'; }
+
+  var controller = new AbortController();
+  var timeoutId  = setTimeout(function() { controller.abort(); }, 8000);
+
+  fetch('/api/llm-ping', { signal: controller.signal })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var cur = d.current || {};
+      var provider = cur.provider || window._sel.provider || 'provider';
+      if (d.online) {
+        toast('Connected — ' + provider + ' / ' + (cur.model || ''), 'ok', 4000);
+        updateTopbar(cur, true);
+        if (status) { status.textContent = '✓ Online'; status.className = 'set-status ok'; }
+      } else {
+        toast(provider + ' is offline — check API key or server.', 'warn', 5000);
+        updateTopbar(cur, false);
+        if (status) { status.textContent = '✕ Offline'; status.className = 'set-status err'; }
+      }
+    })
+    .catch(function(e) {
+      var msg = e && e.name === 'AbortError'
+        ? 'Test timed out after 8 s — server may be slow.'
+        : 'Test failed: ' + e;
+      toast(msg, 'err', 5000);
+      if (status) { status.textContent = '✕ Error'; status.className = 'set-status err'; }
+    })
+    .finally(function() {
+      clearTimeout(timeoutId);
+      if (btn) { btn.disabled = false; btn.textContent = orig; }
+    });
+};
+
 // Load once the settings elements exist.
 (function bindSettings() {
   if (document.getElementById('dd-provider')) {

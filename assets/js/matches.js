@@ -36,6 +36,21 @@ function relTime(posted) {
   return months + (months === 1 ? ' month ago' : ' months ago');
 }
 
+// Human-friendly "time since fetched" from an ISO timestamp string (scored_at).
+function fetchedAgo(scored_at) {
+  if (!scored_at) return '';
+  const d = new Date(scored_at);
+  if (isNaN(d.getTime())) return '';
+  const mins = Math.floor((Date.now() - d.getTime()) / 60000);
+  if (mins < 1)   return 'just now';
+  if (mins < 60)  return mins + 'm ago';
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24)   return hrs + 'h ago';
+  const days = Math.floor(hrs / 24);
+  if (days < 7)   return days + 'd ago';
+  return Math.floor(days / 7) + 'w ago';
+}
+
 // ── Load current state (resume + stored results) ──────────
 window.loadMatchState = function() {
   fetch('/api/match/state')
@@ -47,7 +62,14 @@ window.loadMatchState = function() {
       renderResume(d.resume);
       renderScheduler(d.scheduler);
       renderFilters(d.filters);
-      renderMatches(d.results || [], new Set());
+      // Restore "New" highlights from the last fetch run (survives page reload).
+      var threshold = localStorage.getItem('jfa_run_threshold') || '';
+      var newIds = threshold
+        ? new Set((d.results || []).filter(function(r) {
+            return r.scored_at && r.scored_at > threshold;
+          }).map(function(r) { return r.id; }))
+        : new Set();
+      renderMatches(d.results || [], newIds);
     })
     .catch(() => {});
 };
@@ -265,13 +287,13 @@ function uploadMatchResume(file) {
     .then(d => {
       if (!d.ok) throw new Error(d.error || 'extraction failed');
       setResumeStatus(true, d.name + ' · ' + d.experience_years + 'y exp');
-      // New resume re-scores existing jobs — refresh the list to show it.
       if (typeof loadMatchState === 'function') loadMatchState();
       const poll = document.getElementById('mt-poll-status');
       if (poll && d.rescored) {
         poll.textContent = '✓ re-scored ' + d.rescored + ' jobs against the new resume';
         poll.className = 'mt-status ok';
       }
+      if (d.diff) renderResumeDiff(d.diff);
     })
     .catch(e => {
       status.textContent = '✕ ' + e.message;
@@ -290,6 +312,11 @@ window.runMatch = function() {
   if (btn) btn.disabled = true;
   status.textContent = 'Starting…';
   status.className = 'mt-status';
+  renderSkeletons(6);
+  setTopbarRunning(true, 'Starting…');
+
+  // Record run start — scored_at values after this are flagged "New" even after reload.
+  localStorage.setItem('jfa_run_threshold', new Date(Date.now() - 3000).toISOString().slice(0, 19));
 
   // Snapshot current ids so everything scored this run is flagged NEW.
   fetch('/api/match/state')
@@ -325,6 +352,18 @@ window.runMatch = function() {
 var _pollAttempts = 0;
 var MAX_POLL_ATTEMPTS = 150; // 150 × 2 s = 5 minutes max
 
+function setTopbarRunning(running, label) {
+  var dot = document.getElementById('tb-run-dot');
+  var lbl = document.getElementById('tb-run-label');
+  if (dot) dot.style.display = running ? 'flex' : 'none';
+  if (lbl && label) lbl.textContent = label;
+}
+
+function setTopbarFetchTime() {
+  var el = document.getElementById('tb-fetch-time');
+  if (el) el.textContent = 'Last fetch ' + new Date().toLocaleTimeString();
+}
+
 function pollRun() {
   const status = document.getElementById('mt-poll-status');
   const btn    = document.getElementById('mt-run-btn');
@@ -334,6 +373,7 @@ function pollRun() {
     if (btn) btn.disabled = false;
     status.textContent = '✕ Timed out — run took too long. Try again.';
     status.className = 'mt-status err';
+    setTopbarRunning(false);
     return;
   }
 
@@ -349,12 +389,13 @@ function pollRun() {
 
       const rs = d.run_status || {};
       if (rs.running) {
-        status.className = 'mt-status';
-        status.textContent =
+        var phaseText =
           rs.phase === 'fetching'    ? 'Fetching jobs…' :
           rs.phase === 'classifying' ? 'Filtering ' + (rs.total || 0) + ' jobs…' :
-          'Scoring… ' + (rs.scored || 0) + ' done · ' +
-            (rs.checked || 0) + '/' + (rs.total || 0);
+          'Scoring ' + (rs.scored || 0) + '/' + (rs.total || 0) + '…';
+        status.className  = 'mt-status';
+        status.textContent = phaseText;
+        setTopbarRunning(true, phaseText);
         setTimeout(pollRun, 2000);
       } else {
         _pollAttempts = 0;
@@ -363,6 +404,9 @@ function pollRun() {
                              (d.results || []).length + ' total · ' +
                              new Date().toLocaleTimeString();
         status.className = 'mt-status ok';
+        setTopbarRunning(false);
+        setTopbarFetchTime();
+        if (newIds.size > 0) toast(newIds.size + ' new job' + (newIds.size === 1 ? '' : 's') + ' scored', 'ok', 3000);
       }
     })
     .catch(() => {
@@ -370,75 +414,101 @@ function pollRun() {
       if (btn) btn.disabled = false;
       status.textContent = '✕ Connection lost. Check server and try again.';
       status.className = 'mt-status err';
+      setTopbarRunning(false);
     });
 }
 
 // ── Render ranked matches ─────────────────────────────────
-// Shared match-card builder, reused by the Matches and History views.
+// Shared thumbnail card builder, reused by Matches and History views.
 window.matchCardHTML = function(r, isNew) {
-  const matched = (r.matched_required || []).slice(0, 5).map(mtEsc).join(', ');
-  const missing = (r.missing_required || []).slice(0, 5).map(mtEsc).join(', ');
   const posted  = relTime(r.posted_at);
+  const fetched = fetchedAgo(r.scored_at);
   const applied = !!r.applied;
   const pending = r.status === 'pending';
   const noJd    = r.status === 'jd_unavailable';
 
-  // Score badge: real score, or a state marker for pending / jd-unavailable.
-  const badge = pending
-    ? '<div class="match-score sc-na">…</div>'
-    : noJd
-      ? '<div class="match-score sc-na" title="JD not on Adzuna">JD?</div>'
-      : '<div class="match-score ' + labelClass(r.label, r.score) + '">' +
-          Math.round(r.score) + '<span class="match-score-pct">%</span></div>';
+  const lc = labelClass(r.label, r.score);
 
-  let body;
-  if (noJd) {
-    body = '<div class="match-na">JD not available on Adzuna — open the posting to read it, then score it on the Analyzer tab.</div>';
-  } else if (pending) {
-    body = '<div class="match-na">Scoring…</div>';
+  // Score badge — uses data-target for count-up animation
+  const scoreVal = Math.round(r.score || 0);
+  const badge = pending
+    ? '<div class="jt-score sc-na">…</div>'
+    : noJd
+      ? '<div class="jt-score sc-na" title="JD not available">JD?</div>'
+      : '<div class="jt-score ' + lc + '"><span class="jt-score-num" data-target="' +
+        scoreVal + '">0</span><span class="jt-score-pct">%</span></div>';
+
+  // Top-right label chips
+  const chips =
+    (isNew  ? '<span class="match-new">NEW</span>' : '') +
+    (noJd   ? '<span class="match-na-tag">manual</span>' : '') +
+    (applied? '<span class="match-applied-tag">Applied</span>' : '');
+
+  // Skill tags — 4 matched (green) + 4 missing (red), rest hidden
+  let skillsHTML = '';
+  if (!noJd && !pending) {
+    const mTags = (r.matched_required || []).slice(0, 4)
+      .map(s => '<span class="tag tg">' + mtEsc(s) + '</span>').join('');
+    const xTags = (r.missing_required || []).slice(0, 4)
+      .map(s => '<span class="tag tr">' + mtEsc(s) + '</span>').join('');
+    skillsHTML = mTags + xTags;
+  } else if (noJd) {
+    skillsHTML = '<span class="jt-na-hint">Open posting to read JD, then score in Analyzer</span>';
   } else {
-    body =
-      (matched ? '<div class="match-skills"><span class="ok">✓</span> ' + matched + '</div>' : '') +
-      (missing ? '<div class="match-skills"><span class="miss">✗</span> ' + missing + '</div>' : '');
+    skillsHTML = '<span class="jt-na-hint">Scoring…</span>';
   }
 
-  const actions =
-    '<div class="match-actions">' +
-      (noJd
-        ? '<button class="analyze-btn" onclick="showView(\'analyzer\')">📝 Score in Analyzer</button>'
-        : '<button class="analyze-btn" onclick="openDetail(\'' + mtEsc(r.id) + '\')">🔍 Analyze</button>') +
-      (r.url ? '<a class="job-card-link" href="' + mtEsc(r.url) +
-               '" target="_blank" rel="noopener">Open ↗</a>' : '') +
-      '<button class="apply-toggle' + (applied ? ' on' : '') +
-        '" onclick="toggleApplied(\'' + mtEsc(r.id) + '\',' + (applied ? 1 : 0) + ')">' +
-        (applied ? 'Applied ✓' : 'Mark applied') +
-      '</button>' +
-      '<button class="del-btn" onclick="deleteMatch(\'' + mtEsc(r.id) +
-        '\')" title="Delete &amp; never show again">🗑</button>' +
-    '</div>';
+  // Meta line: published date + language + source
+  const metaParts = [
+    posted   ? '📅 ' + posted : null,
+    r.language || null,
+    r.source   ? r.source : null,
+  ].filter(Boolean);
+
+  // Footer actions
+  const detailBtn = noJd
+    ? '<button class="jt-btn jt-btn-primary" onclick="openJdModal(\'' + mtEsc(r.id) + '\')">&#128203; Paste JD</button>'
+    : '<button class="jt-btn jt-btn-primary" onclick="openDetail(\'' + mtEsc(r.id) + '\')">Analyze</button>';
+
+  const openBtn = r.url
+    ? '<a class="jt-btn" href="' + mtEsc(r.url) + '" target="_blank" rel="noopener">Open ↗</a>'
+    : '';
+
+  const applyBtn =
+    '<button class="jt-btn jt-apply' + (applied ? ' on' : '') +
+    '" onclick="toggleApplied(\'' + mtEsc(r.id) + '\',' + (applied ? 1 : 0) + ')">' +
+    (applied ? '✓ Applied' : 'Applied?') + '</button>';
+
+  const delBtn =
+    '<button class="jt-del" onclick="deleteMatch(\'' + mtEsc(r.id) + '\')" title="Remove">✕</button>';
 
   return '' +
-    '<div class="match-card' + (isNew ? ' is-new' : '') + (applied ? ' is-applied' : '') +
-        (noJd ? ' is-na' : '') + '">' +
-      '<div class="match-top">' +
+    '<div class="job-thumb' +
+        (isNew    ? ' is-new'    : '') +
+        (applied  ? ' is-applied': '') +
+        (noJd     ? ' is-na'     : '') + '">' +
+
+      '<div class="jt-head">' +
         badge +
-        (isNew ? '<span class="match-new">✨ NEW</span>' : '') +
-        (noJd ? '<span class="match-na-tag">manual</span>' : '') +
-        (applied ? '<span class="match-applied-tag">✓ Applied</span>' : '') +
+        '<div class="jt-chips">' + chips + '</div>' +
       '</div>' +
-      '<div class="match-title">' + mtEsc(r.title) + '</div>' +
-      '<div class="match-meta">' +
-        mtEsc(r.company || 'Unknown') +
-        (r.location ? ' · ' + mtEsc(r.location) : '') +
+
+      '<div class="jt-body">' +
+        '<div class="jt-title">' + mtEsc(r.title || '') + '</div>' +
+        (r.location ? '<div class="jt-loc">&#128205; ' + mtEsc(r.location) + '</div>' : '') +
+        '<div class="jt-company">' + mtEsc(r.company || 'Unknown') + '</div>' +
+        (metaParts.length
+          ? '<div class="jt-meta">' + metaParts.join(' &middot; ') + '</div>'
+          : '') +
+        (fetched ? '<div class="jt-fetched">📥 Fetched ' + mtEsc(fetched) + '</div>' : '') +
+        '<div class="jt-skills">' + skillsHTML + '</div>' +
       '</div>' +
-      '<div class="match-sub">' +
-        (posted ? '🕒 ' + posted : '') +
-        (posted && r.language ? ' · ' : '') +
-        (r.language ? mtEsc(r.language) : '') +
-        (r.source ? ' · <span class="src-tag">' + mtEsc(r.source) + '</span>' : '') +
+
+      '<div class="jt-foot">' +
+        detailBtn + openBtn + applyBtn +
+        '<div class="jt-foot-r">' + delBtn + '</div>' +
       '</div>' +
-      body +
-      actions +
+
     '</div>';
 };
 
@@ -454,11 +524,29 @@ window.deleteMatch = function(id) {
 };
 
 window.clearAllMatches = function() {
-  if (!confirm('Clear ALL matches, history, and seen-jobs? This cannot be undone.')) return;
+  // Two-click confirmation: first click arms, second fires
+  var btn = document.querySelector('.mt-clear');
+  if (!btn) return;
+  if (btn.dataset.armed !== 'yes') {
+    btn.dataset.armed = 'yes';
+    btn.textContent = '⚠ Confirm clear?';
+    btn.style.color = 'var(--red)';
+    setTimeout(function() {
+      btn.dataset.armed = '';
+      btn.textContent = '🗑 Clear all';
+      btn.style.color = '';
+    }, 3000);
+    return;
+  }
+  btn.dataset.armed = '';
+  btn.textContent = '🗑 Clear all';
+  btn.style.color = '';
   fetch('/api/match/clear', { method: 'POST' })
     .then(r => r.json())
-    .then(d => { if (d.ok) loadMatchState(); })
-    .catch(() => {});
+    .then(d => {
+      if (d.ok) { loadMatchState(); toast('All matches cleared.', 'ok'); }
+    })
+    .catch(function() { toast('Clear failed — check server.', 'err'); });
 };
 
 // ── Detail / "more analysis" modal ────────────────────────
@@ -560,26 +648,308 @@ window.toggleApplied = function(id, applied) {
     .catch(() => {});
 };
 
+// Active client-side filters (updated by onScoreFilter / onLangFilter).
+window._mtMinScore   = 0;
+window._mtLang       = '';
+window._mtAllData    = [];
+window._mtShowNew     = false;   // show only "New" jobs
+window._mtHideApplied = false;   // hide applied jobs
+window._mtMaxAge      = 'all';   // published within N days ('all' = no limit)
+window._mtSource      = 'all';   // job source ('all', 'adzuna', 'arbeitnow')
+
+// ── Sort ──────────────────────────────────────────────────
+window._mtSort = 'score';
+
+window.setSort = function(s) {
+  window._mtSort = s;
+  document.querySelectorAll('.sort-btn[data-sort]').forEach(function(btn) {
+    btn.classList.toggle('active', btn.dataset.sort === s);
+  });
+  renderMatches(window._mtAllData, window._mtLastNewIds || new Set());
+};
+
+window.setMtAge = function(days) {
+  window._mtMaxAge = days;
+  document.querySelectorAll('.sort-btn[data-age]').forEach(function(btn) {
+    btn.classList.toggle('active', btn.dataset.age === String(days));
+  });
+  renderMatches(window._mtAllData, window._mtLastNewIds || new Set());
+};
+
+window.setMtScore = function(min) {
+  window._mtMinScore = min;
+  document.querySelectorAll('.sort-btn[data-score]').forEach(function(btn) {
+    btn.classList.toggle('active', btn.dataset.score === String(min));
+  });
+  renderMatches(window._mtAllData, window._mtLastNewIds || new Set());
+};
+
+window.setMtSource = function(src) {
+  window._mtSource = src;
+  document.querySelectorAll('.sort-btn[data-src]').forEach(function(btn) {
+    btn.classList.toggle('active', btn.dataset.src === src);
+  });
+  renderMatches(window._mtAllData, window._mtLastNewIds || new Set());
+};
+
+window.toggleMtNew = function() {
+  window._mtShowNew = !window._mtShowNew;
+  var btn = document.getElementById('mt-fn-btn');
+  if (btn) btn.classList.toggle('active', window._mtShowNew);
+  renderMatches(window._mtAllData, window._mtLastNewIds || new Set());
+};
+
+window.toggleMtApplied = function() {
+  window._mtHideApplied = !window._mtHideApplied;
+  var btn = document.getElementById('mt-fa-btn');
+  if (btn) btn.classList.toggle('active', window._mtHideApplied);
+  renderMatches(window._mtAllData, window._mtLastNewIds || new Set());
+};
+
+// ── Skeleton loading ──────────────────────────────────────
+function renderSkeletons(n) {
+  const box = document.getElementById('mt-results');
+  if (!box) return;
+  var html = '';
+  for (var i = 0; i < (n || 6); i++) {
+    html +=
+      '<div class="sk-card">' +
+        '<div class="sk-line sk-score"></div>' +
+        '<div class="sk-line sk-title"></div>' +
+        '<div class="sk-line sk-sub"></div>' +
+        '<div class="sk-line sk-meta"></div>' +
+        '<div class="sk-line sk-tags"></div>' +
+        '<div class="sk-line sk-foot"></div>' +
+      '</div>';
+  }
+  box.innerHTML = html;
+}
+
+// ── Score count-up animation ──────────────────────────────
+function animateScores() {
+  var nums = document.querySelectorAll('.jt-score-num[data-target]');
+  nums.forEach(function(el) {
+    var target = parseInt(el.dataset.target, 10) || 0;
+    if (target === 0) { el.textContent = '0'; return; }
+    var start = 0;
+    var duration = 600;
+    var startTime = null;
+    function step(ts) {
+      if (!startTime) startTime = ts;
+      var progress = Math.min((ts - startTime) / duration, 1);
+      var eased = 1 - Math.pow(1 - progress, 3);
+      el.textContent = Math.round(eased * target);
+      if (progress < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  });
+}
+
+window.onLangFilter = function() {
+  const el = document.getElementById('flt-lang');
+  window._mtLang = el ? el.value : '';
+  renderMatches(window._mtAllData, window._mtLastNewIds || new Set());
+};
+
 function renderMatches(results, newIds) {
+  window._mtAllData    = results;
+  window._mtLastNewIds = newIds;
   const box = document.getElementById('mt-results');
   if (!box) return;
   newIds = newIds || new Set();
 
-  if (!results.length) {
-    box.innerHTML = '<div class="fetch-empty">No matches yet. Load a resume and click Fetch &amp; Score.</div>';
+  // Apply all client-side filters.
+  const minScore    = window._mtMinScore   || 0;
+  const lang        = window._mtLang       || '';
+  const showNew     = window._mtShowNew;
+  const hideApplied = window._mtHideApplied;
+  const maxAge      = window._mtMaxAge;
+  const source      = window._mtSource     || 'all';
+  const nowSec      = Date.now() / 1000;
+
+  const filtered = results.filter(function(r) {
+    if (r.status === 'jd_unavailable') return true;
+    if ((r.score || 0) < minScore) return false;
+    if (lang && (r.language || '') !== lang) return false;
+    if (showNew && !newIds.has(r.id)) return false;
+    if (hideApplied && r.applied) return false;
+    if (source !== 'all' && (r.source || '') !== source) return false;
+    if (maxAge !== 'all') {
+      var ts = parseInt(r.posted_at, 10) || 0;
+      if (ts && (nowSec - ts) > maxAge * 86400) return false;
+    }
+    return true;
+  });
+
+  // Update sidebar badge — unreviewed (unapplied, scored) jobs
+  var unreviewed = results.filter(function(r) { return !r.applied && r.status !== 'pending'; }).length;
+  var badge = document.getElementById('sb-badge-matches');
+  if (badge) {
+    badge.textContent = unreviewed > 0 ? String(unreviewed) : '';
+    badge.style.display = unreviewed > 0 ? '' : 'none';
+  }
+
+  // Show sort row when there are any results
+  var sortRow = document.getElementById('sort-row');
+  if (sortRow) sortRow.style.display = results.length ? 'flex' : 'none';
+
+  // Update result count
+  var countEl = document.getElementById('mt-result-count');
+  if (countEl) {
+    countEl.textContent = filtered.length < results.length
+      ? filtered.length + ' of ' + results.length
+      : results.length + ' jobs';
+  }
+
+  if (!filtered.length) {
+    const msg = results.length
+      ? 'No jobs match the current filters.'
+      : 'No matches yet. Load a resume and click Fetch &amp; Score.';
+    box.innerHTML = '<div class="fetch-empty">' + msg + '</div>';
     return;
   }
 
-  // New jobs first, then by score within each group.
-  const ordered = results.slice().sort((a, b) => {
+  // Sort — new jobs always float to top in score mode
+  const sort = window._mtSort || 'score';
+  const ordered = filtered.slice().sort(function(a, b) {
     const an = newIds.has(a.id) ? 1 : 0;
     const bn = newIds.has(b.id) ? 1 : 0;
-    if (an !== bn) return bn - an;
-    return (b.score || 0) - (a.score || 0);
+    if (sort === 'score' && an !== bn) return bn - an;
+    if (sort === 'score')   return (b.score || 0) - (a.score || 0);
+    if (sort === 'fetched') return (b.scored_at || '').localeCompare(a.scored_at || '');
+    return 0;
   });
 
-  box.innerHTML = ordered.map(r => window.matchCardHTML(r, newIds.has(r.id))).join('');
+  box.innerHTML = ordered.map(function(r) {
+    return window.matchCardHTML(r, newIds.has(r.id));
+  }).join('');
+
+  requestAnimationFrame(animateScores);
 }
+
+// ── Resume diff banner ────────────────────────────────────
+function renderResumeDiff(diff) {
+  if (!diff) return;
+
+  const added   = diff.skills_added   || [];
+  const removed = diff.skills_removed || [];
+  const expAdd  = diff.exp_added      || [];
+  const expRem  = diff.exp_removed    || [];
+  const yrBefore = diff.years_before  || 0;
+  const yrAfter  = diff.years_after   || 0;
+
+  if (!added.length && !removed.length && !expAdd.length && !expRem.length && yrBefore === yrAfter) return;
+
+  const chip = function(text, cls) {
+    return '<span class="tag ' + cls + '" style="font-size:11px;">' + mtEsc(text) + '</span>';
+  };
+
+  var rows = [];
+
+  if (added.length)
+    rows.push('<div><strong>Skills added:</strong> ' + added.map(s => chip(s, 'tg')).join(' ') + '</div>');
+  if (removed.length)
+    rows.push('<div><strong>Skills removed:</strong> ' + removed.map(s => chip(s, 'tr')).join(' ') + '</div>');
+  if (expAdd.length)
+    rows.push('<div><strong>Experience added:</strong> ' + expAdd.map(function(e) {
+      return chip(e.replace('|', ' @ '), 'tg'); }).join(' ') + '</div>');
+  if (expRem.length)
+    rows.push('<div><strong>Experience removed:</strong> ' + expRem.map(function(e) {
+      return chip(e.replace('|', ' @ '), 'tr'); }).join(' ') + '</div>');
+  if (yrBefore !== yrAfter)
+    rows.push('<div><strong>Experience years:</strong> ' + yrBefore + 'y &rarr; ' + yrAfter + 'y</div>');
+
+  const banner = document.createElement('div');
+  banner.className = 'content-card';
+  banner.style.cssText = 'margin-bottom:12px;border-left:3px solid var(--blue);padding:12px 16px;font-size:13px;';
+  banner.innerHTML =
+    '<div style="font-weight:600;margin-bottom:8px;">Resume updated - what changed</div>' +
+    rows.join('') +
+    '<button onclick="this.parentElement.remove()" style="margin-top:8px;font-size:11px;background:none;border:none;cursor:pointer;opacity:.6;">dismiss</button>';
+
+  const results = document.getElementById('mt-results');
+  if (results) results.before(banner);
+}
+
+// ── JD paste modal (for jd_unavailable cards) ────────────
+window.openJdModal = function(id) {
+  var job    = (window._mtAllData || []).find(function(r) { return r.id === id; }) || {};
+  var modal  = document.getElementById('jd-modal');
+  var title  = document.getElementById('jd-modal-title');
+  var sub    = document.getElementById('jd-modal-sub');
+  var input  = document.getElementById('jd-modal-input');
+  var status = document.getElementById('jd-modal-status');
+  var btn    = document.getElementById('jd-modal-btn');
+  if (!modal) return;
+  window._jdModalId = id;
+  if (title)  title.textContent  = job.title   || 'Paste Job Description';
+  if (sub)    sub.textContent    = job.company  || '';
+  if (input)  input.value        = '';
+  if (status) { status.textContent = ''; status.className = 'mt-status'; }
+  if (btn)    { btn.disabled = false; btn.textContent = 'Score this job'; }
+  modal.style.display = 'flex';
+  setTimeout(function() { if (input) input.focus(); }, 60);
+};
+
+window.closeJdModal = function(ev) {
+  if (ev && ev.target && ev.target.id !== 'jd-modal') return;
+  document.getElementById('jd-modal').style.display = 'none';
+};
+
+window.confirmJdModal = function() {
+  document.getElementById('jd-modal').style.display = 'none';
+};
+
+window.submitJd = function() {
+  var id     = window._jdModalId;
+  var input  = document.getElementById('jd-modal-input');
+  var btn    = document.getElementById('jd-modal-btn');
+  var status = document.getElementById('jd-modal-status');
+  var text   = (input ? input.value : '').trim();
+
+  if (text.length < 50) {
+    if (status) { status.textContent = 'Too short — paste the full job description.'; status.className = 'mt-status err'; }
+    return;
+  }
+
+  if (btn)    { btn.disabled = true; btn.textContent = 'Scoring…'; }
+  if (status) { status.textContent = ''; status.className = 'mt-status'; }
+
+  fetch('/api/match/score-jd', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ id: id, jd_text: text }),
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (!d.ok) {
+        if (btn) { btn.disabled = false; btn.textContent = 'Score this job'; }
+        var msg = d.error === 'no_resume' ? 'Load a resume first.' : (d.error || 'Scoring failed.');
+        if (status) { status.textContent = '✕ ' + msg; status.className = 'mt-status err'; }
+        return;
+      }
+      // Show result panel; OK button will close the modal
+      var score = Math.round(d.score || 0);
+      var badge = document.getElementById('jd-res-badge');
+      var lbl   = document.getElementById('jd-res-label');
+      var res   = document.getElementById('jd-modal-result');
+      var hint  = document.getElementById('jd-modal-hint');
+      if (badge) badge.textContent = score + '%';
+      if (lbl)   lbl.textContent   = d.label || '';
+      // colour-code the badge using existing label classes
+      if (badge) badge.className = 'jd-res-badge ' + labelClass(d.label, d.score);
+      // hide the form, show the result
+      if (document.getElementById('jd-modal-input')) document.getElementById('jd-modal-input').style.display = 'none';
+      if (document.getElementById('jd-modal-foot'))  document.getElementById('jd-modal-foot').style.display  = 'none';
+      if (hint) hint.style.display = 'none';
+      if (res)  res.style.display  = 'flex';
+      loadMatchState();
+    })
+    .catch(function(e) {
+      if (btn) { btn.disabled = false; btn.textContent = 'Score this job'; }
+      if (status) { status.textContent = '✕ ' + e; status.className = 'mt-status err'; }
+    });
+};
 
 // ── Bind ──────────────────────────────────────────────────
 (function bindMatches() {
