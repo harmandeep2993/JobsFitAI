@@ -25,6 +25,13 @@
 }
 @media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
 
+/* Analyzer: narrow resume col, wide JD col, equal heights */
+.az-cols { grid-template-columns: 2fr 3fr; align-items: stretch; }
+.az-col  { display: flex; flex-direction: column; }
+.az-upload { flex: 1; min-height: 0; }
+.az-jd   { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.az-jd .jd-box { flex: 1; min-height: 0; height: 100%; resize: none; }
+
 /* --- Buttons --- */
 .btn-primary {
   display: inline-flex;
