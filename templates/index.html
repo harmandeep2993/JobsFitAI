@@ -25,7 +25,7 @@
         <svg class="sb-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="7" cy="7" r="5"/><path d="M11 11l3 3"/>
         </svg>
-        <span>Analyzer</span>
+        <span>Resume Analyzer</span>
       </div>
       <div class="sb-item" id="nav-matches" onclick="showView('matches')">
         <svg class="sb-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
@@ -59,8 +59,7 @@
     <!-- topbar -->
     <header class="jfai-topbar">
       <div class="topbar-l">
-        <span class="tb-page-title" id="tb-page-title">Analyzer</span>
-        <div class="tb-run-dot" id="tb-run-dot" style="display:none;">
+<div class="tb-run-dot" id="tb-run-dot" style="display:none;">
           <span class="run-pulse"></span>
           <span class="run-label" id="tb-run-label">Running…</span>
         </div>
@@ -81,68 +80,108 @@
 
       <!-- ── Analyzer ───────────────────────────────────── -->
       <div id="view-analyzer" class="view active">
-        <div class="pg-title">AI Resume <em>Matcher</em></div>
-        <div class="pg-sub">Upload a resume and paste a job description to get a semantic match score</div>
 
-        <div class="steps" id="az-steps">
-          <div class="step-pill"><div class="step-num s-act">1</div><span class="step-lbl sl-act">Upload</span></div>
-          <div class="step-sep"></div>
-          <div class="step-pill"><div class="step-num s-todo">2</div><span class="step-lbl sl-todo">Job Description</span></div>
-          <div class="step-sep"></div>
-          <div class="step-pill"><div class="step-num s-todo">3</div><span class="step-lbl sl-todo">Analysing</span></div>
-          <div class="step-sep"></div>
-          <div class="step-pill"><div class="step-num s-todo">4</div><span class="step-lbl sl-todo">Results</span></div>
+        <!-- Hero ──────────────────────────────────────── -->
+        <div class="az-hero">
+          <div class="az-hero-icon" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="2" width="10" height="13" rx="1.5"/>
+              <path d="M5.5 5.5h5M5.5 8h3.5M5.5 10.5h2"/>
+              <circle cx="14.5" cy="14.5" r="3.5"/>
+              <line x1="17" y1="17" x2="18.5" y2="18.5"/>
+            </svg>
+          </div>
+          <div>
+            <h1 class="az-hero-title">Resume <em>Analyzer</em></h1>
+            <p class="az-hero-sub">Upload your resume and paste a job description to get an instant AI-powered match score</p>
+          </div>
         </div>
 
-        <div class="divider"></div>
+        <!-- Workspace ──────────────────────────────────── -->
+        <input type="file" id="file-input" accept=".pdf,.docx" style="display:none;"/>
 
-        <div class="card">
-          <input type="file" id="file-input" accept=".pdf,.docx" style="display:none;"/>
-          <div class="two-col">
+        <div class="az-workspace">
 
-            <div>
-              <div class="sec-lbl-row">
-                <div class="sec-lbl">Resume File</div>
-                <button class="clear-btn" onclick="clearResume()" title="Clear">&#10005;</button>
-              </div>
-              <div class="up-zone" id="up-zone"
-                  ondragover="event.preventDefault();this.classList.add('drag')"
-                  ondragleave="this.classList.remove('drag')"
-                  ondrop="event.preventDefault();this.classList.remove('drag');handleFileSelect(event.dataTransfer.files[0])">
-                <svg width="30" height="36" viewBox="0 0 36 44" fill="none" style="opacity:0.3;">
-                  <rect x="1" y="1" width="26" height="34" rx="3" stroke="currentColor" stroke-width="2" fill="none"/>
-                  <path d="M27 1l8 8h-8V1z" stroke="currentColor" stroke-width="2" fill="none"/>
-                  <line x1="6" y1="13" x2="22" y2="13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                  <line x1="6" y1="19" x2="22" y2="19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                  <line x1="6" y1="25" x2="15" y2="25" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <!-- Resume panel -->
+          <div class="az-panel az-panel-resume">
+            <div class="az-panel-hd">
+              <span class="az-pnum">01</span>
+              <span class="az-plbl">Resume</span>
+              <button class="az-pact" onclick="clearResume()">Clear</button>
+            </div>
+            <div class="up-zone az-upload" id="up-zone"
+                ondragover="event.preventDefault();this.classList.add('drag')"
+                ondragleave="this.classList.remove('drag')"
+                ondrop="event.preventDefault();this.classList.remove('drag');handleFileSelect(event.dataTransfer.files[0])">
+              <svg width="28" height="34" viewBox="0 0 36 44" fill="none" style="opacity:0.3;">
+                <rect x="1" y="1" width="26" height="34" rx="3" stroke="currentColor" stroke-width="2" fill="none"/>
+                <path d="M27 1l8 8h-8V1z" stroke="currentColor" stroke-width="2" fill="none"/>
+                <line x1="6" y1="13" x2="22" y2="13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                <line x1="6" y1="19" x2="22" y2="19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                <line x1="6" y1="25" x2="15" y2="25" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+              <div class="up-text">Drop or <strong>browse</strong></div>
+              <div class="up-hint">PDF &nbsp;&middot;&nbsp; DOCX &nbsp;&middot;&nbsp; max 5&thinsp;MB</div>
+            </div>
+          </div>
+
+          <!-- JD panel -->
+          <div class="az-panel az-panel-jd">
+            <div class="az-panel-hd">
+              <span class="az-pnum">02</span>
+              <span class="az-plbl">Job Description</span>
+              <span class="jd-counter" id="jd-counter">0 / 5000</span>
+              <button class="az-pact az-pact-jd" onclick="clearJD()">Clear</button>
+            </div>
+            <div class="jd-wrap az-jd">
+              <div class="jd-empty-icon" aria-hidden="true">
+                <svg width="30" height="34" viewBox="0 0 30 34" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="2" y="5" width="26" height="27" rx="3"/>
+                  <rect x="9" y="1" width="12" height="7" rx="2"/>
+                  <line x1="8" y1="15" x2="22" y2="15"/>
+                  <line x1="8" y1="20" x2="22" y2="20"/>
+                  <line x1="8" y1="25" x2="16" y2="25"/>
                 </svg>
-                <div class="up-text">Drop file or <strong>browse</strong></div>
-                <div class="up-hint">PDF &nbsp;&middot;&nbsp; DOCX</div>
               </div>
+              <textarea id="jd-input" class="jd-box"
+                placeholder="Paste the full job description here&hellip;"></textarea>
             </div>
-
-            <div>
-              <div class="sec-lbl-row">
-                <div class="sec-lbl">Job Description</div>
-                <button class="clear-btn" onclick="clearJD()" title="Clear">&#10005;</button>
-              </div>
-              <div class="jd-wrap">
-                <textarea id="jd-input" class="jd-box"
-                  placeholder="Paste the full job description here, or use the URL fetcher above&hellip;"></textarea>
-                <div class="jd-counter" id="jd-counter">0 / 5000</div>
-              </div>
-            </div>
-
           </div>
-          <div style="margin-top:24px;">
-            <button class="btn-primary" id="analyse-btn">Analyse Match</button>
-          </div>
+
+        </div><!-- /az-workspace -->
+
+        <!-- CTA ────────────────────────────────────────── -->
+        <div class="az-cta">
+          <span class="az-shortcut">Ctrl+Enter</span>
+          <button class="btn-primary az-analyse-btn" id="analyse-btn">
+            Analyse Match
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M3 8h10M9 4l4 4-4 4"/>
+            </svg>
+          </button>
         </div>
 
         <div id="spinner" style="display:none;"></div>
 
         <div class="divider"></div>
-        <div id="jf-results" style="display:none;"></div>
+        <div id="jf-results">
+          <div class="res-placeholder">
+            <div class="tab-row">
+              <div class="tab-item active">Summary</div>
+              <div class="tab-item">Breakdown</div>
+              <div class="tab-item">Keywords</div>
+              <div class="tab-item">Recommendations</div>
+            </div>
+            <div class="res-empty-body">
+              <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="12" width="4" height="9" rx="1"/>
+                <rect x="10" y="5" width="4" height="16" rx="1"/>
+                <rect x="17" y="8" width="4" height="13" rx="1"/>
+              </svg>
+              <p>Upload your resume and paste a job description,<br>then click <strong>Analyse Match</strong> to see your results</p>
+            </div>
+          </div>
+        </div>
       </div><!-- /view-analyzer -->
 
       <!-- ── Job Matches ────────────────────────────────── -->
@@ -339,6 +378,20 @@
       <div class="jd-res-label" id="jd-res-label"></div>
       <button class="btn-primary" onclick="confirmJdModal()">OK</button>
     </div>
+  </div>
+</div>
+
+<!-- Resume preview modal -->
+<div id="resume-preview-modal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeResumePreview()">
+  <div class="modal-box rp-modal-box">
+    <div class="dt-head">
+      <div>
+        <div class="dt-title">Resume Preview</div>
+        <div class="dt-sub">Extracted text from your uploaded file</div>
+      </div>
+      <button class="dt-close" onclick="closeResumePreview()">&#10005;</button>
+    </div>
+    <div id="rp-content" class="rp-content"></div>
   </div>
 </div>
 
