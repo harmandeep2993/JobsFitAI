@@ -367,56 +367,63 @@
   background: linear-gradient(90deg, var(--accent), #ff8c6a);
 }
 
-/* Score circle — compact inline ring */
+/* SVG gauge ring — wrapper */
 .jt-score {
   width: 44px;
   height: 44px;
-  border-radius: 50%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-family: 'DM Mono', monospace;
-  border: 2px solid;
   flex-shrink: 0;
   position: relative;
-  transition: box-shadow .2s;
 }
 
-/* score color classes — glow rings on hover */
-.sc-exc {
-  background: var(--green-bg);
-  color: var(--green);
-  border-color: var(--green-bd);
-  box-shadow: 0 0 0 4px var(--green-glow);
-}
-.sc-good {
-  background: var(--blue-bg);
-  color: var(--blue);
-  border-color: var(--blue-bd);
-  box-shadow: 0 0 0 4px var(--blue-glow);
-}
-.sc-partial {
-  background: var(--amber-bg);
-  color: var(--amber);
-  border-color: var(--amber-bd);
-  box-shadow: 0 0 0 4px var(--amber-glow);
-}
-.sc-poor {
-  background: var(--red-bg);
-  color: var(--red);
-  border-color: var(--red-bd);
-  box-shadow: 0 0 0 4px var(--red-glow);
-}
-.sc-na {
-  background: var(--bg-c);
-  color: var(--t3);
-  border-color: var(--bd);
-  box-shadow: none;
+.jt-gauge {
+  width: 44px;
+  height: 44px;
+  transform: rotate(-90deg);
+  display: block;
 }
 
-.jt-score-num { font-size: 13px; font-weight: 800; line-height: 1; letter-spacing: -0.3px; }
-.jt-score-pct { font-size: 8px; opacity: .6; line-height: 1.4; margin-top: 1px; }
+.jt-gauge-bg {
+  fill: none;
+  stroke: var(--bd);
+  stroke-width: 3;
+}
+
+.jt-gauge-arc {
+  fill: none;
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+.jt-gauge-arc.sc-exc     { stroke: var(--green); }
+.jt-gauge-arc.sc-good    { stroke: var(--blue);  }
+.jt-gauge-arc.sc-partial { stroke: var(--amber); }
+.jt-gauge-arc.sc-poor    { stroke: var(--red);   }
+.jt-gauge-arc.sc-na      { stroke: var(--t3);    }
+
+/* centered label inside the ring */
+.jt-score-val {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10.5px;
+  font-weight: 800;
+  font-family: 'DM Mono', monospace;
+  letter-spacing: -0.3px;
+  line-height: 1;
+}
+.jt-score-val.sc-exc     { color: var(--green); }
+.jt-score-val.sc-good    { color: var(--blue);  }
+.jt-score-val.sc-partial { color: var(--amber); }
+.jt-score-val.sc-poor    { color: var(--red);   }
+.jt-score-val.sc-na      { color: var(--t3);    }
+
+/* score color classes — still used in results.css detail badge */
+.sc-exc     { color: var(--green); }
+.sc-good    { color: var(--blue);  }
+.sc-partial { color: var(--amber); }
+.sc-poor    { color: var(--red);   }
+.sc-na      { color: var(--t3);    }
 
 /* chips — inline row next to company */
 .jt-chips {
