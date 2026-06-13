@@ -1,6 +1,6 @@
-# src/utils/config.py
+﻿# src/utils/config.py
 """
-Configuration loader for JobFitAI.
+Configuration loader for JobsFitAI.
 
 Loads configuration from:
     1. config.yaml — static provider configs, weights, limits

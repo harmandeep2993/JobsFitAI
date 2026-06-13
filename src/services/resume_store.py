@@ -77,12 +77,24 @@ def save(user_id: str, slot: int, original_name: str, data: bytes,
 
 
 def list_all(user_id: str) -> list[dict]:
-    """Return all stored resumes for a user, ordered by slot."""
+    """Return all stored resumes for a user, ordered by slot, with last analysis."""
     with db.connect() as conn:
         rows = conn.execute(
-            """SELECT id, slot, label, original_name, file_path, mime_type,
-                      file_size_kb, uploaded_at
-               FROM resumes WHERE user_id=? ORDER BY slot ASC""",
+            """SELECT r.id, r.slot, r.label, r.original_name, r.file_path, r.mime_type,
+                      r.file_size_kb, r.uploaded_at,
+                      a.score      AS last_score,
+                      a.label      AS last_label,
+                      a.jd_snippet AS last_jd,
+                      a.scored_at  AS last_analysed_at
+               FROM resumes r
+               LEFT JOIN (
+                   SELECT resume_id, score, label, jd_snippet, scored_at
+                   FROM analyses
+                   WHERE (resume_id, scored_at) IN (
+                       SELECT resume_id, MAX(scored_at) FROM analyses GROUP BY resume_id
+                   )
+               ) a ON a.resume_id = r.id
+               WHERE r.user_id=? ORDER BY r.slot ASC""",
             (user_id,),
         ).fetchall()
     return [dict(r) for r in rows]

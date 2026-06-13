@@ -1790,6 +1790,32 @@
 }
 .az-rv-card.selected .az-rv-card-check { opacity: 1; }
 
+.az-rv-card-hist {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+.az-rv-hist-score {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+.az-rv-hist-score.sc-exc     { background: var(--green-bg);  color: var(--green);  }
+.az-rv-hist-score.sc-good    { background: var(--blue-bg);   color: var(--blue);   }
+.az-rv-hist-score.sc-partial { background: var(--amber-bg);  color: var(--amber);  }
+.az-rv-hist-score.sc-poor    { background: var(--red-bg);    color: var(--red);    }
+.az-rv-hist-jd {
+  font-size: 11px;
+  color: var(--t3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+}
+
 .az-rv-add {
   margin-top: 4px;
   font-size: 12px;

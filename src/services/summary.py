@@ -1,4 +1,4 @@
-# src/services/summary.py
+﻿# src/services/summary.py
 # Generates a concise candidate summary using LLM
 # Called after scoring — uses score data for accurate narrative
 
@@ -86,7 +86,7 @@ def generate_summary(resume_json, jd_json, results):
     edu_lbl  = "strong" if edu_score  >= 70 else "moderate" if edu_score  >= 40 else "weak"
     resp_lbl = "strong" if resp_score >= 70 else "moderate" if resp_score >= 40 else "weak"
 
-    prompt = f"""You are generating a candidate-facing job fit analysis for JobFitAI.
+    prompt = f"""You are generating a candidate-facing job fit analysis for JobsFitAI.
 
 ROLE: {role}
 OVERALL FIT: {overall_fit}

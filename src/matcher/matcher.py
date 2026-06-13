@@ -1,6 +1,6 @@
-# src/matcher/matcher.py
+﻿# src/matcher/matcher.py
 """
-Main matcher for JOBfitAI.
+Main matcher for JOBsFitAI.
 
 Orchestrates all section scorers and computes a final
 weighted overall score.

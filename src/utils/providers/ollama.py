@@ -1,6 +1,6 @@
-# src/utils/providers/ollama.py
+﻿# src/utils/providers/ollama.py
 """
-Ollama local LLM provider for JobFitAI.
+Ollama local LLM provider for JobsFitAI.
 Runs fully local — no API key required. Get Ollama: https://ollama.com
 """
 

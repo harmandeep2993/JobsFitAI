@@ -1,4 +1,4 @@
-<div align="center">
+﻿<div align="center">
  
 ![Status](https://img.shields.io/badge/Status-Active_Development-orange?style=for-the-badge)
 ![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)
@@ -19,21 +19,21 @@
 ![pyyaml](https://img.shields.io/badge/pyyaml-config-lightgrey?style=flat-square)
 ![python--dotenv](https://img.shields.io/badge/python--dotenv-env-lightgrey?style=flat-square)
  
-# JobFitAI 🎯
+# JobsFitAI 🎯
 
 ### Stop applying blind. Know your fit before you apply.
  
 *Before I apply for any job I want to know three things.*
 *Am I a good fit. What keywords am I missing. Is this role even worth my time.*
-*JobFitAI answers all three in seconds.*
-*JobFitAI answers all three in seconds. Paste the job description, upload your resume, and get a structured breakdown of exactly where you stand before you modify or write  a single line of a resume or cover letter.*
+*JobsFitAI answers all three in seconds.*
+*JobsFitAI answers all three in seconds. Paste the job description, upload your resume, and get a structured breakdown of exactly where you stand before you modify or write  a single line of a resume or cover letter.*
  
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-Connect-0A66C2?style=flat&logo=linkedin)](https://linkedin.com/in/harmandeep/)
 [![GitHub](https://img.shields.io/badge/GitHub-Follow-181717?style=flat&logo=github)](https://github.com/harmandeep2993)
  
 </div>
 
-![JobFitAI Demo](demo/jobfitAI-demo.gif)
+![JobsFitAI Demo](demo/jobfitAI-demo.gif)
 
 ---
 
@@ -49,13 +49,13 @@ So I **built** it. It is still being built. But the core of it works and I use i
 
 ## ✨ What It Does
  
-Upload your resume and paste a job description. JobFitAI reads both documents, understands the content, and produces a detailed match report in seconds.
+Upload your resume and paste a job description. JobsFitAI reads both documents, understands the content, and produces a detailed match report in seconds.
  
 You get an overall score, a breakdown across every section of your profile, a full skills gap analysis showing exactly what you have and what you are missing, and a set of actionable recommendations telling you what to fix before you apply.
  
 The scoring is not keyword matching. If your resume says you built ML pipelines and the job asks for machine learning experience that is a match. If the JD is written in German and your resume is in English that still works. The system understands meaning not just exact words.
  
-![JobFitAI Screenshot](assets/jobfitAI-image.png)
+![JobsFitAI Screenshot](assets/jobfitAI-image.png)
  
 ---
  
@@ -134,7 +134,7 @@ Resumes and job descriptions written in any European language are automatically 
 ## 🗂️ Project Structure
  
 ```
-JobFitAI/
+JobsFitAI/
 │
 ├── app.py                        NiceGUI entry point
 ├── main.py                       CLI entry point
@@ -204,8 +204,8 @@ JobFitAI/
 Clone the repo first.
  
 ```bash
-git clone https://github.com/harmandeep2993/JobFitAI
-cd JobFitAI
+git clone https://github.com/harmandeep2993/JobsFitAI
+cd JobsFitAI
 ```
  
 Then choose your preferred package manager.

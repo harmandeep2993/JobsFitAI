@@ -1,4 +1,4 @@
-# src/fetchers/enrich.py
+﻿# src/fetchers/enrich.py
 """
 Full job-description enrichment.
 
@@ -24,7 +24,7 @@ _LD_RE    = re.compile(
     r'<script[^>]*type="application/ld\+json"[^>]*>(.*?)</script>',
     re.DOTALL,
 )
-_HEADERS  = {"User-Agent": "Mozilla/5.0 (compatible; JobFitAI/1.0)"}
+_HEADERS  = {"User-Agent": "Mozilla/5.0 (compatible; JobsFitAI/1.0)"}
 
 
 def _clean(text: str) -> str:
