@@ -34,3 +34,18 @@ dependencies = [
     "tqdm>=4.67.3",
     "transformers>=5.3.0",
 ]
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.6.0",
+]
+
+[tool.ruff.lint]
+# E402 is suppressed per-file for modules that intentionally defer imports:
+#   app.py       - logger must be initialised before src imports trigger their own loggers
+#   config.py    - settings import is deferred to break a circular dependency
+#   utils.py     - sentence-transformers import is deferred (heavy, only needed on first call)
+[tool.ruff.lint.per-file-ignores]
+"app.py" = ["E402"]
+"src/utils/config.py" = ["E402"]
+"src/matcher/utils.py" = ["E402"]

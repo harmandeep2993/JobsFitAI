@@ -1,4 +1,4 @@
-﻿# src/matcher/scores/education.py
+# src/matcher/scores/education.py
 """
 Education scoring for JOBsFitAI.
 
@@ -16,7 +16,6 @@ Sources:
     Resume → education[] (degree, field, institution)
     JD     → education_requirements[]
 """
-
 
 from src.matcher.utils import _cosine_score
 from src.utils.logger import get_logger
@@ -41,8 +40,8 @@ def _build_education_text(education_entries: list) -> str:
     parts = []
 
     for edu in education_entries:
-        degree      = edu.get("degree", "")
-        field       = edu.get("field", "")
+        degree = edu.get("degree", "")
+        field = edu.get("field", "")
         institution = edu.get("institution", "")
 
         entry_text = " ".join(p for p in [degree, field, institution] if p).strip()
@@ -76,7 +75,7 @@ def score_education(resume: dict, jd: dict) -> float:
         float: Education score 0-100
     """
     education_requirements = jd.get("education_requirements", [])
-    education_entries      = resume.get("education", [])
+    education_entries = resume.get("education", [])
 
     logger.info("JD education requirements : %s", education_requirements)
     logger.info("Resume education entries  : %d", len(education_entries))
@@ -84,8 +83,8 @@ def score_education(resume: dict, jd: dict) -> float:
     # --- Edge case: no requirements ---
     if not education_requirements:
         logger.info(
-            "No education requirements in JD — returning neutral score %.1f",
-            NO_REQUIREMENT_SCORE
+            "No education requirements in JD - returning neutral score %.1f",
+            NO_REQUIREMENT_SCORE,
         )
         return NO_REQUIREMENT_SCORE
 
@@ -95,10 +94,8 @@ def score_education(resume: dict, jd: dict) -> float:
         return 0.0
 
     # --- Build text blocks ---
-    candidate_text    = _build_education_text(education_entries)
-    requirements_text = " ".join(
-        r for r in education_requirements if r
-    ).strip()
+    candidate_text = _build_education_text(education_entries)
+    requirements_text = " ".join(r for r in education_requirements if r).strip()
 
     logger.info("Candidate education text  : %s", candidate_text)
     logger.info("Requirements text         : %s", requirements_text)

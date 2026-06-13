@@ -1,5 +1,5 @@
 // assets/js/upload.js
-// File upload — drag and drop + browse
+// File upload - drag and drop + browse
 // POSTs to /api/upload, stores tmp path in window._resumeTmp
 
 const JD_MAX_CHARS = 5000;
@@ -56,7 +56,7 @@ window.handleFileSelect = function(file) {
 
   const ext = file.name.split('.').pop().toLowerCase();
   if (ext === 'doc') {
-    toast('.doc not supported — convert to .docx or .pdf first.', 'warn', 5000);
+    toast('.doc not supported - convert to .docx or .pdf first.', 'warn', 5000);
     return;
   }
   if (!['pdf', 'docx'].includes(ext)) {
@@ -69,7 +69,7 @@ window.handleFileSelect = function(file) {
     return;
   }
 
-  // Stable fingerprint — survives page refresh for the same physical file
+  // Stable fingerprint - survives page refresh for the same physical file
   window._resumeFingerprint = file.name + '|' + file.size + '|' + (file.lastModified || 0);
 
   // Upload directly to the persistent store (slot 0 = base, or next free slot).

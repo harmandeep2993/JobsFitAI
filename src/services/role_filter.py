@@ -22,7 +22,7 @@ def _norm(text: str) -> str:
 def is_target_role(title: str, titles: list[str] | None = None) -> bool:
     """True if the job title contains one of the target role phrases."""
     t = _norm(title)
-    for phrase in (titles or TARGET_TITLES):
+    for phrase in titles or TARGET_TITLES:
         if phrase.lower() in t:
             return True
     return False

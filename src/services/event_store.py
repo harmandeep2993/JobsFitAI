@@ -77,10 +77,14 @@ def recent_events(limit: int = 50) -> list[dict]:
 def stats() -> dict:
     """Aggregate counts for the metrics header."""
     with db.connect() as conn:
-        scored  = conn.execute("SELECT COUNT(*) FROM matches").fetchone()[0]
-        applied = conn.execute("SELECT COUNT(*) FROM matches WHERE applied = 1").fetchone()[0]
-        seen    = conn.execute("SELECT COUNT(*) FROM seen_jobs").fetchone()[0]
-        good    = conn.execute("SELECT COUNT(*) FROM matches WHERE score >= 60").fetchone()[0]
+        scored = conn.execute("SELECT COUNT(*) FROM matches").fetchone()[0]
+        applied = conn.execute(
+            "SELECT COUNT(*) FROM matches WHERE applied = 1"
+        ).fetchone()[0]
+        seen = conn.execute("SELECT COUNT(*) FROM seen_jobs").fetchone()[0]
+        good = conn.execute(
+            "SELECT COUNT(*) FROM matches WHERE score >= 60"
+        ).fetchone()[0]
     return {"seen": seen, "scored": scored, "applied": applied, "good": good}
 
 

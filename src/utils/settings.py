@@ -21,33 +21,44 @@ logger = logging.getLogger(__name__)
 
 # ── Sub-models ────────────────────────────────────────────────────────────
 
+
 class LLMConfig(BaseModel):
     model_config = {"extra": "ignore"}
 
-    timeout:               int   = Field(gt=0)
-    temperature:           float = Field(ge=0.0, le=2.0)
-    max_output_tokens:     int   = Field(gt=0)
-    resume_max_input_chars: int  = Field(gt=0)
-    jd_max_input_chars:    int   = Field(gt=0)
+    timeout: int = Field(gt=0)
+    temperature: float = Field(ge=0.0, le=2.0)
+    max_output_tokens: int = Field(gt=0)
+    resume_max_input_chars: int = Field(gt=0)
+    jd_max_input_chars: int = Field(gt=0)
 
 
 class MatcherWeights(BaseModel):
     model_config = {"extra": "ignore"}
 
-    required_skills:  float = Field(ge=0.0, le=1.0)
+    required_skills: float = Field(ge=0.0, le=1.0)
     responsibilities: float = Field(ge=0.0, le=1.0)
-    experience:       float = Field(ge=0.0, le=1.0)
-    education:        float = Field(ge=0.0, le=1.0)
+    experience: float = Field(ge=0.0, le=1.0)
+    education: float = Field(ge=0.0, le=1.0)
     preferred_skills: float = Field(ge=0.0, le=1.0)
-    languages:        float = Field(ge=0.0, le=1.0)
-    certifications:   float = Field(ge=0.0, le=1.0)
+    languages: float = Field(ge=0.0, le=1.0)
+    certifications: float = Field(ge=0.0, le=1.0)
 
     @model_validator(mode="after")
     def weights_sum_to_one(self) -> "MatcherWeights":
-        total = round(sum([
-            self.required_skills, self.responsibilities, self.experience,
-            self.education, self.preferred_skills, self.languages, self.certifications,
-        ]), 6)
+        total = round(
+            sum(
+                [
+                    self.required_skills,
+                    self.responsibilities,
+                    self.experience,
+                    self.education,
+                    self.preferred_skills,
+                    self.languages,
+                    self.certifications,
+                ]
+            ),
+            6,
+        )
         if abs(total - 1.0) > 0.001:
             raise ValueError(
                 f"matcher.weights must sum to 1.0, got {total} -- "
@@ -60,8 +71,8 @@ class MatcherThresholds(BaseModel):
     model_config = {"extra": "ignore"}
 
     excellent: int = Field(ge=1, le=100)
-    good:      int = Field(ge=1, le=100)
-    partial:   int = Field(ge=1, le=100)
+    good: int = Field(ge=1, le=100)
+    partial: int = Field(ge=1, le=100)
 
     @model_validator(mode="after")
     def thresholds_are_ordered(self) -> "MatcherThresholds":
@@ -76,14 +87,14 @@ class MatcherThresholds(BaseModel):
 class MatcherConfig(BaseModel):
     model_config = {"extra": "ignore"}
 
-    weights:    MatcherWeights
+    weights: MatcherWeights
     thresholds: MatcherThresholds
 
 
 class ValidatorConfig(BaseModel):
     model_config = {"extra": "ignore"}
 
-    max_file_size_mb:    int  = Field(gt=0)
+    max_file_size_mb: int = Field(gt=0)
     supported_extensions: list[str]
 
     @model_validator(mode="after")
@@ -95,14 +106,16 @@ class ValidatorConfig(BaseModel):
 
 class Settings(BaseModel):
     """Top-level validated settings loaded from config.yaml."""
+
     model_config = {"extra": "ignore"}
 
     llm_config: LLMConfig
-    matcher:    MatcherConfig
-    validator:  ValidatorConfig
+    matcher: MatcherConfig
+    validator: ValidatorConfig
 
 
 # ── Public API ────────────────────────────────────────────────────────────
+
 
 def validate_config(raw: dict) -> Settings:
     """

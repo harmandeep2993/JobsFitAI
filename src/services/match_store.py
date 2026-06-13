@@ -15,8 +15,18 @@ from src.utils.logger import get_logger
 logger = get_logger(__name__)
 
 _COLUMNS = (
-    "id", "source", "title", "company", "location", "url", "language",
-    "posted_at", "score", "label", "matched_required", "missing_required",
+    "id",
+    "source",
+    "title",
+    "company",
+    "location",
+    "url",
+    "language",
+    "posted_at",
+    "score",
+    "label",
+    "matched_required",
+    "missing_required",
     "scored_at",
 )
 
@@ -50,9 +60,16 @@ def upsert(items: list[dict]) -> None:
     """
     rows = [
         (
-            it.get("id"), it.get("source"), it.get("title"), it.get("company"),
-            it.get("location"), it.get("url"), it.get("language"), it.get("posted_at"),
-            it.get("score"), it.get("label"),
+            it.get("id"),
+            it.get("source"),
+            it.get("title"),
+            it.get("company"),
+            it.get("location"),
+            it.get("url"),
+            it.get("language"),
+            it.get("posted_at"),
+            it.get("score"),
+            it.get("label"),
             json.dumps(it.get("matched_required", [])),
             json.dumps(it.get("missing_required", [])),
             it.get("scored_at"),
@@ -68,13 +85,28 @@ def upsert(items: list[dict]) -> None:
 
 def upsert_pending(job) -> None:
     """Store a job's metadata immediately (status='pending'), before scoring."""
-    upsert([{
-        "id": job.id, "source": job.source, "title": job.title,
-        "company": job.company, "location": job.location, "url": job.url,
-        "language": job.language, "posted_at": job.posted_at,
-        "score": 0, "label": "", "matched_required": [], "missing_required": [],
-        "section_scores": {}, "scored_at": "", "jd_json": None, "status": "pending",
-    }])
+    upsert(
+        [
+            {
+                "id": job.id,
+                "source": job.source,
+                "title": job.title,
+                "company": job.company,
+                "location": job.location,
+                "url": job.url,
+                "language": job.language,
+                "posted_at": job.posted_at,
+                "score": 0,
+                "label": "",
+                "matched_required": [],
+                "missing_required": [],
+                "section_scores": {},
+                "scored_at": "",
+                "jd_json": None,
+                "status": "pending",
+            }
+        ]
+    )
 
 
 def set_status(job_id: str, status: str) -> None:
@@ -83,7 +115,7 @@ def set_status(job_id: str, status: str) -> None:
         conn.execute("UPDATE matches SET status = ? WHERE id = ?", (status, job_id))
 
 
-# Columns returned to the UI (jd_json is large — excluded).
+# Columns returned to the UI (jd_json is large - excluded).
 _LIST_COLS = (
     "id, source, title, company, location, url, language, posted_at, "
     "score, label, matched_required, missing_required, scored_at, applied, status"
@@ -103,12 +135,16 @@ def get_all() -> list[dict]:
         try:
             d["matched_required"] = json.loads(d.get("matched_required") or "[]")
         except (ValueError, TypeError):
-            logger.warning("Corrupt matched_required for job %s — using []", d.get("id"))
+            logger.warning(
+                "Corrupt matched_required for job %s - using []", d.get("id")
+            )
             d["matched_required"] = []
         try:
             d["missing_required"] = json.loads(d.get("missing_required") or "[]")
         except (ValueError, TypeError):
-            logger.warning("Corrupt missing_required for job %s — using []", d.get("id"))
+            logger.warning(
+                "Corrupt missing_required for job %s - using []", d.get("id")
+            )
             d["missing_required"] = []
         out.append(d)
     return out
@@ -142,7 +178,8 @@ def update_score(job_id: str, result: dict) -> None:
             WHERE id=?
             """,
             (
-                result.get("overall_score", 0), result.get("label", ""),
+                result.get("overall_score", 0),
+                result.get("label", ""),
                 json.dumps(result.get("matched_required", [])),
                 json.dumps(result.get("missing_required", [])),
                 json.dumps(result.get("section_scores", {})),
@@ -161,17 +198,17 @@ def get_one(job_id: str) -> dict | None:
     for field, default, raw in (
         ("matched_required", [], d.get("matched_required") or "[]"),
         ("missing_required", [], d.get("missing_required") or "[]"),
-        ("section_scores",   {}, d.get("section_scores")   or "{}"),
+        ("section_scores", {}, d.get("section_scores") or "{}"),
     ):
         try:
             d[field] = json.loads(raw)
         except (ValueError, TypeError):
-            logger.warning("Corrupt %s for job %s — using default", field, d.get("id"))
+            logger.warning("Corrupt %s for job %s - using default", field, d.get("id"))
             d[field] = default
     try:
         d["jd_json"] = json.loads(d["jd_json"]) if d.get("jd_json") else {}
     except (ValueError, TypeError):
-        logger.warning("Corrupt jd_json for job %s — using {}", d.get("id"))
+        logger.warning("Corrupt jd_json for job %s - using {}", d.get("id"))
         d["jd_json"] = {}
     return d
 

@@ -168,7 +168,7 @@ window.startAnalysis = function() {
   if (jd.length < 50)                             { toast('Paste a job description (at least 50 characters).', 'warn'); return; }
   if (!window._resumeId && !window._resumeTmp)    { toast('Select or upload a resume first.', 'warn'); return; }
 
-  // Cache hit — keyed on stable file fingerprint so it survives page refresh
+  // Cache hit - keyed on stable file fingerprint so it survives page refresh
   var fingerprint = window._resumeFingerprint || window._resumeId || window._resumeTmp || '';
   var cacheKey    = fingerprint + '::' + jd;
   var cached      = _cacheGet(cacheKey);
@@ -179,7 +179,7 @@ window.startAnalysis = function() {
       animateResRing();
       animateBdRings();
     }
-    toast('Showing cached result — inputs unchanged', 'info', 3000);
+    toast('Showing cached result - inputs unchanged', 'info', 3000);
     return;
   }
 
@@ -230,7 +230,7 @@ window.startAnalysis = function() {
           animateBdRings();
           _cacheSet(cacheKey, d.html);
         }
-        toast('Analysis complete — ' + Math.round(d.score) + '% match (' + d.label + ')', 'ok', 4000);
+        toast('Analysis complete - ' + Math.round(d.score) + '% match (' + d.label + ')', 'ok', 4000);
       });
     })
     .catch(function(e) {

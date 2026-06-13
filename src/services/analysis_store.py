@@ -5,7 +5,7 @@ from src.services import db
 
 
 def save(resume_id: str, jd_snippet: str, score: float, label: str) -> None:
-    now     = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
     snippet = (jd_snippet or "")[:120]
     with db.connect() as conn:
         existing = conn.execute(

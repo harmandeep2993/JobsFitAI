@@ -1,5 +1,5 @@
 // assets/js/theme.js
-// Theme toggle — light / dark
+// Theme toggle - light / dark
 // Saves preference to localStorage key 'jf'
 
 function toggleTheme() {
@@ -18,7 +18,7 @@ function toggleTheme() {
 }
 
 // Restore saved theme and bind toggle button
-// Uses retry IIFE — button may not exist at load time
+// Uses retry IIFE - button may not exist at load time
 (function bindTheme() {
   const btn = document.getElementById('themechange');
 

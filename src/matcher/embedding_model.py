@@ -19,6 +19,7 @@ from sentence_transformers import SentenceTransformer
 
 try:
     from transformers.utils import logging as _hf_logging
+
     _hf_logging.set_verbosity_error()
 except Exception:
     pass
@@ -27,7 +28,7 @@ from src.utils import get_logger
 
 logger = get_logger(__name__)
 
-# Multilingual model — supports 50+ languages including all European languages
+# Multilingual model - supports 50+ languages including all European languages
 # Swap to paraphrase-multilingual-mpnet-base-v2 for better quality at cost of speed
 # MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 
@@ -40,8 +41,8 @@ _model = None
 def _suppress_native_output():
     """
     Best-effort: redirect fd 1 & 2 to devnull to silence native/library prints
-    (the weights bar / "LOAD REPORT"). If the fds can't be duplicated — e.g.
-    inside a server threadpool on Windows, which raised WinError 1 — this
+    (the weights bar / "LOAD REPORT"). If the fds can't be duplicated - e.g.
+    inside a server threadpool on Windows, which raised WinError 1 - this
     yields WITHOUT redirecting so the caller still runs normally.
     """
     saved_out = saved_err = devnull = None
@@ -98,7 +99,7 @@ def load_model() -> SentenceTransformer:
                 with _suppress_native_output():
                     _model = SentenceTransformer(MODEL_NAME)
             except Exception:
-                # Suppression context interfered (e.g. WinError 1) — load plainly.
+                # Suppression context interfered (e.g. WinError 1) - load plainly.
                 _model = SentenceTransformer(MODEL_NAME)
             logger.info("Embedding model loaded successfully")
         except Exception as e:

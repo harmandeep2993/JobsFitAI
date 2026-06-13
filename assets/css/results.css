@@ -1,4 +1,4 @@
-/* results.css – analysis result panel */
+/* results.css - analysis result panel */
 
 #jf-results { margin-top: 20px; }
 
@@ -937,7 +937,7 @@
 
 /* --- Breakdown accordion list --- */
 
-/* Panel header — "Score Breakdown" + expand all */
+/* Panel header - "Score Breakdown" + expand all */
 .bd-panel-hd {
   display: flex;
   align-items: center;
@@ -974,7 +974,7 @@
   gap: 8px;
 }
 
-/* Single row — mirrors job-thumb structure */
+/* Single row - mirrors job-thumb structure */
 .bd-item {
   background: var(--bg-r);
   border: 1px solid var(--bd);
@@ -1038,12 +1038,12 @@
 }
 .bd-item[data-open="true"] .bd-chevron { transform: rotate(180deg); }
 
-/* Progress bar strip — always visible */
+/* Progress bar strip - always visible */
 .bd-item-bar {
   padding: 0 14px 12px;
 }
 
-/* Collapsible detail — hidden by default */
+/* Collapsible detail - hidden by default */
 .bd-item-detail {
   display: none;
   border-top: 1px solid var(--bd-s);
@@ -1135,7 +1135,7 @@
 .kw-coverage-pct.sc-partial { color: var(--amber); }
 .kw-coverage-pct.sc-poor    { color: var(--red); }
 
-/* Section heading — matches bd-card-hd / jt-foot style */
+/* Section heading - matches bd-card-hd / jt-foot style */
 .kw-section-hd {
   padding: 9px 14px;
   background: var(--bg-c);
@@ -1214,7 +1214,7 @@
 .swot-t .swot-quad-hd { color: var(--amber); }
 
 /* ═══════════════════════════════════════════════════
-   V2 LAYOUT — sidebar scorecard + scrollable main
+   V2 LAYOUT - sidebar scorecard + scrollable main
    ═══════════════════════════════════════════════════ */
 
 .res-v2 {

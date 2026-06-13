@@ -186,7 +186,7 @@ function _hvRenderFetcher(entries) {
   var totalRuns    = parsed.length;
   var totalScored  = parsed.reduce(function(s, x) { return s + (x.d.scored || 0); }, 0);
   var totalFetched = parsed.reduce(function(s, x) { return s + (x.d.fetched || 0); }, 0);
-  var lastRun      = parsed[0] ? _hTime(parsed[0].e.created_at) : '—';
+  var lastRun      = parsed[0] ? _hTime(parsed[0].e.created_at) : '-';
   var lastSeen     = parsed[0] && parsed[0].d.total_seen != null ? parsed[0].d.total_seen : null;
 
   var statsHtml =

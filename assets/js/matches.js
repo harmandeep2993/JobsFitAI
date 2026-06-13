@@ -1,5 +1,5 @@
 // assets/js/matches.js
-// Job Matches dashboard — load a resume once, fetch German jobs from
+// Job Matches dashboard - load a resume once, fetch German jobs from
 // Arbeitnow, score each against the resume, and show a ranked list.
 // Supports auto-refresh that scores only newly-seen jobs.
 
@@ -88,7 +88,7 @@ function resumeHTML(r) {
   const exp = (r.experience || []).map(e =>
     '<div class="rz-row"><span class="rz-role">' + mtEsc(e.title || '') + '</span>' +
     '<span class="rz-co">' + mtEsc(e.company || '') + '</span>' +
-    '<span class="rz-dt">' + mtEsc(e.start || '') + '–' + mtEsc(e.end || '') +
+    '<span class="rz-dt">' + mtEsc(e.start || '') + '-' + mtEsc(e.end || '') +
     ' (' + (e.years || 0) + 'y)</span></div>').join('');
   const edu = (r.education || []).map(e =>
     '<div class="rz-row">' + mtEsc((e.degree || '') + ' ' + (e.field || '')) +
@@ -169,7 +169,7 @@ function renderStats(s) {
   ).join('');
 }
 
-// Editable filter panel — built once so polling doesn't clobber edits.
+// Editable filter panel - built once so polling doesn't clobber edits.
 function renderFilters(f) {
   if (!f) return;
   window._filtersData = f;
@@ -185,7 +185,7 @@ function renderFilters(f) {
         '" placeholder="germany, netherlands, belgium"/></div>' +
     '<div class="set-row"><label class="set-lbl">Location</label>' +
       '<input id="flt-location" class="fetch-inp" value="' + mtEsc(f.location || '') +
-        '" placeholder="city (optional) — blank = whole country"/></div>' +
+        '" placeholder="city (optional) - blank = whole country"/></div>' +
     '<div class="set-row" style="align-items:flex-start;">' +
       '<label class="set-lbl">Target titles</label>' +
       '<div class="kw-wrap" id="kw-wrap"></div></div>' +
@@ -315,7 +315,7 @@ window.runMatch = function() {
   renderSkeletons(6);
   setTopbarRunning(true, 'Starting…');
 
-  // Record run start — scored_at values after this are flagged "New" even after reload.
+  // Record run start - scored_at values after this are flagged "New" even after reload.
   localStorage.setItem('jfa_run_threshold', new Date(Date.now() - 3000).toISOString().slice(0, 19));
 
   // Snapshot current ids so everything scored this run is flagged NEW.
@@ -371,7 +371,7 @@ function pollRun() {
   _pollAttempts++;
   if (_pollAttempts > MAX_POLL_ATTEMPTS) {
     if (btn) btn.disabled = false;
-    status.textContent = '✕ Timed out — run took too long. Try again.';
+    status.textContent = '✕ Timed out - run took too long. Try again.';
     status.className = 'mt-status err';
     setTopbarRunning(false);
     return;
@@ -447,7 +447,7 @@ window.matchCardHTML = function(r, isNew) {
 
   const lc = labelClass(r.label, r.score);
 
-  // SVG gauge ring — arc length reflects actual score
+  // SVG gauge ring - arc length reflects actual score
   const scoreVal = Math.round(r.score || 0);
   const badge = pending
     ? gaugeHTML('sc-na', 0, '…')
@@ -461,7 +461,7 @@ window.matchCardHTML = function(r, isNew) {
     (noJd    ? '<span class="match-na-tag">manual</span>' : '') +
     (applied ? '<span class="match-applied-tag">Applied</span>' : '');
 
-  // Skill tags — 4 matched (green) + 4 missing (red)
+  // Skill tags - 4 matched (green) + 4 missing (red)
   let skillsHTML = '';
   if (!noJd && !pending) {
     const mTags = (r.matched_required || []).slice(0, 4)
@@ -567,7 +567,7 @@ window.clearAllMatches = function() {
     .then(d => {
       if (d.ok) { loadMatchState(); toast('All matches cleared.', 'ok'); }
     })
-    .catch(function() { toast('Clear failed — check server.', 'err'); });
+    .catch(function() { toast('Clear failed - check server.', 'err'); });
 };
 
 // ── Detail / "more analysis" modal ────────────────────────
@@ -618,9 +618,9 @@ function renderDetail(d) {
   ];
   const bars = order.filter(([_, k]) => k in ss).map(([l, k]) => bar(l, ss[k])).join('');
 
-  const matched = (d.matched_required || []).map(mtEsc).join(', ') || '—';
-  const missing = (d.missing_required || []).map(mtEsc).join(', ') || '—';
-  const jdReq   = (jd.required_skills || []).map(mtEsc).join(', ') || '—';
+  const matched = (d.matched_required || []).map(mtEsc).join(', ') || '-';
+  const missing = (d.missing_required || []).map(mtEsc).join(', ') || '-';
+  const jdReq   = (jd.required_skills || []).map(mtEsc).join(', ') || '-';
   const jdResp  = (jd.responsibilities || []).slice(0, 8).map(x => '<li>' + mtEsc(x) + '</li>').join('');
 
   return '' +
@@ -801,7 +801,7 @@ function renderMatches(results, newIds) {
     return true;
   });
 
-  // Update sidebar badge — unreviewed (unapplied, scored) jobs
+  // Update sidebar badge - unreviewed (unapplied, scored) jobs
   var unreviewed = results.filter(function(r) { return !r.applied && r.status !== 'pending'; }).length;
   var badge = document.getElementById('sb-badge-matches');
   if (badge) {
@@ -829,7 +829,7 @@ function renderMatches(results, newIds) {
     return;
   }
 
-  // Sort — new jobs always float to top in score mode
+  // Sort - new jobs always float to top in score mode
   const sort = window._mtSort || 'score';
   const ordered = filtered.slice().sort(function(a, b) {
     const an = newIds.has(a.id) ? 1 : 0;
@@ -928,7 +928,7 @@ window.submitJd = function() {
   var text   = (input ? input.value : '').trim();
 
   if (text.length < 50) {
-    if (status) { status.textContent = 'Too short — paste the full job description.'; status.className = 'mt-status err'; }
+    if (status) { status.textContent = 'Too short - paste the full job description.'; status.className = 'mt-status err'; }
     return;
   }
 

@@ -3,7 +3,7 @@
 Arbeitnow job fetcher.
 
 Arbeitnow (https://www.arbeitnow.com) exposes a free, key-less job-board
-API focused on Germany/EU that returns the FULL job description — unlike
+API focused on Germany/EU that returns the FULL job description - unlike
 Adzuna's ~500-char snippet. That makes the resume↔JD match scores far
 more trustworthy.
 
@@ -30,12 +30,14 @@ def _matches(raw: dict, query_terms: list[str], location: str) -> bool:
             return False
 
     if query_terms:
-        haystack = " ".join([
-            raw.get("title", ""),
-            " ".join(raw.get("tags", []) or []),
-            " ".join(raw.get("job_types", []) or []),
-            raw.get("description", "")[:600],
-        ]).lower()
+        haystack = " ".join(
+            [
+                raw.get("title", ""),
+                " ".join(raw.get("tags", []) or []),
+                " ".join(raw.get("job_types", []) or []),
+                raw.get("description", "")[:600],
+            ]
+        ).lower()
         if not any(term in haystack for term in query_terms):
             return False
 

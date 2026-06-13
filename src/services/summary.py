@@ -1,6 +1,6 @@
-﻿# src/services/summary.py
+# src/services/summary.py
 # Generates a concise candidate summary using LLM
-# Called after scoring — uses score data for accurate narrative
+# Called after scoring - uses score data for accurate narrative
 
 from src.utils.router import call_llm
 
@@ -18,7 +18,7 @@ def generate_summary(resume_json, jd_json, results):
     Returns:
         str: 3-4 sentence summary or fallback text
     """
-    # Build focused context — no raw text, only structured data.
+    # Build focused context - no raw text, only structured data.
     # Keys must match match() output (overall_score, section_scores,
     # matched_*/missing_*) and the resume/jd JSON schemas (nested
     # candidate/job objects, meta.total_experience_years).
@@ -65,13 +65,6 @@ def generate_summary(resume_json, jd_json, results):
     exp_score = context["breakdown"]["experience"]
     edu_score = context["breakdown"]["education"]
     resp_score = context["breakdown"]["responsibilities"]
-    candidate_langs = (
-        ", ".join(context["candidate"].get("languages", [])) or "not specified"
-    )
-    required_langs = (
-        ", ".join(context["role"].get("required_skills", [])[:3]) or "none specified"
-    )
-
     overall_fit = (
         "strong match"
         if context["score"] >= 80
@@ -82,9 +75,17 @@ def generate_summary(resume_json, jd_json, results):
         else "significant gaps to close"
     )
 
-    exp_lbl  = "strong" if exp_score  >= 70 else "moderate" if exp_score  >= 40 else "below target"
-    edu_lbl  = "strong" if edu_score  >= 70 else "moderate" if edu_score  >= 40 else "weak"
-    resp_lbl = "strong" if resp_score >= 70 else "moderate" if resp_score >= 40 else "weak"
+    exp_lbl = (
+        "strong"
+        if exp_score >= 70
+        else "moderate"
+        if exp_score >= 40
+        else "below target"
+    )
+    edu_lbl = "strong" if edu_score >= 70 else "moderate" if edu_score >= 40 else "weak"
+    resp_lbl = (
+        "strong" if resp_score >= 70 else "moderate" if resp_score >= 40 else "weak"
+    )
 
     prompt = f"""You are generating a candidate-facing job fit analysis for JobsFitAI.
 
@@ -109,21 +110,23 @@ Rules:
 - 2-4 items per section (focus: 1-3)
 - Each item is a plain English string
 - Wrap specific skills, tools, and qualifications in <strong>...</strong> within each string
-- profile: candidate title, years of experience, education — what they bring overall
+- profile: candidate title, years of experience, education - what they bring overall
 - strengths: concrete things the candidate has that this role specifically needs
-- gaps: concrete missing skills or requirements from the JD — name them explicitly
+- gaps: concrete missing skills or requirements from the JD - name them explicitly
 - focus: specific actionable steps tied directly to the real gaps
 - No percentages, no em-dashes, no emojis, no score numbers
-- Be specific — name actual skills, not vague phrases"""
+- Be specific - name actual skills, not vague phrases"""
 
-    _res     = call_llm(prompt)
+    _res = call_llm(prompt)
     response = _res.text if (_res and _res.text) else None
 
     if response and len(response.strip()) > 20:
-        import json, re
-        cleaned = re.sub(r'^```(?:json)?\s*', '', response.strip(), flags=re.IGNORECASE)
-        cleaned = re.sub(r'\s*```$', '', cleaned)
-        match_obj = re.search(r'\{[\s\S]*\}', cleaned)
+        import json
+        import re
+
+        cleaned = re.sub(r"^```(?:json)?\s*", "", response.strip(), flags=re.IGNORECASE)
+        cleaned = re.sub(r"\s*```$", "", cleaned)
+        match_obj = re.search(r"\{[\s\S]*\}", cleaned)
         if match_obj:
             try:
                 data = json.loads(match_obj.group())
@@ -141,7 +144,7 @@ Rules:
 
 
 def _flatten_skills(skills_dict):
-    """Flatten skills — handles both dict and list format."""
+    """Flatten skills - handles both dict and list format."""
     if isinstance(skills_dict, list):
         return skills_dict[:15]
     if isinstance(skills_dict, dict):
@@ -158,21 +161,21 @@ def generate_swot(resume_json, jd_json, results):
     Generate a SWOT analysis for the candidate vs this role.
 
     Returns:
-        dict: {strengths, weaknesses, opportunities, threats} — each a list of strings
+        dict: {strengths, weaknesses, opportunities, threats} - each a list of strings
     """
     import json
     import re
 
     candidate_years = resume_json.get("meta", {}).get("total_experience_years", 0)
-    section_scores  = results.get("section_scores", {})
-    matched_req     = results.get("matched_required",  [])
-    missing_req     = results.get("missing_required",  [])
-    matched_pref    = results.get("matched_preferred", [])
-    missing_pref    = results.get("missing_preferred", [])
-    score           = results.get("overall_score", 0)
-    c_langs         = resume_json.get("languages", [])
-    r_langs         = jd_json.get("languages", [])
-    role_title      = jd_json.get("job", {}).get("title", "this role")
+    section_scores = results.get("section_scores", {})
+    matched_req = results.get("matched_required", [])
+    missing_req = results.get("missing_required", [])
+    matched_pref = results.get("matched_preferred", [])
+    missing_pref = results.get("missing_preferred", [])
+    score = results.get("overall_score", 0)
+    c_langs = resume_json.get("languages", [])
+    r_langs = jd_json.get("languages", [])
+    role_title = jd_json.get("job", {}).get("title", "this role")
 
     prompt = f"""You are producing a SWOT analysis for a job candidate applying to a specific role.
 
@@ -204,11 +207,11 @@ Return ONLY valid JSON, nothing else:
   "threats":       ["phrase 1", "phrase 2", "phrase 3"]
 }}"""
 
-    _res     = call_llm(prompt)
+    _res = call_llm(prompt)
     response = _res.text if (_res and _res.text) else None
 
     if response:
-        match_obj = re.search(r'\{[\s\S]*\}', response)
+        match_obj = re.search(r"\{[\s\S]*\}", response)
         if match_obj:
             try:
                 data = json.loads(match_obj.group())
@@ -222,7 +225,9 @@ Return ONLY valid JSON, nothing else:
             except (json.JSONDecodeError, ValueError):
                 pass
 
-    return _fallback_swot(matched_req, missing_req, matched_pref, missing_pref, score, candidate_years)
+    return _fallback_swot(
+        matched_req, missing_req, matched_pref, missing_pref, score, candidate_years
+    )
 
 
 def _fallback_swot(matched_req, missing_req, matched_pref, missing_pref, score, c_yrs):
@@ -258,23 +263,24 @@ def _fallback_swot(matched_req, missing_req, matched_pref, missing_pref, score, 
     ]
 
     return {
-        "strengths":     strengths[:3],
-        "weaknesses":    weaknesses[:3],
+        "strengths": strengths[:3],
+        "weaknesses": weaknesses[:3],
         "opportunities": opportunities,
-        "threats":       threats,
+        "threats": threats,
     }
 
 
 def _fallback_summary(ctx):
     import json
 
-    score   = ctx["score"]
+    score = ctx["score"]
     matched = ctx["matched_skills"]
     missing = ctx["missing_skills"]
-    c_yrs   = ctx["candidate_years"]
-    title   = ctx["candidate"]["title"]
+    c_yrs = ctx["candidate_years"]
+    title = ctx["candidate"]["title"]
 
-    def bold(t): return f"<strong>{t}</strong>"
+    def bold(t):
+        return f"<strong>{t}</strong>"
 
     profile = []
     if title:
@@ -284,11 +290,17 @@ def _fallback_summary(ctx):
     if not profile:
         profile.append("Profile details extracted from resume")
 
-    strengths = [f"{bold(s)} is present in your profile and required by this role" for s in matched[:3]]
+    strengths = [
+        f"{bold(s)} is present in your profile and required by this role"
+        for s in matched[:3]
+    ]
     if not strengths:
         strengths = ["No direct required skill matches were identified"]
 
-    gaps = [f"{bold(s)} is required by the role but not visible in your profile" for s in missing[:3]]
+    gaps = [
+        f"{bold(s)} is required by the role but not visible in your profile"
+        for s in missing[:3]
+    ]
     if not gaps:
         gaps = ["No critical skill gaps identified"]
 
@@ -299,13 +311,17 @@ def _fallback_summary(ctx):
         ]
     else:
         focus = [
-            f"Build hands-on experience in {bold(missing[0])} and similar skills" if missing else "Address the identified skill gaps through courses or projects",
+            f"Build hands-on experience in {bold(missing[0])} and similar skills"
+            if missing
+            else "Address the identified skill gaps through courses or projects",
             "Revisit this role once the core required skills are covered",
         ]
 
-    return json.dumps({
-        "profile":   profile,
-        "strengths": strengths,
-        "gaps":      gaps,
-        "focus":     focus,
-    })
+    return json.dumps(
+        {
+            "profile": profile,
+            "strengths": strengths,
+            "gaps": gaps,
+            "focus": focus,
+        }
+    )

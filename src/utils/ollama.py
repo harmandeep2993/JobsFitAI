@@ -37,9 +37,9 @@ def call_ollama(prompt):
         response = requests.post(
             OLLAMA_URL,
             json={
-                "model":   OLLAMA_MODEL,
-                "prompt":  prompt,
-                "stream":  False,
+                "model": OLLAMA_MODEL,
+                "prompt": prompt,
+                "stream": False,
                 "options": {
                     "temperature": OLLAMA_TEMPERATURE,
                     "num_predict": OLLAMA_MAX_TOKENS,

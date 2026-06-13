@@ -10,7 +10,6 @@ Uploading to a slot replaces any existing resume in that slot.
 """
 
 import uuid
-import shutil
 from pathlib import Path
 from datetime import datetime, timezone
 
@@ -20,7 +19,7 @@ from src.utils.logger import get_logger
 logger = get_logger(__name__)
 
 RESUME_DIR = Path("resumes")
-MAX_SLOTS  = 3
+MAX_SLOTS = 3
 
 SLOT_LABELS = {
     0: "Base Resume",
@@ -35,19 +34,25 @@ def _user_dir(user_id: str) -> Path:
     return d
 
 
-def save(user_id: str, slot: int, original_name: str, data: bytes,
-         suffix: str, mime_type: str) -> dict:
+def save(
+    user_id: str,
+    slot: int,
+    original_name: str,
+    data: bytes,
+    suffix: str,
+    mime_type: str,
+) -> dict:
     """Save a resume file to disk and record it in SQLite. Returns the record."""
     if slot not in range(MAX_SLOTS):
         raise ValueError(f"slot must be 0-{MAX_SLOTS - 1}")
 
     resume_id = str(uuid.uuid4())
-    dest      = _user_dir(user_id) / f"{resume_id}{suffix}"
+    dest = _user_dir(user_id) / f"{resume_id}{suffix}"
     dest.write_bytes(data)
 
-    kb    = round(len(data) / 1024, 1)
+    kb = round(len(data) / 1024, 1)
     label = SLOT_LABELS[slot]
-    now   = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
 
     with db.connect() as conn:
         # Remove old resume in this slot (and its file).
@@ -65,12 +70,26 @@ def save(user_id: str, slot: int, original_name: str, data: bytes,
             """INSERT INTO resumes
                (id, user_id, slot, label, original_name, file_path, mime_type, file_size_kb, uploaded_at)
                VALUES (?,?,?,?,?,?,?,?,?)""",
-            (resume_id, user_id, slot, label, original_name, str(dest), mime_type, kb, now),
+            (
+                resume_id,
+                user_id,
+                slot,
+                label,
+                original_name,
+                str(dest),
+                mime_type,
+                kb,
+                now,
+            ),
         )
 
     record = {
-        "id": resume_id, "slot": slot, "label": label,
-        "name": original_name, "kb": kb, "uploaded_at": now,
+        "id": resume_id,
+        "slot": slot,
+        "label": label,
+        "name": original_name,
+        "kb": kb,
+        "uploaded_at": now,
     }
     logger.info("Saved resume slot=%d id=%s user=%s", slot, resume_id, user_id)
     return record
@@ -145,7 +164,7 @@ def set_extracted(user_id: str, resume_id: str, extracted_json: str) -> None:
 
 
 def list_scoreable(user_id: str) -> list[dict]:
-    """Return only resumes that have a cached extracted_json — ready for scoring."""
+    """Return only resumes that have a cached extracted_json - ready for scoring."""
     with db.connect() as conn:
         rows = conn.execute(
             """SELECT id, slot, label, original_name, extracted_json

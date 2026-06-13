@@ -1,7 +1,7 @@
-﻿# src/utils/providers/ollama.py
+# src/utils/providers/ollama.py
 """
 Ollama local LLM provider for JobsFitAI.
-Runs fully local — no API key required. Get Ollama: https://ollama.com
+Runs fully local - no API key required. Get Ollama: https://ollama.com
 """
 
 import requests
@@ -16,9 +16,9 @@ from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-OLLAMA_URL        = OLLAMA_CONFIG.get("url", "http://localhost:11434/api/generate")
+OLLAMA_URL = OLLAMA_CONFIG.get("url", "http://localhost:11434/api/generate")
 OLLAMA_HEALTH_URL = OLLAMA_CONFIG.get("health_url", "http://localhost:11434")
-_MODEL            = OLLAMA_CONFIG.get("model", "qwen2.5:3b")
+_MODEL = OLLAMA_CONFIG.get("model", "qwen2.5:3b")
 
 
 def check() -> bool:
@@ -53,9 +53,9 @@ def call(prompt: str, model: str | None = None) -> str | None:
         response = requests.post(
             OLLAMA_URL,
             json={
-                "model":   use_model,
-                "prompt":  prompt,
-                "stream":  False,
+                "model": use_model,
+                "prompt": prompt,
+                "stream": False,
                 "options": {
                     "temperature": LLM_TEMPERATURE,
                     "num_predict": LLM_MAX_OUTPUT_TOKENS,

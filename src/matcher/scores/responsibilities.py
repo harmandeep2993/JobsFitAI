@@ -1,4 +1,4 @@
-﻿# src/matcher/scores/responsibilities.py
+# src/matcher/scores/responsibilities.py
 """
 Responsibilities scoring for JOBsFitAI.
 
@@ -10,7 +10,7 @@ Sources:
     JD     → responsibilities list
 
 Approach:
-    Sentence-level best match — for each JD bullet find the best
+    Sentence-level best match - for each JD bullet find the best
     matching resume bullet. Average of best matches = final score.
     Irrelevant experience bullets are never selected as best match
     so they don't dilute the score.
@@ -23,12 +23,12 @@ from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-# Neutral score returned when the JD lists no responsibilities —
+# Neutral score returned when the JD lists no responsibilities -
 # a missing requirement must not penalize the candidate.
 NO_REQUIREMENT_SCORE = 60.0
 
 # Minimum cosine similarity for a resume bullet to count as matching a JD
-# bullet. Below this threshold the match is treated as 0 — avoids inflating
+# bullet. Below this threshold the match is treated as 0 - avoids inflating
 # the score when two unrelated sentences happen to share common words.
 MIN_MATCH_SIM = 0.35
 
@@ -56,7 +56,7 @@ def score_responsibilities(resume: dict, jd: dict) -> float:
         bullets = entry.get("responsibilities", [])
         resume_bullets.extend(bullets)
 
-    # From project descriptions — shows practical work done
+    # From project descriptions - shows practical work done
     for project in resume.get("projects", []):
         desc = project.get("description", "")
         if desc and desc.strip():
@@ -67,7 +67,7 @@ def score_responsibilities(resume: dict, jd: dict) -> float:
 
     # --- Clean both lists ---
     resume_bullets = [b.strip() for b in resume_bullets if b.strip()]
-    jd_bullets     = [b.strip() for b in jd_bullets     if b.strip()]
+    jd_bullets = [b.strip() for b in jd_bullets if b.strip()]
 
     logger.info("Resume bullets collected : %d", len(resume_bullets))
     logger.info("JD bullets collected     : %d", len(jd_bullets))
@@ -78,16 +78,18 @@ def score_responsibilities(resume: dict, jd: dict) -> float:
         return 0.0
 
     if not jd_bullets:
-        logger.info("No responsibilities in JD — returning neutral %.1f", NO_REQUIREMENT_SCORE)
+        logger.info(
+            "No responsibilities in JD - returning neutral %.1f", NO_REQUIREMENT_SCORE
+        )
         return NO_REQUIREMENT_SCORE
 
     # --- Encode ---
-    model          = load_model()
-    resume_vecs    = model.encode(resume_bullets, convert_to_tensor=True)
-    jd_vecs        = model.encode(jd_bullets,     convert_to_tensor=True)
+    model = load_model()
+    resume_vecs = model.encode(resume_bullets, convert_to_tensor=True)
+    jd_vecs = model.encode(jd_bullets, convert_to_tensor=True)
 
     logger.debug("Encoded %d resume bullets", len(resume_bullets))
-    logger.debug("Encoded %d JD bullets",     len(jd_bullets))
+    logger.debug("Encoded %d JD bullets", len(jd_bullets))
 
     # --- Similarity matrix ---
     # Shape: (len(jd_bullets), len(resume_bullets))
@@ -97,14 +99,15 @@ def score_responsibilities(resume: dict, jd: dict) -> float:
     # --- Best resume match per JD bullet ---
     best_per_jd_bullet = sim_matrix.max(dim=1).values
 
-    # Zero out matches below the confidence threshold — they are noise.
+    # Zero out matches below the confidence threshold - they are noise.
     best_per_jd_bullet = best_per_jd_bullet.clone()
     best_per_jd_bullet[best_per_jd_bullet < MIN_MATCH_SIM] = 0.0
 
-    logger.debug("Best match per JD bullet: %s",
-                 [round(v.item(), 4) for v in best_per_jd_bullet])
+    logger.debug(
+        "Best match per JD bullet: %s", [round(v.item(), 4) for v in best_per_jd_bullet]
+    )
 
-    # Clamp weak matches to 0 — a similarity below MIN_MATCH_SIM means no
+    # Clamp weak matches to 0 - a similarity below MIN_MATCH_SIM means no
     # real match, not a weak one. Without this, unrelated sentences sharing
     # common words inflate the score.
     best_per_jd_bullet = best_per_jd_bullet.clone()

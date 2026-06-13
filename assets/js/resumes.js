@@ -384,7 +384,7 @@ function _rvRequestReco(jd) {
     .catch(function() { _rvRecoActive = false; });
 }
 
-// Called by analysis.js checkJD — fires when JD changes and 2+ resumes exist.
+// Called by analysis.js checkJD - fires when JD changes and 2+ resumes exist.
 window.rvCheckReco = function(jd) {
   var picker = document.getElementById('az-resume-picker');
   if (!picker || picker.style.display === 'none') return;

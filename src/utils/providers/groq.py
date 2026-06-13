@@ -1,4 +1,4 @@
-﻿# src/utils/providers/groq.py
+# src/utils/providers/groq.py
 """
 Groq API provider for JobsFitAI.
 Groq uses OpenAI-compatible chat completions API.
@@ -8,17 +8,22 @@ Get API key: https://console.groq.com
 import os
 import requests
 
-from src.utils.config import LLM_TIMEOUT, LLM_TEMPERATURE, LLM_MAX_OUTPUT_TOKENS, GROQ_CONFIG
+from src.utils.config import (
+    LLM_TIMEOUT,
+    LLM_TEMPERATURE,
+    LLM_MAX_OUTPUT_TOKENS,
+    GROQ_CONFIG,
+)
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 
-# Safe to load at module level — config.py import above ensures
+# Safe to load at module level - config.py import above ensures
 # load_dotenv() has already run before this line executes
 _API_KEY = os.getenv("GROQ_API_KEY", "").strip()
-_MODEL   = GROQ_CONFIG.get("model", "llama-3.1-8b-instant")
+_MODEL = GROQ_CONFIG.get("model", "llama-3.1-8b-instant")
 
 
 def check() -> bool:
@@ -30,7 +35,7 @@ def check() -> bool:
         bool: True if API key is set and reachable
     """
     if not _API_KEY:
-        logger.warning("[Groq] No API key found — set GROQ_API_KEY in .env")
+        logger.warning("[Groq] No API key found - set GROQ_API_KEY in .env")
         return False
 
     try:
@@ -58,7 +63,7 @@ def call(prompt: str, model: str | None = None) -> str | None:
         str | None: Response text or None if failed
     """
     if not _API_KEY:
-        logger.warning("[Groq] No API key found — set GROQ_API_KEY in .env")
+        logger.warning("[Groq] No API key found - set GROQ_API_KEY in .env")
         return None
 
     use_model = model or _MODEL
@@ -68,13 +73,13 @@ def call(prompt: str, model: str | None = None) -> str | None:
             GROQ_URL,
             headers={
                 "Authorization": f"Bearer {_API_KEY}",
-                "Content-Type":  "application/json",
+                "Content-Type": "application/json",
             },
             json={
-                "model":       use_model,
-                "messages":    [{"role": "user", "content": prompt}],
+                "model": use_model,
+                "messages": [{"role": "user", "content": prompt}],
                 "temperature": LLM_TEMPERATURE,
-                "max_tokens":  LLM_MAX_OUTPUT_TOKENS,
+                "max_tokens": LLM_MAX_OUTPUT_TOKENS,
             },
             timeout=LLM_TIMEOUT,
         )
