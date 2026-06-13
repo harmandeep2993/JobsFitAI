@@ -50,6 +50,7 @@
           <circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 2"/>
         </svg>
         <span>History</span>
+        <span class="sb-badge" id="sb-badge-history" style="display:none;"></span>
       </div>
       <div class="sb-rule"></div>
       <div class="sb-item" id="nav-settings" onclick="showView('settings')">
@@ -331,18 +332,30 @@
 
       <!-- ── History ────────────────────────────────────── -->
       <div id="view-history" class="view">
-        <div class="pg-title">Match <em>History</em></div>
-        <div class="pg-sub">Every job you've scored — sortable table, track applications</div>
+        <div class="pg-title">Activity <em>History</em></div>
+        <div class="pg-sub">Track your analyses, job fetcher runs, and applications</div>
 
         <div class="divider"></div>
 
-        <div id="hist-filters" class="hist-filters">
-          <button class="hist-fbtn active" data-f="all"     onclick="setHistFilter('all')">All <span class="hist-count">0</span></button>
-          <button class="hist-fbtn"        data-f="open"    onclick="setHistFilter('open')">Not applied <span class="hist-count">0</span></button>
-          <button class="hist-fbtn"        data-f="applied" onclick="setHistFilter('applied')">Applied <span class="hist-count">0</span></button>
+        <div class="hv-card">
+          <div class="hv-tab-row" id="hv-tab-row">
+            <button class="hv-tab active" onclick="hTab(this,'hv-analyser')">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="4"/><path d="M11 11l3 3"/></svg>
+              Analyser
+            </button>
+            <button class="hv-tab" onclick="hTab(this,'hv-fetcher')">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 8a7 7 0 1 0 14 0"/><path d="M8 1v6l3 3"/></svg>
+              Fetcher
+            </button>
+            <button class="hv-tab" onclick="hTab(this,'hv-applications')">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12l4-4 3 3 5-7"/></svg>
+              Applications
+            </button>
+          </div>
+          <div id="hv-analyser"     class="hv-panel"></div>
+          <div id="hv-fetcher"      class="hv-panel" style="display:none;"></div>
+          <div id="hv-applications" class="hv-panel" style="display:none;"></div>
         </div>
-
-        <div id="hist-results"></div>
       </div><!-- /view-history -->
 
       <!-- ── Settings ───────────────────────────────────── -->
