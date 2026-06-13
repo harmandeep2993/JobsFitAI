@@ -63,6 +63,13 @@ def load_config(config_path: str = "config.yaml") -> dict:
 
 config = load_config()
 
+# Validate config structure and values at import time (i.e. at startup).
+# validate_config() calls sys.exit(1) on any failure so the server never
+# starts with a broken config. Import is deferred to avoid a circular
+# dependency (settings.py imports nothing from this package).
+from src.utils.settings import validate_config as _validate_config
+_validate_config(config)
+
 # Common LLM parameters
 _llm = config["llm_config"]
 
@@ -98,13 +105,6 @@ SUPPORTED_EXTENSIONS = set(config["validator"]["supported_extensions"])
 # Matcher
 WEIGHTS = config["matcher"]["weights"]
 THRESHOLDS = config["matcher"]["thresholds"]
-
-_weight_sum = round(sum(WEIGHTS.values()), 6)
-if abs(_weight_sum - 1.0) > 0.001:
-    raise ValueError(
-        f"matcher.weights in config.yaml must sum to 1.0, got {_weight_sum}. "
-        f"Current weights: {WEIGHTS}"
-    )
 
 # Job search — target roles + entry-level filtering
 _job_search = config.get("job_search", {})

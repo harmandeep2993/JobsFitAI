@@ -37,7 +37,7 @@ from src.extractors import extract_all
 from src.extractors.resume import extract_resume
 from src.extractors.jd import extract_jd
 from src.matcher.matcher import match
-from src.frontend.results import build_results_html
+from src.frontend.results import build_results_html, render_error_panel
 from src.services.job_matcher import (
     discover_and_score,
     begin_run,
@@ -49,7 +49,7 @@ from src.services.job_matcher import (
 from src.services import match_store, event_store, vector_store, settings_store, resume_store, analysis_store, db
 import json as _json
 from src.services.summary import generate_summary
-from src.utils.config import SEARCH_PER_TITLE, MAX_AGE_DAYS
+from src.utils.config import SEARCH_PER_TITLE, MAX_AGE_DAYS, JD_MAX_CHARS, MAX_FILE_SIZE_MB, SUPPORTED_EXTENSIONS
 
 
 app = FastAPI(title="JobsFitAI")
@@ -57,11 +57,10 @@ app = FastAPI(title="JobsFitAI")
 # Static assets
 app.mount("/assets", StaticFiles(directory="assets"), name="assets")
 
-# Allowed resume file extensions
-ALLOWED_EXTENSIONS: Set[str] = {".pdf", ".docx"}
-
-# Maximum allowed upload size (MB)
-MAX_FILE_MB: int = 5
+# These mirror config.yaml validator block -- sourced at import so Pydantic
+# has already validated them before any request arrives.
+ALLOWED_EXTENSIONS: Set[str] = SUPPORTED_EXTENSIONS
+MAX_FILE_MB: int = MAX_FILE_SIZE_MB
 
 
 # ── Frontend ──────────────────────────────────────────────
@@ -91,11 +90,12 @@ async def api_upload(request: Request) -> JSONResponse:
     filename = upload.filename or "resume"
     suffix   = Path(filename).suffix.lower()
 
+    if len(data) == 0:
+        return JSONResponse({"ok": False, "error": "empty file"}, status_code=400)
     if len(data) > MAX_FILE_MB * 1024 * 1024:
-        return JSONResponse({"ok": False, "error": "file too large"}, status_code=400)
-
+        return JSONResponse({"ok": False, "error": f"file too large (max {MAX_FILE_MB} MB)"}, status_code=400)
     if suffix not in ALLOWED_EXTENSIONS:
-        return JSONResponse({"ok": False, "error": "unsupported file type"}, status_code=400)
+        return JSONResponse({"ok": False, "error": f"unsupported file type (allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))})"}, status_code=400)
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp_file:
         tmp_file.write(data)
@@ -130,10 +130,12 @@ async def api_resumes_upload(request: Request) -> JSONResponse:
     filename = upload.filename or "resume"
     suffix   = Path(filename).suffix.lower()
 
+    if len(data) == 0:
+        return JSONResponse({"ok": False, "error": "empty file"}, status_code=400)
     if len(data) > MAX_FILE_MB * 1024 * 1024:
-        return JSONResponse({"ok": False, "error": "file too large"}, status_code=400)
+        return JSONResponse({"ok": False, "error": f"file too large (max {MAX_FILE_MB} MB)"}, status_code=400)
     if suffix not in ALLOWED_EXTENSIONS:
-        return JSONResponse({"ok": False, "error": "unsupported file type"}, status_code=400)
+        return JSONResponse({"ok": False, "error": f"unsupported file type (allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))})"}, status_code=400)
 
     mime   = _PREVIEW_TYPES.get(suffix, "application/octet-stream")
     record = resume_store.save(_USER, slot, filename, data, suffix, mime)
@@ -317,7 +319,22 @@ async def api_analyze(request: Request) -> JSONResponse:
     elif not tmp or not os.path.exists(tmp):
         return JSONResponse({"ok": False, "error": "resume file not found"}, status_code=400)
     if len(jd_text) < 50:
-        return JSONResponse({"ok": False, "error": "job description too short"}, status_code=400)
+        return JSONResponse({
+            "ok":    False,
+            "error": "jd_too_short",
+            "html":  render_error_panel(
+                "Job description too short",
+                "Paste the full job description (at least a few sentences). "
+                "Short snippets don't give the analyser enough signal to score accurately.",
+            ),
+        }, status_code=400)
+
+    # Cap JD at the configured limit -- very long JDs are truncated rather than
+    # rejected so the user does not need to manually trim before pasting.
+    if len(jd_text) > JD_MAX_CHARS:
+        logger.warning("JD truncated from %d to %d chars", len(jd_text), JD_MAX_CHARS)
+        jd_text = jd_text[:JD_MAX_CHARS]
+
     if not check_llm():
         return JSONResponse({"ok": False, "error": "llm_unavailable"}, status_code=503)
 
@@ -343,11 +360,35 @@ async def api_analyze(request: Request) -> JSONResponse:
         pass  # temp file kept so the same resume can be re-analysed without re-uploading
 
     if not resume_json and not jd_json:
-        return JSONResponse({"ok": False, "error": "could not parse resume"}, status_code=422)
+        return JSONResponse({
+            "ok":    False,
+            "error": "could_not_parse_resume",
+            "html":  render_error_panel(
+                "Could not read resume",
+                "The file could not be parsed. Make sure it is a valid PDF or DOCX "
+                "with selectable text (not a scanned image). Try re-exporting from your word processor.",
+            ),
+        }, status_code=422)
     if not resume_json:
-        return JSONResponse({"ok": False, "error": "resume_extraction_failed"}, status_code=422)
+        return JSONResponse({
+            "ok":    False,
+            "error": "resume_extraction_failed",
+            "html":  render_error_panel(
+                "Resume extraction failed",
+                "The resume text was found but the LLM could not extract structured data. "
+                "Check that your LLM provider is configured and reachable in Settings.",
+            ),
+        }, status_code=422)
     if not jd_json:
-        return JSONResponse({"ok": False, "error": "jd_extraction_failed"}, status_code=422)
+        return JSONResponse({
+            "ok":    False,
+            "error": "jd_extraction_failed",
+            "html":  render_error_panel(
+                "Job description extraction failed",
+                "The job description text could not be parsed. Try adding more detail -- "
+                "responsibilities, required skills, and qualifications improve extraction accuracy.",
+            ),
+        }, status_code=422)
     if not results:
         return JSONResponse({"ok": False, "error": "scoring_failed"}, status_code=500)
 

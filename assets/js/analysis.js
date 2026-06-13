@@ -204,14 +204,21 @@ window.startAnalysis = function() {
     .then(function(r) { return r.json(); })
     .then(function(d) {
       if (!d.ok) {
-        var msgs = {
-          'resume_extraction_failed': 'Could not extract resume — check the file or try a different one.',
-          'jd_extraction_failed':     'Could not extract the job description — add more text.',
-          'could not parse resume':   'Could not parse resume — check the file format.',
-          'llm_unavailable':          'LLM provider is unavailable. Check your API key in Settings.',
-        };
         hideProgress();
-        toast(msgs[d.error] || 'Analysis failed: ' + (d.error || 'unknown error'), 'err', 5000);
+        // User-fixable errors (bad file, short JD, parse failure) carry a
+        // server-rendered html panel so the user sees it in context rather
+        // than as a brief toast that disappears.
+        if (d.html && resultsEl) {
+          setStep(4);
+          resultsEl.innerHTML = d.html;
+        } else {
+          var msgs = {
+            'llm_unavailable': 'LLM provider is unavailable. Check your API key in Settings.',
+            'results_render_failed': 'Results could not be rendered. Check server logs.',
+            'scoring_failed': 'Scoring failed. Check server logs.',
+          };
+          toast(msgs[d.error] || 'Analysis failed: ' + (d.error || 'unknown error'), 'err', 5000);
+        }
         return;
       }
 
