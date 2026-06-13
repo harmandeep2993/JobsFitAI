@@ -605,6 +605,92 @@ async def api_improve_resume(request: Request) -> JSONResponse:
     return JSONResponse(result)
 
 
+# ── ATS Maker ─────────────────────────────────────────────
+
+
+@app.post("/api/ats/optimise")
+async def api_ats_optimise(request: Request) -> JSONResponse:
+    """
+    Full ATS optimisation pipeline.
+
+    Accepts {resume_id, jd}. Extracts raw resume text from the stored file,
+    runs exact keyword coverage, section/formatting flags, and injects missing
+    exact keywords into experience bullets via LLM.
+
+    Returns {coverage_before, coverage_after, section_flags, formatting_flags, rewrites}.
+    """
+    from src.services.ats import ats_optimise
+
+    body = await request.json()
+    resume_id = (body.get("resume_id") or "").strip()
+    jd_text = (body.get("jd") or "").strip()
+
+    if not resume_id:
+        return JSONResponse(
+            {"ok": False, "error": "resume_id_required"}, status_code=400
+        )
+    if len(jd_text) < 30:
+        return JSONResponse({"ok": False, "error": "jd_required"}, status_code=400)
+
+    record = resume_store.get("local", resume_id)
+    if not record:
+        return JSONResponse({"ok": False, "error": "resume_not_found"}, status_code=404)
+
+    # Extract raw text from file for exact string matching
+    resume_text = await run_in_threadpool(extract_all_text, record["file_path"])
+    if not resume_text:
+        return JSONResponse(
+            {"ok": False, "error": "could_not_read_resume"}, status_code=422
+        )
+
+    # Load cached extracted JSON (already done at upload time)
+    extracted_raw = record.get("extracted_json")
+    if extracted_raw:
+        try:
+            resume_json = _json.loads(extracted_raw)
+        except Exception:
+            resume_json = {}
+    else:
+        resume_json = await run_in_threadpool(extract_resume, resume_text)
+
+    jd_json = await run_in_threadpool(extract_jd, jd_text)
+
+    result = await run_in_threadpool(ats_optimise, resume_text, resume_json, jd_json)
+    return JSONResponse({"ok": True, **result})
+
+
+@app.post("/api/ats/check")
+async def api_ats_check(request: Request) -> JSONResponse:
+    """
+    Lightweight ATS scan - no LLM, no keyword injection.
+
+    Accepts {resume_id}. Returns section heading flags and formatting flags
+    only. Fast enough to run on every resume load.
+    """
+    from src.services.ats import ats_check
+
+    body = await request.json()
+    resume_id = (body.get("resume_id") or "").strip()
+
+    if not resume_id:
+        return JSONResponse(
+            {"ok": False, "error": "resume_id_required"}, status_code=400
+        )
+
+    record = resume_store.get("local", resume_id)
+    if not record:
+        return JSONResponse({"ok": False, "error": "resume_not_found"}, status_code=404)
+
+    resume_text = await run_in_threadpool(extract_all_text, record["file_path"])
+    if not resume_text:
+        return JSONResponse(
+            {"ok": False, "error": "could_not_read_resume"}, status_code=422
+        )
+
+    result = await run_in_threadpool(ats_check, resume_text)
+    return JSONResponse({"ok": True, **result})
+
+
 # ── History ───────────────────────────────────────────────
 
 
