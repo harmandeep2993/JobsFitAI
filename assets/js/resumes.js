@@ -110,7 +110,7 @@ function _rvRenderPicker(resumes) {
   if (zone)   zone.style.display   = 'none';
   if (manBtn) manBtn.style.display = '';
 
-  var html = '<div class="az-rv-picker">';
+  var html = '<div class="az-rv-picker"><div id="az-rv-reco-banner" style="display:none;"></div>';
   resumes.forEach(function(r) {
     var ext  = r.original_name.split('.').pop().toUpperCase();
     var sel  = (window._resumeId === r.id) ? ' selected' : '';
@@ -308,6 +308,81 @@ window.rvPreview = function(id, filename) {
         content.innerHTML = '<p class="rp-err">Request failed: ' + e + '</p>';
       });
   }
+};
+
+// ── Recommendation ───────────────────────────────────────
+
+var _rvRecoTimer  = null;
+var _rvRecoActive = false; // true while a request is in flight
+var _rvLastJD     = '';
+
+function _rvRenderBanner(scores, recommendedId) {
+  var banner = document.getElementById('az-rv-reco-banner');
+  if (!banner) return;
+
+  // Dismiss if recommended is already selected or only 1 score
+  if (!scores || scores.length < 2 || recommendedId === window._resumeId) {
+    banner.style.display = 'none';
+    return;
+  }
+
+  var best   = scores[0];
+  var others = scores.slice(1).map(function(s) {
+    return _esc(s.label) + ': ' + s.score + '%';
+  }).join(' &nbsp;&middot;&nbsp; ');
+
+  banner.style.display = '';
+  banner.innerHTML =
+    '<div class="az-rv-reco-inner">' +
+      '<div class="az-rv-reco-body">' +
+        '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0">' +
+          '<circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 2"/>' +
+        '</svg>' +
+        '<div>' +
+          '<div class="az-rv-reco-title">' +
+            '<strong>' + _esc(best.label) + '</strong> looks like the best match for this role &mdash; ' + best.score + '%' +
+          '</div>' +
+          '<div class="az-rv-reco-sub">' + others + '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="az-rv-reco-actions">' +
+        '<button class="az-rv-reco-use" onclick="rvSelect(\'' + best.id + '\',\'' + _esc(best.name) + '\');document.getElementById(\'az-rv-reco-banner\').style.display=\'none\'">Use this</button>' +
+        '<button class="az-rv-reco-dismiss" onclick="document.getElementById(\'az-rv-reco-banner\').style.display=\'none\'">Dismiss</button>' +
+      '</div>' +
+    '</div>';
+}
+
+function _rvRequestReco(jd) {
+  if (_rvRecoActive) return;
+  _rvLastJD     = jd;
+  _rvRecoActive = true;
+
+  fetch('/api/resumes/recommend', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ jd: jd }),
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      _rvRecoActive = false;
+      if (d.ok && d.scores && d.scores.length >= 2) {
+        _rvRenderBanner(d.scores, d.recommended_id);
+      }
+    })
+    .catch(function() { _rvRecoActive = false; });
+}
+
+// Called by analysis.js checkJD — fires when JD changes and 2+ resumes exist.
+window.rvCheckReco = function(jd) {
+  var picker = document.getElementById('az-resume-picker');
+  if (!picker || picker.style.display === 'none') return;
+  var cards = picker.querySelectorAll('.az-rv-card');
+  if (cards.length < 2) return;
+  if (jd.length < 150) return;
+  if (jd === _rvLastJD) return;
+
+  clearTimeout(_rvRecoTimer);
+  _rvRecoTimer = setTimeout(function() { _rvRequestReco(jd); }, 1500);
 };
 
 // ── Badge ─────────────────────────────────────────────────
