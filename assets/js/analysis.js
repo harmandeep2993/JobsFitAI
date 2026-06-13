@@ -117,11 +117,13 @@ function hideProgress() {
 function checkJD() {
   var jd = document.getElementById('jd-input');
   if (!jd) return;
-  if (jd.value.trim().length > 30) {
+  var val = jd.value.trim();
+  if (val.length > 30) {
     if (!jd.classList.contains('success')) { jd.classList.add('success'); setStep(2); }
   } else {
     jd.classList.remove('success');
   }
+  if (typeof rvCheckReco === 'function') rvCheckReco(val);
 }
 
 // ── Persistent result cache (localStorage, survives refresh) ─
