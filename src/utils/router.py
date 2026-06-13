@@ -14,6 +14,8 @@ import re
 import json
 import time
 import random
+import collections
+import threading
 from dataclasses import dataclass
 
 from src.utils import session
@@ -24,21 +26,28 @@ logger = get_logger(__name__)
 
 logger.info("LLM Router initialized with %s provider", session.get_provider())
 
-# --- Token budget constants ---
-# 6000-token hard ceiling is the project-wide rule (prompt + response combined).
-# We target 5800 to leave a small safety margin so floating-point estimates
-# never accidentally breach the ceiling.
-_TOKEN_BUDGET    = 6000
-_SAFETY_MARGIN   = 200
-_MAX_TOTAL       = _TOKEN_BUDGET - _SAFETY_MARGIN   # 5800
-_CHARS_PER_TOKEN = 4    # rough English average; intentionally round DOWN for safety
+# --- Character/token estimate ---
+# Rough English average: 4 chars per token. Used only for Groq TPM pacing;
+# NOT used to cap prompts (each provider has its own large context window).
+_CHARS_PER_TOKEN = 4
 
 # --- Retry constants ---
-_MAX_ATTEMPTS  = 4
-_BASE_BACKOFF  = 1.0   # seconds; doubles each attempt: 1s, 2s, 4s, 8s
+_MAX_ATTEMPTS = 4
+_BASE_BACKOFF = 1.0  # seconds; doubles each attempt: 1s, 2s, 4s, 8s
 
-# Groq fallback model -- cheap, large context, good for degraded-mode calls
+# Groq fallback model -- cheap, 128k context, good for degraded-mode calls
 _GROQ_FALLBACK_MODEL = GROQ_CONFIG.get("model", "llama-3.1-8b-instant")
+
+# Groq tokens-per-minute rate limit (free tier default from config).
+# This is NOT a per-call context limit -- Groq supports 128k tokens per call.
+# It is a rolling rate limit: the API returns 429 when you exceed this many
+# estimated tokens in any 60-second window. We pace proactively to avoid it.
+_GROQ_TPM_LIMIT: int = int(GROQ_CONFIG.get("tpm_limit", 6000))
+
+# Sliding window: deque of (monotonic_timestamp, estimated_tokens) tuples.
+# Protected by _groq_lock for thread safety across concurrent requests.
+_groq_window: collections.deque = collections.deque()
+_groq_lock = threading.Lock()
 
 
 @dataclass
@@ -63,30 +72,47 @@ class LLMResult:
     degraded:      bool
 
 
-def _trim_to_budget(prompt: str) -> str:
-    """Truncate prompt so (prompt_tokens + max_output_tokens) stays under _MAX_TOTAL.
+def _groq_pace(prompt: str) -> None:
+    """Block until there is enough Groq TPM headroom to send this prompt.
 
-    Uses a 4-chars-per-token estimate. Truncates from the END so the
-    instruction and the most important context at the top are always preserved.
-    Callers should put the most important content first (instructions, then
-    document text).
+    Groq enforces a tokens-per-minute rate limit at the account level.
+    Rather than relying solely on 429 retries (which waste a round-trip),
+    we track estimated token spend in a 60-second sliding window and sleep
+    proactively when near the limit.
+
+    Estimated tokens = prompt tokens (chars/4) + max_output_tokens (worst-case).
+    The lock is released before sleeping so other threads are not blocked.
     """
-    # How many prompt tokens we can afford given that output tokens will also
-    # consume part of the shared budget.
-    allowed_prompt_tokens = _MAX_TOTAL - LLM_MAX_OUTPUT_TOKENS
-    if allowed_prompt_tokens <= 0:
-        # LLM_MAX_OUTPUT_TOKENS is unexpectedly large; give half the budget to
-        # the prompt so we still have something useful to send.
-        allowed_prompt_tokens = _MAX_TOTAL // 2
+    estimated = len(prompt) // _CHARS_PER_TOKEN + LLM_MAX_OUTPUT_TOKENS
 
-    allowed_chars = allowed_prompt_tokens * _CHARS_PER_TOKEN
-    if len(prompt) > allowed_chars:
-        logger.warning(
-            "Prompt trimmed %d -> %d chars to stay under %d-token budget",
-            len(prompt), allowed_chars, _TOKEN_BUDGET,
+    while True:
+        sleep_secs = 0.0
+        with _groq_lock:
+            now = time.monotonic()
+            # Drop entries that have aged out of the 60-second window
+            while _groq_window and _groq_window[0][0] < now - 60.0:
+                _groq_window.popleft()
+
+            tokens_in_window = sum(t for _, t in _groq_window)
+
+            if tokens_in_window + estimated <= _GROQ_TPM_LIMIT:
+                # Enough headroom -- record this call and proceed
+                _groq_window.append((now, estimated))
+                return
+
+            # Calculate how long until the oldest entry expires
+            if _groq_window:
+                oldest_ts = _groq_window[0][0]
+                sleep_secs = max((oldest_ts + 60.0) - now + 0.5, 0.1)
+            else:
+                sleep_secs = 1.0
+
+        # Sleep OUTSIDE the lock so other threads can proceed
+        logger.info(
+            "Groq TPM pacing: %d/%d tokens in window, need %d more - sleeping %.1fs",
+            tokens_in_window, _GROQ_TPM_LIMIT, estimated, sleep_secs,
         )
-        return prompt[:allowed_chars]
-    return prompt
+        time.sleep(sleep_secs)
 
 
 def _backoff(attempt: int) -> None:
@@ -128,12 +154,7 @@ def _call_with_retry(provider_module, prompt: str, model: str) -> tuple[str | No
 
 
 def _get_provider():
-    """
-    Load the provider module for the currently active provider.
-
-    Returns:
-        module: Provider module with check() and call()
-    """
+    """Load the provider module for the currently active provider."""
     name = session.get_provider()
 
     if name == "openai":
@@ -153,12 +174,7 @@ def _get_provider():
 
 
 def check_llm() -> bool:
-    """
-    Check if the active LLM provider is available.
-
-    Returns:
-        bool: True if provider is reachable
-    """
+    """Check if the active LLM provider is available."""
     provider = _get_provider()
     logger.debug("Checking %s provider connectivity...", session.get_provider())
     return provider.check()
@@ -169,23 +185,29 @@ def call_llm(prompt: str) -> "LLMResult | None":
     Send prompt to the active LLM provider, with retry-backoff and Groq fallback.
 
     Flow:
-    1. Trim prompt to keep total tokens under the 6000-token ceiling.
-    2. Try the primary provider up to _MAX_ATTEMPTS times with backoff.
+    1. If the primary provider is Groq, pace the call against the TPM rate limit.
+    2. Try the primary provider up to _MAX_ATTEMPTS times with exponential backoff.
     3. If primary exhausts all retries, fall through to Groq as cheap fallback
        (unless primary IS Groq -- no point falling back to yourself).
     4. If Groq also fails, return a degraded LLMResult with text=None rather
        than raising an exception. The caller decides how to handle degradation.
 
+    No blanket prompt truncation is applied -- each provider has its own
+    large context window (OpenAI gpt-4o-mini: 128k, Groq llama-3.1-8b: 128k,
+    Ollama: model-dependent). Callers that build very large prompts should trim
+    at the call site with domain-specific knowledge about what to keep.
+
+    Groq calls (both primary and fallback) are paced against the tokens-per-minute
+    rate limit before sending, so rapid successive calls sleep automatically
+    rather than burning 429 round-trips.
+
     Args:
         prompt (str): Prompt text
 
     Returns:
-        LLMResult | None: Typed result. None only when call_llm itself errors
-                          catastrophically (should not happen in normal use).
-                          Check result.degraded and result.text before using.
+        LLMResult | None: Typed result. Check result.degraded and result.text
+                          before using the response.
     """
-    prompt = _trim_to_budget(prompt)
-
     provider      = _get_provider()
     provider_name = session.get_provider()
     model         = session.get_model()
@@ -194,6 +216,10 @@ def call_llm(prompt: str) -> "LLMResult | None":
         "Calling %s (%s) - prompt %d chars",
         provider_name, model, len(prompt),
     )
+
+    # Pace Groq calls to avoid hitting the tokens-per-minute rate limit
+    if provider_name == "groq":
+        _groq_pace(prompt)
 
     # --- Primary provider attempt ---
     text, primary_attempts = _call_with_retry(provider, prompt, model)
@@ -214,9 +240,7 @@ def call_llm(prompt: str) -> "LLMResult | None":
     # --- Groq fallback ---
     # Skip if primary is already Groq -- retrying the same provider gains nothing.
     if provider_name == "groq":
-        logger.error(
-            "Primary IS Groq and it failed - no further fallback available"
-        )
+        logger.error("Primary IS Groq and it failed - no further fallback available")
         return LLMResult(
             text=None,
             provider_used="none",
@@ -227,6 +251,9 @@ def call_llm(prompt: str) -> "LLMResult | None":
     # Import Groq here (not at module top) to avoid circular-import issues and
     # to keep the normal hot path free of unnecessary imports.
     from src.utils.providers import groq as _groq_mod
+
+    # Pace before the fallback Groq call too
+    _groq_pace(prompt)
 
     groq_text, groq_attempts = _call_with_retry(
         _groq_mod, prompt, _GROQ_FALLBACK_MODEL
