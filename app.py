@@ -47,6 +47,7 @@ from src.services.job_matcher import (
     fetch_combined,
 )
 from src.services import match_store, event_store, vector_store, settings_store, resume_store
+import json as _json
 from src.services.summary import generate_summary
 from src.utils.config import SEARCH_PER_TITLE, MAX_AGE_DAYS
 
@@ -134,8 +135,25 @@ async def api_resumes_upload(request: Request) -> JSONResponse:
     if suffix not in ALLOWED_EXTENSIONS:
         return JSONResponse({"ok": False, "error": "unsupported file type"}, status_code=400)
 
-    mime = _PREVIEW_TYPES.get(suffix, "application/octet-stream")
+    mime   = _PREVIEW_TYPES.get(suffix, "application/octet-stream")
     record = resume_store.save(_USER, slot, filename, data, suffix, mime)
+
+    # Extract resume in the background so it's ready for recommendation scoring.
+    async def _extract_bg(rid: str, path: str) -> None:
+        def _run():
+            try:
+                text = extract_all_text(path)
+                if not text or len(text) < 50:
+                    return
+                extracted = extract_resume(text)
+                if extracted:
+                    resume_store.set_extracted(_USER, rid, _json.dumps(extracted))
+                    logger.info("Background extraction done for resume %s", rid)
+            except Exception as e:
+                logger.warning("Background extraction failed for %s: %s", rid, e)
+        await run_in_threadpool(_run)
+
+    asyncio.create_task(_extract_bg(record["id"], str(resume_store.get(_USER, record["id"])["file_path"])))
     return JSONResponse({"ok": True, **record})
 
 
@@ -171,6 +189,53 @@ async def api_resumes_label(resume_id: str, request: Request) -> JSONResponse:
         return JSONResponse({"ok": False, "error": "label required"}, status_code=400)
     resume_store.set_label(_USER, resume_id, label)
     return JSONResponse({"ok": True})
+
+
+@app.post("/api/resumes/recommend")
+async def api_resumes_recommend(request: Request) -> JSONResponse:
+    """Score all cached resumes against a JD and return ranked results.
+
+    Costs exactly 1 LLM call (extract JD). Resume extraction is pre-cached
+    at upload time so no extra LLM calls per resume.
+    """
+    body    = await request.json()
+    jd_text = (body.get("jd") or "").strip()
+
+    if len(jd_text) < 100:
+        return JSONResponse({"ok": False, "error": "jd too short"}, status_code=400)
+
+    scoreable = resume_store.list_scoreable(_USER)
+    if len(scoreable) < 2:
+        return JSONResponse({"ok": True, "scores": [], "recommended_id": None})
+
+    def _score():
+        jd_json = extract_jd(jd_text)
+        if not jd_json:
+            return None
+        results = []
+        for r in scoreable:
+            try:
+                resume_json = _json.loads(r["extracted_json"])
+                result      = match(resume_json, jd_json)
+                results.append({
+                    "id":    r["id"],
+                    "label": r["label"],
+                    "name":  r["original_name"],
+                    "score": round(result.get("overall_score", 0)),
+                })
+            except Exception as e:
+                logger.warning("Scoring failed for resume %s: %s", r["id"], e)
+        return sorted(results, key=lambda x: x["score"], reverse=True)
+
+    scores = await run_in_threadpool(_score)
+    if scores is None:
+        return JSONResponse({"ok": False, "error": "could not parse JD"}, status_code=422)
+
+    return JSONResponse({
+        "ok":              True,
+        "scores":          scores,
+        "recommended_id":  scores[0]["id"] if scores else None,
+    })
 
 
 # ── Serve original resume file ────────────────────────────
@@ -728,9 +793,34 @@ async def _auto_fetch_loop() -> None:
             logger.error("[scheduler] error: %s", e)
 
 
+async def _backfill_extractions() -> None:
+    """Extract resume JSON for any stored resumes that were uploaded before caching was added."""
+    resumes = resume_store.list_all(_USER)
+    pending = [r for r in resumes if not r.get("extracted_json")]
+    if not pending:
+        return
+    logger.info("[backfill] extracting %d resume(s) without cached JSON", len(pending))
+
+    def _run(r: dict) -> None:
+        try:
+            text = extract_all_text(r["file_path"])
+            if not text or len(text) < 50:
+                return
+            extracted = extract_resume(text)
+            if extracted:
+                resume_store.set_extracted(_USER, r["id"], _json.dumps(extracted))
+                logger.info("[backfill] done: %s (%s)", r["label"], r["id"])
+        except Exception as e:
+            logger.warning("[backfill] failed for %s: %s", r["id"], e)
+
+    for r in pending:
+        await run_in_threadpool(_run, r)
+
+
 @app.on_event("startup")
 async def _start_scheduler() -> None:
     asyncio.create_task(_auto_fetch_loop())
+    asyncio.create_task(_backfill_extractions())
     logger.info(
         "[scheduler] loop started (enabled=%s, every %s min)",
         settings_store.get_scheduler_enabled(),

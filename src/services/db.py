@@ -117,10 +117,15 @@ def init() -> None:
                 file_path     TEXT NOT NULL,
                 mime_type     TEXT NOT NULL,
                 file_size_kb  REAL NOT NULL DEFAULT 0,
-                uploaded_at   TEXT NOT NULL
+                uploaded_at   TEXT NOT NULL,
+                extracted_json TEXT
             )
             """
         )
+        # Migrate existing resumes table that predates extracted_json column.
+        resume_cols = [r[1] for r in conn.execute("PRAGMA table_info(resumes)").fetchall()]
+        if "extracted_json" not in resume_cols:
+            conn.execute("ALTER TABLE resumes ADD COLUMN extracted_json TEXT")
     logger.info("SQLite ready at %s", DB_PATH)
 
 

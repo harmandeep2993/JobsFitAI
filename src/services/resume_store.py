@@ -123,6 +123,27 @@ def set_label(user_id: str, resume_id: str, label: str) -> bool:
     return True
 
 
+def set_extracted(user_id: str, resume_id: str, extracted_json: str) -> None:
+    """Cache the LLM-extracted resume JSON so recommendation scoring skips re-extraction."""
+    with db.connect() as conn:
+        conn.execute(
+            "UPDATE resumes SET extracted_json=? WHERE id=? AND user_id=?",
+            (extracted_json, resume_id, user_id),
+        )
+
+
+def list_scoreable(user_id: str) -> list[dict]:
+    """Return only resumes that have a cached extracted_json — ready for scoring."""
+    with db.connect() as conn:
+        rows = conn.execute(
+            """SELECT id, slot, label, original_name, extracted_json
+               FROM resumes WHERE user_id=? AND extracted_json IS NOT NULL
+               ORDER BY slot ASC""",
+            (user_id,),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
 def _safe_delete(path_str: str) -> None:
     try:
         p = Path(path_str)
