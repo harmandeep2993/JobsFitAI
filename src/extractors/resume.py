@@ -253,8 +253,9 @@ def extract_resume(resume_text: str) -> dict:
         )
         resume_text = resume_text[:RESUME_MAX_CHARS]
 
-    prompt   = get_resume_prompt(resume_text)
-    response = call_llm(prompt)
+    prompt = get_resume_prompt(resume_text)
+    _res   = call_llm(prompt)
+    response = _res.text if (_res and _res.text) else None
     result   = parse_json_response(response)
 
     if not isinstance(result, dict):
