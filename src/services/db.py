@@ -126,6 +126,19 @@ def init() -> None:
         resume_cols = [r[1] for r in conn.execute("PRAGMA table_info(resumes)").fetchall()]
         if "extracted_json" not in resume_cols:
             conn.execute("ALTER TABLE resumes ADD COLUMN extracted_json TEXT")
+        # Analysis history tied to stored resumes.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS analyses (
+                id         TEXT PRIMARY KEY,
+                resume_id  TEXT NOT NULL,
+                jd_snippet TEXT,
+                score      REAL,
+                label      TEXT,
+                scored_at  TEXT NOT NULL
+            )
+            """
+        )
     logger.info("SQLite ready at %s", DB_PATH)
 
 

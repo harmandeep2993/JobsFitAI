@@ -296,6 +296,56 @@ window.bdToggleAll = function(btn) {
   btn.textContent = anyOpen ? 'Expand all' : 'Collapse all';
 };
 
+// ── Export / copy results ─────────────────────────────────
+window.copyResults = function() {
+  var score  = document.querySelector('.sum-hero-sub');
+  var label  = document.querySelector('.sum-hero-label');
+  var lines  = ['JobsFitAI Analysis Report', ''];
+  if (score) lines.push('Match: ' + score.textContent.trim());
+  if (label) lines.push('Rating: ' + label.textContent.trim());
+  lines.push('');
+
+  var profile = document.querySelector('.sum-sec--profile .sum-sec-list');
+  if (profile) {
+    lines.push('Your Profile:');
+    profile.querySelectorAll('li').forEach(function(li) { lines.push('  - ' + li.textContent.trim()); });
+    lines.push('');
+  }
+
+  var strengths = document.querySelector('.sum-sec--strengths .sum-sec-list');
+  if (strengths) {
+    lines.push('Strengths:');
+    strengths.querySelectorAll('li').forEach(function(li) { lines.push('  - ' + li.textContent.trim()); });
+    lines.push('');
+  }
+
+  var items = document.querySelectorAll('.bd-item');
+  if (items.length) {
+    lines.push('Breakdown:');
+    items.forEach(function(item) {
+      var ttl = item.querySelector('.bd-item-ttl');
+      var pct = item.querySelector('.bd-item-pct');
+      if (ttl && pct) lines.push('  ' + ttl.textContent.trim() + ': ' + pct.textContent.trim());
+    });
+    lines.push('');
+  }
+
+  var text = lines.join('\n');
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(function() {
+      toast('Copied to clipboard', 'ok', 2000);
+    }).catch(function() { toast('Copy failed', 'err'); });
+  } else {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    toast('Copied to clipboard', 'ok', 2000);
+  }
+};
+
 // ── Run Again (keep resume, clear JD + results) ──────────
 window.runAgain = function() {
   _azTimers.forEach(clearTimeout);

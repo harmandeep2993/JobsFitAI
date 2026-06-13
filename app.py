@@ -46,7 +46,7 @@ from src.services.job_matcher import (
     rescore_all,
     fetch_combined,
 )
-from src.services import match_store, event_store, vector_store, settings_store, resume_store
+from src.services import match_store, event_store, vector_store, settings_store, resume_store, analysis_store
 import json as _json
 from src.services.summary import generate_summary
 from src.utils.config import SEARCH_PER_TITLE, MAX_AGE_DAYS
@@ -189,6 +189,21 @@ async def api_resumes_label(resume_id: str, request: Request) -> JSONResponse:
         return JSONResponse({"ok": False, "error": "label required"}, status_code=400)
     resume_store.set_label(_USER, resume_id, label)
     return JSONResponse({"ok": True})
+
+
+@app.post("/api/resumes/{resume_id}/use-for-matching")
+async def api_resumes_use_for_matching(resume_id: str) -> JSONResponse:
+    """Load a stored resume into the job-matching session so Job Matches uses it."""
+    row = resume_store.get(_USER, resume_id)
+    if not row:
+        return JSONResponse({"ok": False, "error": "not found"}, status_code=404)
+    extracted = row.get("extracted_json")
+    if not extracted:
+        return JSONResponse({"ok": False, "error": "not_extracted_yet"}, status_code=400)
+    resume_json = _json.loads(extracted)
+    session.set_resume(resume_json, row.get("label") or row.get("original_name", "Resume"))
+    rescored = await run_in_threadpool(rescore_all)
+    return JSONResponse({"ok": True, "rescored": rescored})
 
 
 @app.post("/api/resumes/recommend")
@@ -337,6 +352,16 @@ async def api_analyze(request: Request) -> JSONResponse:
         return JSONResponse({"ok": False, "error": "scoring_failed"}, status_code=500)
 
     html = build_results_html(results, resume_json, jd_json, summary or "")
+
+    # Persist analysis history for stored resumes.
+    if resume_id:
+        analysis_store.save(
+            resume_id,
+            jd_text[:120],
+            results.get("overall_score", 0),
+            results.get("label", ""),
+        )
+
     return JSONResponse({
         "ok":    True,
         "score": results.get("overall_score", 0),

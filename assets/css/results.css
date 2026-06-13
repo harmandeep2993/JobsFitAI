@@ -617,10 +617,34 @@
   font-size: 10.5px;
   color: var(--t3);
   font-family: 'DM Mono', monospace;
-  text-align: center;
-  margin-top: 16px;
-  padding: 0 4px 4px;
 }
+
+.res-export-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 12px;
+  padding: 0 2px 4px;
+}
+.res-export-btns {
+  display: flex;
+  gap: 6px;
+}
+.res-export-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--t2);
+  background: var(--bg-r);
+  border: 1px solid var(--bd);
+  border-radius: var(--radius-s);
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: background .12s, color .12s;
+}
+.res-export-btn:hover { background: var(--bg-c); color: var(--t1); }
 
 /* --- Fade in animation --- */
 @keyframes fade-in {
@@ -1425,3 +1449,13 @@
   color: var(--t3);
 }
 .res-empty-body p strong { color: var(--t2); font-weight: 600; }
+
+/* ── Print ──────────────────────────────────────────────── */
+@media print {
+  .sidebar, .topbar, .az-workspace, #spinner,
+  .tab-row, .res-export-row, .callout { display: none !important; }
+  .nb-card { box-shadow: none; border: none; }
+  .jf-panel { display: block !important; }
+  .bd-item-detail { display: block !important; }
+  #jf-results { margin: 0; }
+}

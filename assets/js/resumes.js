@@ -114,6 +114,14 @@ function _rvRenderPicker(resumes) {
   resumes.forEach(function(r) {
     var ext  = r.original_name.split('.').pop().toUpperCase();
     var sel  = (window._resumeId === r.id) ? ' selected' : '';
+    var hist = '';
+    if (r.last_score != null) {
+      var tierCls = r.last_score >= 80 ? 'sc-exc' : r.last_score >= 60 ? 'sc-good' : r.last_score >= 40 ? 'sc-partial' : 'sc-poor';
+      hist = '<div class="az-rv-card-hist">' +
+             '<span class="az-rv-hist-score ' + tierCls + '">' + r.last_score + '%</span>' +
+             '<span class="az-rv-hist-jd">' + _esc((r.last_jd || '').slice(0, 55)) + '…</span>' +
+             '</div>';
+    }
     html += (
       '<div class="az-rv-card' + sel + '" onclick="rvSelect(\'' + r.id + '\',\'' + _esc(r.original_name) + '\')">' +
         '<div class="az-rv-card-left">' +
@@ -125,6 +133,7 @@ function _rvRenderPicker(resumes) {
             '<span class="rv-ext-badge">' + ext + '</span>' +
             _esc(r.original_name) +
           '</div>' +
+          hist +
         '</div>' +
         '<div class="az-rv-card-check">' +
           '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
@@ -159,6 +168,9 @@ window.rvSelect = function(id, name) {
   if (typeof updateUploadZone === 'function') updateUploadZone(name);
   setStep(2);
   toast('Resume selected: ' + name, 'ok', 2000);
+
+  // Wire to Job Matches so it scores against the same resume (fire-and-forget).
+  fetch('/api/resumes/' + id + '/use-for-matching', { method: 'POST' }).catch(function() {});
 };
 
 // ── Upload ────────────────────────────────────────────────
