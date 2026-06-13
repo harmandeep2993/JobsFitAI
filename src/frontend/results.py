@@ -13,6 +13,35 @@ _GAUGE_R    = 17
 _GAUGE_CIRC = round(2 * math.pi * _GAUGE_R, 2)  # 106.81
 
 
+# ── Error panel ──────────────────────────────────────────────
+
+def render_error_panel(title: str, message: str) -> str:
+    """Render a user-facing error inside the results nb-card style.
+
+    Returned HTML is injected into #jf-results by analysis.js when the
+    server returns ok=false with an html field (user-fixable errors only).
+    System errors (LLM unavailable, 500s) still use the toast path.
+    """
+    return f"""
+<div class="res-section">
+  <div class="nb-card" style="border-color:var(--red-bd);overflow:hidden;">
+    <div style="display:flex;align-items:flex-start;gap:14px;padding:28px 24px;background:var(--red-bg);">
+      <svg width="22" height="22" viewBox="0 0 16 16" fill="none"
+           stroke="var(--red)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"
+           style="flex-shrink:0;margin-top:1px;">
+        <path d="M8 2L1.5 14h13L8 2z"/>
+        <line x1="8" y1="7" x2="8" y2="10"/>
+        <circle cx="8" cy="12.5" r=".6" fill="var(--red)" stroke="none"/>
+      </svg>
+      <div>
+        <div style="font-weight:600;color:var(--red);margin-bottom:5px;">{safe_html(title)}</div>
+        <div style="color:var(--t2);font-size:.92rem;line-height:1.5;">{safe_html(message)}</div>
+      </div>
+    </div>
+  </div>
+</div>"""
+
+
 # ── SVG icon helpers ─────────────────────────────────────────
 def _ico(d, s=16):
     return (
