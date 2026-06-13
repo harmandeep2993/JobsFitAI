@@ -14,6 +14,7 @@ import csv
 import io
 import os
 import time
+import uuid
 import asyncio
 import tempfile
 from datetime import datetime, timezone
@@ -76,6 +77,34 @@ app = FastAPI(title="JobsFitAI")
 # Static assets
 app.mount("/assets", StaticFiles(directory="assets"), name="assets")
 
+
+# ── Request logging middleware ─────────────────────────────
+
+
+@app.middleware("http")
+async def _request_logger(request: Request, call_next):
+    """Log each /api/* and /health request with a short request ID and duration."""
+    path = request.url.path
+    if path.startswith("/api/") or path == "/health":
+        req_id = uuid.uuid4().hex[:8]
+        request.state.req_id = req_id
+        method = request.method
+        logger.info("[%s] --> %s %s", req_id, method, path)
+        t0 = time.perf_counter()
+        response = await call_next(request)
+        duration_ms = round((time.perf_counter() - t0) * 1000)
+        logger.info(
+            "[%s] <-- %s %s %s (%dms)",
+            req_id,
+            method,
+            path,
+            response.status_code,
+            duration_ms,
+        )
+        return response
+    return await call_next(request)
+
+
 # These mirror config.yaml validator block -- sourced at import so Pydantic
 # has already validated them before any request arrives.
 ALLOWED_EXTENSIONS: Set[str] = SUPPORTED_EXTENSIONS
@@ -89,6 +118,43 @@ MAX_FILE_MB: int = MAX_FILE_SIZE_MB
 async def index() -> HTMLResponse:
     with open("templates/index.html", encoding="utf-8") as f:
         return HTMLResponse(f.read())
+
+
+@app.get("/health")
+async def health() -> JSONResponse:
+    """
+    Component health check.
+
+    Returns per-component status and overall ok flag.
+    Status 200 when all components are ok, 503 when any are not.
+    """
+    components: dict[str, str] = {}
+
+    # db
+    try:
+        with db.connect() as conn:
+            conn.execute("SELECT 1")
+        components["db"] = "ok"
+    except Exception as exc:
+        logger.error("Health check - db error: %s", exc)
+        components["db"] = "error"
+
+    # config - Pydantic validated at startup; server would not be running if broken
+    components["config"] = "ok"
+
+    # llm
+    try:
+        reachable = await run_in_threadpool(check_llm)
+        components["llm"] = "ok" if reachable else "unreachable"
+    except Exception as exc:
+        logger.error("Health check - llm error: %s", exc)
+        components["llm"] = "error"
+
+    ok = all(v == "ok" for v in components.values())
+    return JSONResponse(
+        {"ok": ok, "components": components},
+        status_code=200 if ok else 503,
+    )
 
 
 # ── Resume upload ─────────────────────────────────────────
