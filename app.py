@@ -879,6 +879,21 @@ async def _backfill_extractions() -> None:
 
 @app.on_event("startup")
 async def _start_scheduler() -> None:
+    global _sched_last
+    # Seed _sched_last from the last run event so server restarts don't
+    # trigger an immediate re-fetch when the interval hasn't elapsed yet.
+    with db.connect() as conn:
+        row = conn.execute(
+            "SELECT created_at FROM events WHERE type='run' ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+    if row:
+        try:
+            last_ts  = datetime.fromisoformat(row["created_at"].replace("Z", "+00:00"))
+            elapsed  = (datetime.now(timezone.utc) - last_ts).total_seconds()
+            _sched_last = time.monotonic() - elapsed
+        except Exception:
+            pass
+
     asyncio.create_task(_auto_fetch_loop())
     asyncio.create_task(_backfill_extractions())
     logger.info(

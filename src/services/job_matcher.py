@@ -7,6 +7,7 @@ Each job costs one JD-extraction LLM call; the resume is extracted once
 (held in session) and reused across all jobs.
 """
 
+import json as _json
 from datetime import datetime, timezone
 
 from src.fetchers import Job, fetch_adzuna_multi, fetch_arbeitnow_jobs
@@ -241,8 +242,21 @@ def discover_and_score(jobs: list[Job], entry_only: bool = True) -> dict:
                 event_store.mark_seen(job, "jd_unavailable")
                 logger.debug("   jd-unavailable | %s", tag)
 
-        event_store.log_event(
-            "run", "", f"{len(candidates)} checked, {len(survivors)} relevant, {scored} scored")
+        by_source = {}
+        for j in jobs:
+            by_source[j.source] = by_source.get(j.source, 0) + 1
+
+        run_detail = _json.dumps({
+            "fetched":    len(jobs),
+            "new":        len(new_jobs),
+            "recent":     len(candidates),
+            "relevant":   len(survivors),
+            "scored":     scored,
+            "adzuna":     by_source.get("adzuna", 0),
+            "arbeitnow":  by_source.get("arbeitnow", 0),
+            "total_seen": len(seen) + len(new_jobs),
+        })
+        event_store.log_event("run", "", run_detail)
         logger.info("== Run complete: %d candidates, %d survivors, %d scored",
                     len(candidates), len(survivors), scored)
     finally:

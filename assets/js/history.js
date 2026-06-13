@@ -105,6 +105,76 @@ function _hvRenderAnalyser(entries) {
 
 // ── Fetcher tab ───────────────────────────────────────────
 
+function _hvParseFetchDetail(raw) {
+  try {
+    var d = JSON.parse(raw || '{}');
+    if (typeof d === 'object' && d !== null && 'fetched' in d) return d;
+  } catch (e) {}
+  // Fallback: old "X checked, Y relevant, Z scored" string format
+  var parts = (raw || '').match(/(\d+) checked.*?(\d+) relevant.*?(\d+) scored/);
+  return parts
+    ? { fetched: '?', new: '?', recent: parseInt(parts[1]), relevant: parseInt(parts[2]),
+        scored: parseInt(parts[3]), adzuna: '?', arbeitnow: '?', total_seen: '?' }
+    : { fetched: '?', new: '?', recent: '?', relevant: '?', scored: 0,
+        adzuna: '?', arbeitnow: '?', total_seen: '?' };
+}
+
+function _hvFetcherEntry(e) {
+  var d = _hvParseFetchDetail(e.detail);
+  var scored = d.scored != null ? d.scored : 0;
+
+  var sources = '';
+  if (d.adzuna !== '?') {
+    sources = '<span class="hv-src-row">' +
+      '<span class="hv-src-badge hv-src-az">Adzuna ' + d.adzuna + '</span>' +
+      '<span class="hv-src-badge hv-src-arb">Arbeitnow ' + d.arbeitnow + '</span>' +
+      '</span>';
+  }
+
+  var stats = [
+    d.fetched !== '?' ? '<b>' + d.fetched + '</b> fetched' : null,
+    d.new     !== '?' ? '<b>' + d.new     + '</b> new'     : null,
+    d.recent  !== '?' ? '<b>' + d.recent  + '</b> recent'  : null,
+    d.relevant !== '?' ? '<b>' + d.relevant + '</b> passed filter' : null,
+    '<b>' + scored + '</b> scored',
+    d.total_seen !== '?' ? d.total_seen + ' total seen' : null,
+  ].filter(Boolean).join(' &middot; ');
+
+  return (
+    '<div class="hv-entry hv-entry--fetch">' +
+      '<div class="hv-entry-left">' +
+        '<span class="hv-icon hv-icon--fetch">' +
+          '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+            '<path d="M1 8a7 7 0 1 0 14 0"/><path d="M8 1v6l3 3"/>' +
+          '</svg>' +
+        '</span>' +
+      '</div>' +
+      '<div class="hv-entry-body">' +
+        '<div class="hv-entry-title">' +
+          'Fetcher run &middot; <span class="hv-run-time">' + _hTime(e.created_at) + '</span>' +
+        '</div>' +
+        '<div class="hv-entry-meta">' + stats + '</div>' +
+        (sources ? '<div class="hv-entry-meta hv-entry-sources">' + sources + '</div>' : '') +
+      '</div>' +
+      '<div class="hv-entry-right">' +
+        (scored > 0
+          ? '<span class="hv-fetch-badge">+' + scored + '</span>'
+          : '<span class="hv-fetch-badge hv-fetch-badge--zero">0</span>') +
+      '</div>' +
+    '</div>'
+  );
+}
+
+function _hTime(iso) {
+  if (!iso) return '';
+  var d = new Date(iso);
+  if (isNaN(d)) return iso.slice(0, 16).replace('T', ' ');
+  return d.toLocaleString(undefined, {
+    month: 'short', day: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  });
+}
+
 function _hvRenderFetcher(entries) {
   var el = document.getElementById('hv-fetcher');
   if (!el) return;
@@ -112,32 +182,7 @@ function _hvRenderFetcher(entries) {
     el.innerHTML = '<p class="hv-empty">No fetcher runs yet. Go to Job Matches and click Run.</p>';
     return;
   }
-  el.innerHTML = entries.map(function(e) {
-    var parts   = (e.detail || '').match(/(\d+) checked.*?(\d+) scored/);
-    var checked = parts ? parts[1] : '?';
-    var scored  = parts ? parts[2] : '?';
-    return (
-      '<div class="hv-entry">' +
-        '<div class="hv-entry-left">' +
-          '<span class="hv-icon hv-icon--fetch">' +
-            '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
-              '<path d="M1 8a7 7 0 1 0 14 0"/><path d="M8 1v6l3 3"/>' +
-            '</svg>' +
-          '</span>' +
-        '</div>' +
-        '<div class="hv-entry-body">' +
-          '<div class="hv-entry-title">Fetcher run</div>' +
-          '<div class="hv-entry-meta">' +
-            checked + ' checked &middot; <strong>' + scored + ' scored</strong>' +
-            ' &middot; ' + _hAgo(e.created_at) +
-          '</div>' +
-        '</div>' +
-        '<div class="hv-entry-right">' +
-          '<span class="hv-fetch-badge">+' + scored + '</span>' +
-        '</div>' +
-      '</div>'
-    );
-  }).join('');
+  el.innerHTML = entries.map(_hvFetcherEntry).join('');
 }
 
 // ── Applications tab ──────────────────────────────────────
