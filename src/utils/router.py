@@ -66,10 +66,11 @@ class LLMResult:
                          and fallback providers combined
         degraded      -- True when we fell back to Groq OR when text is None
     """
-    text:          str | None
+
+    text: str | None
     provider_used: str
-    attempts:      int
-    degraded:      bool
+    attempts: int
+    degraded: bool
 
 
 def _groq_pace(prompt: str) -> None:
@@ -110,7 +111,10 @@ def _groq_pace(prompt: str) -> None:
         # Sleep OUTSIDE the lock so other threads can proceed
         logger.info(
             "Groq TPM pacing: %d/%d tokens in window, need %d more - sleeping %.1fs",
-            tokens_in_window, _GROQ_TPM_LIMIT, estimated, sleep_secs,
+            tokens_in_window,
+            _GROQ_TPM_LIMIT,
+            estimated,
+            sleep_secs,
         )
         time.sleep(sleep_secs)
 
@@ -126,7 +130,9 @@ def _backoff(attempt: int) -> None:
     time.sleep(delay)
 
 
-def _call_with_retry(provider_module, prompt: str, model: str) -> tuple[str | None, int]:
+def _call_with_retry(
+    provider_module, prompt: str, model: str
+) -> tuple[str | None, int]:
     """Call provider.call() up to _MAX_ATTEMPTS times, retrying on None.
 
     All provider modules catch their own exceptions internally and return None
@@ -145,7 +151,8 @@ def _call_with_retry(provider_module, prompt: str, model: str) -> tuple[str | No
         if attempt < _MAX_ATTEMPTS:
             logger.warning(
                 "Provider returned None on attempt %d/%d - retrying",
-                attempt, _MAX_ATTEMPTS,
+                attempt,
+                _MAX_ATTEMPTS,
             )
             _backoff(attempt)
         else:
@@ -159,16 +166,19 @@ def _get_provider():
 
     if name == "openai":
         from src.utils.providers import openai
+
         logger.debug("Using OpenAI provider")
         return openai
 
     if name == "groq":
         from src.utils.providers import groq
+
         logger.debug("Using Groq provider")
         return groq
 
     # Default -- ollama
     from src.utils.providers import ollama
+
     logger.debug("Using Ollama provider")
     return ollama
 
@@ -208,13 +218,15 @@ def call_llm(prompt: str) -> "LLMResult | None":
         LLMResult | None: Typed result. Check result.degraded and result.text
                           before using the response.
     """
-    provider      = _get_provider()
+    provider = _get_provider()
     provider_name = session.get_provider()
-    model         = session.get_model()
+    model = session.get_model()
 
     logger.debug(
         "Calling %s (%s) - prompt %d chars",
-        provider_name, model, len(prompt),
+        provider_name,
+        model,
+        len(prompt),
     )
 
     # Pace Groq calls to avoid hitting the tokens-per-minute rate limit
@@ -234,7 +246,8 @@ def call_llm(prompt: str) -> "LLMResult | None":
 
     logger.warning(
         "Primary provider '%s' failed after %d attempts - trying Groq fallback",
-        provider_name, primary_attempts,
+        provider_name,
+        primary_attempts,
     )
 
     # --- Groq fallback ---
@@ -255,15 +268,15 @@ def call_llm(prompt: str) -> "LLMResult | None":
     # Pace before the fallback Groq call too
     _groq_pace(prompt)
 
-    groq_text, groq_attempts = _call_with_retry(
-        _groq_mod, prompt, _GROQ_FALLBACK_MODEL
-    )
+    groq_text, groq_attempts = _call_with_retry(_groq_mod, prompt, _GROQ_FALLBACK_MODEL)
     total_attempts = primary_attempts + groq_attempts
 
     if groq_text is not None:
         logger.info(
             "Groq fallback succeeded after %d total attempts (primary: %d, groq: %d)",
-            total_attempts, primary_attempts, groq_attempts,
+            total_attempts,
+            primary_attempts,
+            groq_attempts,
         )
         # degraded=True because we had to fall back -- callers can log or alert
         # on this if they want to track primary-provider health.

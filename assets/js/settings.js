@@ -1,5 +1,5 @@
 // assets/js/settings.js
-// LLM Settings tab — pick the active provider + model at runtime via
+// LLM Settings tab - pick the active provider + model at runtime via
 // styled button-dropdowns. Loads the catalog from /api/llm-settings and
 // applies changes via POST.
 
@@ -27,7 +27,7 @@ function loadLlmSettings() {
 
 function setVal(which, val) {
   const el = document.getElementById('dd-' + which + '-val');
-  if (el) el.textContent = val || '—';
+  if (el) el.textContent = val || '-';
 }
 
 function renderProviderMenu() {
@@ -125,7 +125,7 @@ window.applySettings = function() {
 
       const onlineTxt = d.online ? 'online' : 'offline (check API key / server)';
       status.textContent = '✓ Using ' + d.current.provider + ' · ' +
-                           d.current.model + ' — ' + onlineTxt;
+                           d.current.model + ' - ' + onlineTxt;
       status.className = 'set-status ' + (d.online ? 'ok' : 'err');
 
       updateTopbar(d.current, d.online);
@@ -165,18 +165,18 @@ window.testConnection = function() {
       var cur = d.current || {};
       var provider = cur.provider || window._sel.provider || 'provider';
       if (d.online) {
-        toast('Connected — ' + provider + ' / ' + (cur.model || ''), 'ok', 4000);
+        toast('Connected - ' + provider + ' / ' + (cur.model || ''), 'ok', 4000);
         updateTopbar(cur, true);
         if (status) { status.textContent = '✓ Online'; status.className = 'set-status ok'; }
       } else {
-        toast(provider + ' is offline — check API key or server.', 'warn', 5000);
+        toast(provider + ' is offline - check API key or server.', 'warn', 5000);
         updateTopbar(cur, false);
         if (status) { status.textContent = '✕ Offline'; status.className = 'set-status err'; }
       }
     })
     .catch(function(e) {
       var msg = e && e.name === 'AbortError'
-        ? 'Test timed out after 8 s — server may be slow.'
+        ? 'Test timed out after 8 s - server may be slow.'
         : 'Test failed: ' + e;
       toast(msg, 'err', 5000);
       if (status) { status.textContent = '✕ Error'; status.className = 'set-status err'; }

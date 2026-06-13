@@ -45,7 +45,7 @@ def get_jd_prompt(jd_text: str) -> str:
 
     RULES:
     1. Return ONLY valid JSON. No markdown, no explanation, no extra text.
-    2. JD may be in any language — extract and return ALL values in English.
+    2. JD may be in any language - extract and return ALL values in English.
     3. required_skills: ALL skills, tools, technologies, competencies marked as required or essential. Split compound entries into individual items (e.g. "Python incl. Pydantic-AI, LangGraph" → ["python", "pydantic-ai", "langgraph"]).
     4. preferred_skills: bonus, nice-to-have, or optional skills only.
     5. responsibilities: split into individual action items. Translate to English.

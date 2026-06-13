@@ -1,4 +1,4 @@
-﻿# src/matcher/matcher.py
+# src/matcher/matcher.py
 """
 Main matcher for JOBsFitAI.
 
@@ -40,8 +40,8 @@ from src.matcher.scores import (
     score_certifications,
 )
 from src.matcher.utils import get_score_label
-from src.utils.config  import WEIGHTS
-from src.utils.logger  import get_logger
+from src.utils.config import WEIGHTS
+from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -61,7 +61,7 @@ def match(resume: dict, jd: dict) -> dict:
     """
     # --- Validate inputs ---
     if not resume or not jd:
-        logger.error("Invalid inputs — resume or JD is empty")
+        logger.error("Invalid inputs - resume or JD is empty")
         return {}
 
     logger.debug("Starting match scoring")
@@ -70,7 +70,9 @@ def match(resume: dict, jd: dict) -> dict:
     req_score, matched_required, missing_required = score_required_skills(resume, jd)
     logger.debug("Required skills   : %.1f", req_score)
 
-    pref_score, matched_preferred, missing_preferred = score_preferred_skills(resume, jd)
+    pref_score, matched_preferred, missing_preferred = score_preferred_skills(
+        resume, jd
+    )
     logger.debug("Preferred skills  : %.1f", pref_score)
 
     resp_score = score_responsibilities(resume, jd)
@@ -93,13 +95,13 @@ def match(resume: dict, jd: dict) -> dict:
         return round(max(0.0, min(100.0, float(v))), 1)
 
     section_scores = {
-        "required_skills":  _clamp(req_score),
+        "required_skills": _clamp(req_score),
         "preferred_skills": _clamp(pref_score),
         "responsibilities": _clamp(resp_score),
-        "experience":       _clamp(exp_score),
-        "education":        _clamp(edu_score),
-        "languages":        _clamp(lang_score),
-        "certifications":   _clamp(cert_score),
+        "experience": _clamp(exp_score),
+        "education": _clamp(edu_score),
+        "languages": _clamp(lang_score),
+        "certifications": _clamp(cert_score),
     }
 
     # --- Compute weighted overall score ---
@@ -132,17 +134,23 @@ def match(resume: dict, jd: dict) -> dict:
     role = (jd.get("job") or {}).get("title") or "role"
     logger.info(
         "Scored %.0f%% %s · %s  (skills %.0f · resp %.0f · exp %.0f · edu %.0f · lang %.0f)",
-        overall_score, label, role[:40],
-        req_score, resp_score, exp_score, edu_score, lang_score
+        overall_score,
+        label,
+        role[:40],
+        req_score,
+        resp_score,
+        exp_score,
+        edu_score,
+        lang_score,
     )
 
     # --- Build results ---
     results = {
-        "overall_score":    overall_score,
-        "label":            label,
-        "section_scores":   section_scores,
-        "matched_required":  matched_required,
-        "missing_required":  missing_required,
+        "overall_score": overall_score,
+        "label": label,
+        "section_scores": section_scores,
+        "matched_required": matched_required,
+        "missing_required": missing_required,
         "matched_preferred": matched_preferred,
         "missing_preferred": missing_preferred,
     }

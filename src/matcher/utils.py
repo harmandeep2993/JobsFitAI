@@ -67,25 +67,25 @@ def get_resume_sections(resume: dict) -> dict:
     Returns:
         dict: Section name → text string mapping
     """
-    # Skills — flat list joined
+    # Skills - flat list joined
     skills = " ".join(get_all_skills(resume.get("skills", [])))
 
-    # Experience — all responsibilities across all entries joined
+    # Experience - all responsibilities across all entries joined
     experience_parts = []
     for entry in resume.get("experience_entries", []):
         experience_parts.extend(entry.get("responsibilities", []))
     experience = " ".join(experience_parts)
 
-    # Projects — title + description combined
+    # Projects - title + description combined
     project_parts = []
     for project in resume.get("projects", []):
         title = project.get("title", "")
-        desc  = project.get("description", "")
+        desc = project.get("description", "")
         techs = " ".join(project.get("technologies", []))
         project_parts.append(f"{title} {desc} {techs}")
     projects = " ".join(project_parts)
 
-    # Education — degree + field + institution
+    # Education - degree + field + institution
     education_parts = []
     for edu in resume.get("education", []):
         education_parts.append(
@@ -94,16 +94,16 @@ def get_resume_sections(resume: dict) -> dict:
     education = " ".join(education_parts)
 
     # Languages + certifications
-    languages     = " ".join(resume.get("languages", []))
+    languages = " ".join(resume.get("languages", []))
     certifications = " ".join(resume.get("certifications", []))
 
     return {
-        "skills":          skills.strip(),
-        "experience":      experience.strip(),
-        "projects":        projects.strip(),
-        "education":       education.strip(),
-        "languages":       languages.strip(),
-        "certifications":  certifications.strip(),
+        "skills": skills.strip(),
+        "experience": experience.strip(),
+        "projects": projects.strip(),
+        "education": education.strip(),
+        "languages": languages.strip(),
+        "certifications": certifications.strip(),
     }
 
 
@@ -119,9 +119,9 @@ def get_jd_sections(jd: dict) -> dict:
         dict: Section name → text string mapping
     """
     # Required + preferred skills combined for skills section
-    required  = " ".join(jd.get("required_skills", []))
+    required = " ".join(jd.get("required_skills", []))
     preferred = " ".join(jd.get("preferred_skills", []))
-    skills    = f"{required} {preferred}".strip()
+    skills = f"{required} {preferred}".strip()
 
     # Responsibilities
     experience = " ".join(jd.get("responsibilities", []))
@@ -133,16 +133,16 @@ def get_jd_sections(jd: dict) -> dict:
     education = " ".join(jd.get("education_requirements", []))
 
     # Languages + certifications
-    languages      = " ".join(jd.get("languages", []))
+    languages = " ".join(jd.get("languages", []))
     certifications = " ".join(jd.get("certifications", []))
 
     return {
-        "skills":          skills.strip(),
-        "experience":      experience.strip(),
-        "projects":        projects.strip(),
-        "education":       education.strip(),
-        "languages":       languages.strip(),
-        "certifications":  certifications.strip(),
+        "skills": skills.strip(),
+        "experience": experience.strip(),
+        "projects": projects.strip(),
+        "education": education.strip(),
+        "languages": languages.strip(),
+        "certifications": certifications.strip(),
     }
 
 
@@ -150,6 +150,7 @@ def get_jd_sections(jd: dict) -> dict:
 
 from sentence_transformers import util
 from src.matcher.embedding_model import load_model
+
 
 def _cosine_score(text_a: str, text_b: str) -> float:
     """
@@ -166,7 +167,7 @@ def _cosine_score(text_a: str, text_b: str) -> float:
         return 0.0
 
     model = load_model()
-    vecs  = model.encode([text_a, text_b], convert_to_tensor=True)
+    vecs = model.encode([text_a, text_b], convert_to_tensor=True)
     score = util.cos_sim(vecs[0], vecs[1]).item()
 
     return round(max(score, 0) * 100, 1)
@@ -175,7 +176,7 @@ def _cosine_score(text_a: str, text_b: str) -> float:
 def _best_match_score(source_list: list, target_list: list) -> float:
     """
     For each target item find the best matching source item.
-    Returns average of best matches — 0-100.
+    Returns average of best matches - 0-100.
 
     Args:
         source_list (list): Candidate items (resume)
@@ -187,12 +188,12 @@ def _best_match_score(source_list: list, target_list: list) -> float:
     if not source_list or not target_list:
         return 0.0
 
-    model       = load_model()
+    model = load_model()
     source_vecs = model.encode(source_list, convert_to_tensor=True)
     target_vecs = model.encode(target_list, convert_to_tensor=True)
 
-    sim_matrix      = util.cos_sim(target_vecs, source_vecs)
+    sim_matrix = util.cos_sim(target_vecs, source_vecs)
     best_per_target = sim_matrix.max(dim=1).values
-    score           = float(best_per_target.mean()) * 100
+    score = float(best_per_target.mean()) * 100
 
     return round(max(score, 0), 1)

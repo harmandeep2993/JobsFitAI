@@ -6,13 +6,13 @@
   --accent-h: #cf3d12;
   --accent-xl: rgba(232,71,26,0.06);
 
-  /* Surfaces — warm zinc */
+  /* Surfaces - warm zinc */
   --bg:     #f5f4f0;
   --bg-r:   #ffffff;
   --bg-c:   #fafaf8;
   --bg-hov: rgba(9,9,11,0.034);
 
-  /* Borders — zinc */
+  /* Borders - zinc */
   --bd:   rgba(9,9,11,0.08);
   --bd-s: rgba(9,9,11,0.05);
 
@@ -21,23 +21,23 @@
   --t2: #71717a;   /* zinc-500 */
   --t3: #a1a1aa;   /* zinc-400 */
 
-  /* Score palette — vivid & distinct */
-  --green:    #10b981;   /* emerald-500  – Excellent */
+  /* Score palette - vivid & distinct */
+  --green:    #10b981;   /* emerald-500  - Excellent */
   --green-bg: #ecfdf5;
   --green-bd: rgba(16,185,129,0.22);
   --green-glow: rgba(16,185,129,0.15);
 
-  --blue:    #6366f1;    /* indigo-500   – Good */
+  --blue:    #6366f1;    /* indigo-500   - Good */
   --blue-bg: #eef2ff;
   --blue-bd: rgba(99,102,241,0.22);
   --blue-glow: rgba(99,102,241,0.15);
 
-  --amber:    #f59e0b;   /* amber-500    – Partial */
+  --amber:    #f59e0b;   /* amber-500    - Partial */
   --amber-bg: #fffbeb;
   --amber-bd: rgba(245,158,11,0.22);
   --amber-glow: rgba(245,158,11,0.15);
 
-  --red:    #f43f5e;     /* rose-500     – Poor */
+  --red:    #f43f5e;     /* rose-500     - Poor */
   --red-bg: #fff1f2;
   --red-bd: rgba(244,63,94,0.22);
   --red-glow: rgba(244,63,94,0.15);

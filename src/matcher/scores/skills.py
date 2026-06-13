@@ -1,10 +1,10 @@
-﻿# src/matcher/scores/skills.py
+# src/matcher/scores/skills.py
 """
 Skill scoring functions for JOBsFitAI.
 
 Covers:
-    score_required_skills()  — semantic match, threshold 0.75
-    score_preferred_skills() — semantic match, threshold 0.70
+    score_required_skills()  - semantic match, threshold 0.75
+    score_preferred_skills() - semantic match, threshold 0.70
 """
 
 from sentence_transformers import util
@@ -16,13 +16,13 @@ from src.utils.logger import get_logger
 logger = get_logger(__name__)
 
 # Similarity thresholds
-# Kept in the semantic-match range — sentence-transformer cosine scores
+# Kept in the semantic-match range - sentence-transformer cosine scores
 # for genuine synonyms typically land ~0.5-0.75, so 0.90 collapsed the
 # matcher down to exact string matching only.
-REQUIRED_THRESHOLD  = 0.75
+REQUIRED_THRESHOLD = 0.75
 PREFERRED_THRESHOLD = 0.70
 
-# Neutral score when the JD lists no preferred skills — a missing
+# Neutral score when the JD lists no preferred skills - a missing
 # requirement must not penalize the candidate (mirrors score_languages).
 NO_REQUIREMENT_SCORE = 60.0
 
@@ -41,7 +41,7 @@ def score_required_skills(resume: dict, jd: dict) -> tuple[float, list, list]:
     Returns:
         tuple: (score 0-100, matched_skills, missing_skills)
     """
-    required  = [s.lower().strip() for s in jd.get("required_skills", []) if s]
+    required = [s.lower().strip() for s in jd.get("required_skills", []) if s]
     candidate = get_all_skills(resume.get("skills", []))
 
     logger.info("Required skills from JD: %s", required)
@@ -49,7 +49,9 @@ def score_required_skills(resume: dict, jd: dict) -> tuple[float, list, list]:
 
     # Edge cases
     if not required:
-        logger.info("No required skills in JD — returning neutral %.1f", NO_REQUIREMENT_SCORE)
+        logger.info(
+            "No required skills in JD - returning neutral %.1f", NO_REQUIREMENT_SCORE
+        )
         return NO_REQUIREMENT_SCORE, [], []
 
     if not candidate:
@@ -57,14 +59,14 @@ def score_required_skills(resume: dict, jd: dict) -> tuple[float, list, list]:
         return 0.0, [], required
 
     # Encode both lists
-    model          = load_model()
-    required_vecs  = model.encode(required,  convert_to_tensor=True)
+    model = load_model()
+    required_vecs = model.encode(required, convert_to_tensor=True)
     candidate_vecs = model.encode(candidate, convert_to_tensor=True)
 
     logger.debug("Encoded %d required skills", len(required))
     logger.debug("Encoded %d candidate skills", len(candidate))
 
-    # Similarity matrix — shape: (len(required), len(candidate))
+    # Similarity matrix - shape: (len(required), len(candidate))
     sim_matrix = util.cos_sim(required_vecs, candidate_vecs)
 
     matched = []
@@ -72,7 +74,7 @@ def score_required_skills(resume: dict, jd: dict) -> tuple[float, list, list]:
 
     for i, skill in enumerate(required):
         best_sim = sim_matrix[i].max().item()
-        logger.debug("Required skill '%s' — best similarity: %.4f", skill, best_sim)
+        logger.debug("Required skill '%s' - best similarity: %.4f", skill, best_sim)
 
         if skill in candidate:
             matched.append(skill)
@@ -116,8 +118,7 @@ def score_preferred_skills(resume: dict, jd: dict) -> tuple[float, list, list]:
     # Edge cases
     if not preferred:
         logger.info(
-            "No preferred skills in JD — returning neutral %.1f",
-            NO_REQUIREMENT_SCORE
+            "No preferred skills in JD - returning neutral %.1f", NO_REQUIREMENT_SCORE
         )
         return NO_REQUIREMENT_SCORE, [], []
 
@@ -126,10 +127,10 @@ def score_preferred_skills(resume: dict, jd: dict) -> tuple[float, list, list]:
 
     # Encode both lists
     model = load_model()
-    preferred_vecs = model.encode(preferred,  convert_to_tensor=True)
-    candidate_vecs = model.encode(candidate,  convert_to_tensor=True)
+    preferred_vecs = model.encode(preferred, convert_to_tensor=True)
+    candidate_vecs = model.encode(candidate, convert_to_tensor=True)
 
-    # Similarity matrix — shape: (len(preferred), len(candidate))
+    # Similarity matrix - shape: (len(preferred), len(candidate))
     sim_matrix = util.cos_sim(preferred_vecs, candidate_vecs)
 
     matched = []
@@ -143,7 +144,7 @@ def score_preferred_skills(resume: dict, jd: dict) -> tuple[float, list, list]:
             logger.info("Preferred skill '%s' found exactly in candidate skills", skill)
             continue
 
-        logger.info("Preferred skill '%s' — best similarity: %.4f", skill, best_sim)
+        logger.info("Preferred skill '%s' - best similarity: %.4f", skill, best_sim)
 
         if best_sim >= PREFERRED_THRESHOLD:
             matched.append(skill)

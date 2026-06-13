@@ -1,4 +1,4 @@
-﻿# src/fetchers/enrich.py
+# src/fetchers/enrich.py
 """
 Full job-description enrichment.
 
@@ -19,12 +19,12 @@ from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-_TAG_RE   = re.compile(r"<[^>]+>")
-_LD_RE    = re.compile(
+_TAG_RE = re.compile(r"<[^>]+>")
+_LD_RE = re.compile(
     r'<script[^>]*type="application/ld\+json"[^>]*>(.*?)</script>',
     re.DOTALL,
 )
-_HEADERS  = {"User-Agent": "Mozilla/5.0 (compatible; JobsFitAI/1.0)"}
+_HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; JobsFitAI/1.0)"}
 
 
 def _clean(text: str) -> str:
@@ -53,7 +53,7 @@ def fetch_full_description(url: str) -> str:
     Return the full job description from a posting's detail page, or "".
 
     Looks for a JSON-LD JobPosting; falls back to the longest JSON-LD
-    'description' string. Never raises — returns "" on any failure.
+    'description' string. Never raises - returns "" on any failure.
     """
     if not url:
         return ""

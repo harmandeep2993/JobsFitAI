@@ -1,24 +1,24 @@
-﻿# src/utils/config.py
+# src/utils/config.py
 """
 Configuration loader for JobsFitAI.
 
 Loads configuration from:
-    1. config.yaml — static provider configs, weights, limits
-    2. .env — API keys (never hardcode in config.yaml)
+    1. config.yaml - static provider configs, weights, limits
+    2. .env - API keys (never hardcode in config.yaml)
 
 Provider selection and API key are set at runtime via UI
-through src/utils/session.py — not from this file.
+through src/utils/session.py - not from this file.
 
 The configuration is loaded once when the module is imported
 and exposed as constants across the application.
 """
 
-import os
 import yaml
 from pathlib import Path
 from dotenv import load_dotenv
 
 import logging
+
 _logger = logging.getLogger(__name__)
 
 status = load_dotenv()
@@ -68,31 +68,32 @@ config = load_config()
 # starts with a broken config. Import is deferred to avoid a circular
 # dependency (settings.py imports nothing from this package).
 from src.utils.settings import validate_config as _validate_config
+
 _validate_config(config)
 
 # Common LLM parameters
 _llm = config["llm_config"]
 
-LLM_TIMEOUT            = _llm["timeout"]
-LLM_TEMPERATURE        = _llm["temperature"]
-LLM_MAX_OUTPUT_TOKENS  = _llm["max_output_tokens"]
-RESUME_MAX_CHARS       = _llm["resume_max_input_chars"]
-JD_MAX_CHARS           = _llm["jd_max_input_chars"]
+LLM_TIMEOUT = _llm["timeout"]
+LLM_TEMPERATURE = _llm["temperature"]
+LLM_MAX_OUTPUT_TOKENS = _llm["max_output_tokens"]
+RESUME_MAX_CHARS = _llm["resume_max_input_chars"]
+JD_MAX_CHARS = _llm["jd_max_input_chars"]
 
 # Provider configs
-OPENAI_CONFIG      = config["openai_provider"]
-GROQ_CONFIG        = config["groq_provider"]
-GEMINI_CONFIG      = config["gemini_provider"]
+OPENAI_CONFIG = config["openai_provider"]
+GROQ_CONFIG = config["groq_provider"]
+GEMINI_CONFIG = config["gemini_provider"]
 HUGGINGFACE_CONFIG = config["huggingface_provider"]
-OLLAMA_CONFIG      = config["ollama_provider"]
+OLLAMA_CONFIG = config["ollama_provider"]
 
 # All providers indexed by name
 PROVIDER_CONFIGS = {
-    "openai":      OPENAI_CONFIG,
-    "groq":        GROQ_CONFIG,
-    "gemini":      GEMINI_CONFIG,
+    "openai": OPENAI_CONFIG,
+    "groq": GROQ_CONFIG,
+    "gemini": GEMINI_CONFIG,
     "huggingface": HUGGINGFACE_CONFIG,
-    "ollama":      OLLAMA_CONFIG,
+    "ollama": OLLAMA_CONFIG,
 }
 
 # Parser
@@ -106,16 +107,16 @@ SUPPORTED_EXTENSIONS = set(config["validator"]["supported_extensions"])
 WEIGHTS = config["matcher"]["weights"]
 THRESHOLDS = config["matcher"]["thresholds"]
 
-# Job search — target roles + entry-level filtering
+# Job search - target roles + entry-level filtering
 _job_search = config.get("job_search", {})
-SEARCH_COUNTRY        = _job_search.get("default_country", "de")
-SEARCH_PER_TITLE      = _job_search.get("per_title_results", 5)
-MAX_EXPERIENCE_YEARS  = _job_search.get("max_experience_years", 2)
-MAX_AGE_DAYS          = _job_search.get("max_age_days", 45)
-AUTO_FETCH_MINUTES    = _job_search.get("auto_fetch_minutes", 0)
-TARGET_TITLES         = _job_search.get("target_titles", [])
-EXCLUDE_KEYWORDS      = _job_search.get("exclude_keywords", [])
-ENTRY_KEYWORDS        = _job_search.get("entry_keywords", [])
+SEARCH_COUNTRY = _job_search.get("default_country", "de")
+SEARCH_PER_TITLE = _job_search.get("per_title_results", 5)
+MAX_EXPERIENCE_YEARS = _job_search.get("max_experience_years", 2)
+MAX_AGE_DAYS = _job_search.get("max_age_days", 45)
+AUTO_FETCH_MINUTES = _job_search.get("auto_fetch_minutes", 0)
+TARGET_TITLES = _job_search.get("target_titles", [])
+EXCLUDE_KEYWORDS = _job_search.get("exclude_keywords", [])
+ENTRY_KEYWORDS = _job_search.get("entry_keywords", [])
 
 # Logging
 LOG_LEVEL = config.get("logging", {}).get("level", "INFO")

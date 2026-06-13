@@ -22,6 +22,7 @@ logger = get_logger(__name__)
 
 # Paragraph extraction
 
+
 def _extract_paragraphs(doc) -> list[str]:
     """
     Extract text from all paragraphs in the document.
@@ -45,6 +46,7 @@ def _extract_paragraphs(doc) -> list[str]:
 
 
 # Table extraction
+
 
 def _extract_tables(doc) -> list[str]:
     """
@@ -72,6 +74,7 @@ def _extract_tables(doc) -> list[str]:
 
 # Header and footer extraction
 
+
 def _extract_headers_footers(doc) -> list[str]:
     """
     Extract text from headers and footers across all sections.
@@ -98,6 +101,7 @@ def _extract_headers_footers(doc) -> list[str]:
 
 
 # Public API
+
 
 def parse_docx(file_path: str) -> str:
     """
@@ -130,11 +134,11 @@ def parse_docx(file_path: str) -> str:
 
         doc = Document(str(path))
 
-        paragraphs     = _extract_paragraphs(doc)
-        tables         = _extract_tables(doc)
+        paragraphs = _extract_paragraphs(doc)
+        tables = _extract_tables(doc)
         headers_footers = _extract_headers_footers(doc)
 
-        # Combine all sections — headers first as they often have contact info
+        # Combine all sections - headers first as they often have contact info
         all_text = "\n".join(headers_footers + paragraphs + tables).strip()
 
         if not all_text:
@@ -143,13 +147,12 @@ def parse_docx(file_path: str) -> str:
                 "The file may be empty or use an unsupported format."
             )
 
-        logger.info("DOCX extraction complete — %d chars extracted", len(all_text))
+        logger.info("DOCX extraction complete - %d chars extracted", len(all_text))
         return all_text
 
     except ImportError:
         raise RuntimeError(
-            "python-docx is not installed. "
-            "Run: pip install python-docx"
+            "python-docx is not installed. " "Run: pip install python-docx"
         )
     except ValueError:
         raise

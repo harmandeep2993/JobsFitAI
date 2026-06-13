@@ -3,7 +3,7 @@
 Runtime LLM selection state.
 
 Holds the currently active provider and (optional) model override chosen
-at runtime — e.g. from the Settings tab in the UI. This is in-memory only:
+at runtime - e.g. from the Settings tab in the UI. This is in-memory only:
 it applies for the life of the running process and resets to the
 config.yaml defaults on restart.
 
@@ -25,21 +25,21 @@ SUPPORTED_PROVIDERS = ["openai", "groq", "ollama"]
 
 # Default provider used until the user changes it.
 # OpenAI gpt-4o-mini has far higher rate limits than Groq's free tier
-# (which caps at 6k tokens/min — too small for this 3-call pipeline).
+# (which caps at 6k tokens/min - too small for this 3-call pipeline).
 DEFAULT_PROVIDER = "openai"
 
 # model = None means "use this provider's default model from config.yaml".
 _state = {
     "provider": DEFAULT_PROVIDER,
-    "model":    None,
+    "model": None,
 }
 
-# Extracted resume — cached in memory and persisted to SQLite so it
+# Extracted resume - cached in memory and persisted to SQLite so it
 # survives restarts (no re-extraction). "loaded" tracks whether we've
 # tried loading from the DB yet.
 _resume = {
-    "json":   None,
-    "name":   "",
+    "json": None,
+    "name": "",
     "loaded": False,
 }
 
@@ -94,7 +94,7 @@ def set_active(provider: str, model: str | None = None) -> None:
         raise ValueError(f"Unsupported provider: {provider!r}")
 
     _state["provider"] = provider
-    _state["model"]    = (model or "").strip() or None
+    _state["model"] = (model or "").strip() or None
 
     logger.info("Active LLM set to %s / %s", provider, get_model())
 
@@ -106,8 +106,8 @@ def get_settings() -> dict:
 
 def set_resume(resume_json: dict, name: str = "") -> None:
     """Store the extracted resume (in memory + persisted) for reuse."""
-    _resume["json"]   = resume_json
-    _resume["name"]   = name or ""
+    _resume["json"] = resume_json
+    _resume["name"] = name or ""
     _resume["loaded"] = True
 
     try:
@@ -118,8 +118,11 @@ def set_resume(resume_json: dict, name: str = "") -> None:
                 ON CONFLICT(id) DO UPDATE SET
                     name=excluded.name, json=excluded.json, created_at=excluded.created_at
                 """,
-                (_resume["name"], json.dumps(resume_json),
-                 datetime.now(timezone.utc).isoformat(timespec="seconds")),
+                (
+                    _resume["name"],
+                    json.dumps(resume_json),
+                    datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                ),
             )
     except Exception as e:
         logger.error("Failed to persist resume: %s", e)
@@ -162,22 +165,31 @@ def resume_info() -> dict:
     if not r:
         return {}
     return {
-        "name":        get_resume_name(),
-        "title":       (r.get("candidate") or {}).get("title", ""),
+        "name": get_resume_name(),
+        "title": (r.get("candidate") or {}).get("title", ""),
         "total_years": (r.get("meta") or {}).get("total_experience_years", 0),
-        "skills":      _flatten_skills(r.get("skills", [])),
+        "skills": _flatten_skills(r.get("skills", [])),
         "experience": [
-            {"title": e.get("title", ""), "company": e.get("company", ""),
-             "start": e.get("start_date", ""), "end": e.get("end_date", ""),
-             "years": e.get("duration_years", 0)}
-            for e in r.get("experience_entries", []) if isinstance(e, dict)
+            {
+                "title": e.get("title", ""),
+                "company": e.get("company", ""),
+                "start": e.get("start_date", ""),
+                "end": e.get("end_date", ""),
+                "years": e.get("duration_years", 0),
+            }
+            for e in r.get("experience_entries", [])
+            if isinstance(e, dict)
         ],
         "education": [
-            {"degree": e.get("degree", ""), "field": e.get("field", ""),
-             "institution": e.get("institution", "")}
-            for e in r.get("education", []) if isinstance(e, dict)
+            {
+                "degree": e.get("degree", ""),
+                "field": e.get("field", ""),
+                "institution": e.get("institution", ""),
+            }
+            for e in r.get("education", [])
+            if isinstance(e, dict)
         ],
-        "languages":      r.get("languages", []),
+        "languages": r.get("languages", []),
         "certifications": r.get("certifications", []),
     }
 
@@ -191,9 +203,11 @@ def provider_catalog() -> list[dict]:
     catalog = []
     for name in SUPPORTED_PROVIDERS:
         cfg = PROVIDER_CONFIGS.get(name, {})
-        catalog.append({
-            "name":          name,
-            "default_model": cfg.get("model", ""),
-            "models":        cfg.get("models", []),
-        })
+        catalog.append(
+            {
+                "name": name,
+                "default_model": cfg.get("model", ""),
+                "models": cfg.get("models", []),
+            }
+        )
     return catalog

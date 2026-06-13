@@ -1,4 +1,4 @@
-﻿# src/matcher/scores/certifications.py
+# src/matcher/scores/certifications.py
 """
 Certification scoring for JOBsFitAI.
 
@@ -50,7 +50,7 @@ def score_certifications(resume: dict, jd: dict) -> float:
     Returns:
         float: Certification score 0-100
     """
-    jd_certs     = [c.strip() for c in jd.get("certifications", [])     if c]
+    jd_certs = [c.strip() for c in jd.get("certifications", []) if c]
     resume_certs = [c.strip() for c in resume.get("certifications", []) if c]
 
     logger.info("JD certifications     : %s", jd_certs)
@@ -59,8 +59,8 @@ def score_certifications(resume: dict, jd: dict) -> float:
     # --- Edge case: no requirements ---
     if not jd_certs:
         logger.info(
-            "No certification requirements in JD — returning neutral %.1f",
-            NO_REQUIREMENT_SCORE
+            "No certification requirements in JD - returning neutral %.1f",
+            NO_REQUIREMENT_SCORE,
         )
         return NO_REQUIREMENT_SCORE
 
@@ -70,10 +70,7 @@ def score_certifications(resume: dict, jd: dict) -> float:
         return 0.0
 
     # --- Semantic best match ---
-    score = _best_match_score(
-        source_list=resume_certs,
-        target_list=jd_certs
-    )
+    score = _best_match_score(source_list=resume_certs, target_list=jd_certs)
 
     logger.info("Certifications score: %s", score)
     return score

@@ -18,7 +18,7 @@ def extract_all(resume_text: str, jd_text: str) -> tuple[dict, dict]:
     """
     Extract structured data from resume and job description.
 
-    Runs both extractors independently — a failure in one does not
+    Runs both extractors independently - a failure in one does not
     block the other.
 
     Args:
@@ -31,11 +31,11 @@ def extract_all(resume_text: str, jd_text: str) -> tuple[dict, dict]:
             Returns ({}, jd_json) or (resume_json, {}) on partial failure.
     """
     if not check_llm():
-        logger.error("LLM provider unavailable — aborting extraction")
+        logger.error("LLM provider unavailable - aborting extraction")
         return {}, {}
 
     if not resume_text or not jd_text:
-        logger.error("Missing resume or JD text — aborting extraction")
+        logger.error("Missing resume or JD text - aborting extraction")
         return {}, {}
 
     try:

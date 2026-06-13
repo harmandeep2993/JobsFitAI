@@ -4,7 +4,7 @@ ChromaDB vector store for cross-source semantic deduplication.
 
 The same job often appears on both Adzuna and Arbeitnow with different ids,
 so id-dedup misses it. We embed each scored job's title+company and, before
-scoring a new job, check the store for a near-duplicate — avoiding a wasted
+scoring a new job, check the store for a near-duplicate - avoiding a wasted
 extraction/score (and LLM tokens) on the same role twice.
 
 Embeddings come from the same local sentence-transformers model used for
@@ -20,7 +20,7 @@ from src.utils.logger import get_logger
 logger = get_logger(__name__)
 
 CHROMA_PATH = Path("data/chroma")
-_SIM_THRESHOLD = 0.93   # cosine similarity above which two jobs are "the same"
+_SIM_THRESHOLD = 0.93  # cosine similarity above which two jobs are "the same"
 
 _col = None
 _client = None
@@ -33,13 +33,14 @@ def _collection():
         return _col
     try:
         import chromadb
+
         CHROMA_PATH.mkdir(parents=True, exist_ok=True)
         _client = chromadb.PersistentClient(path=str(CHROMA_PATH))
         _col = _client.get_or_create_collection(
             "jobs", metadata={"hnsw:space": "cosine"}
         )
     except Exception as e:
-        logger.error("ChromaDB unavailable — dedup disabled: %s", e)
+        logger.error("ChromaDB unavailable - dedup disabled: %s", e)
         _col = None
     return _col
 
@@ -57,13 +58,17 @@ def is_duplicate(job) -> bool:
         if col.count() == 0:
             return False
         res = col.query(query_embeddings=[_embed(job)], n_results=1)
-        ids   = (res.get("ids") or [[]])[0]
+        ids = (res.get("ids") or [[]])[0]
         dists = (res.get("distances") or [[]])[0]
         if ids and dists and ids[0] != job.id:
             sim = 1.0 - dists[0]
             if sim >= _SIM_THRESHOLD:
-                logger.info("Duplicate: '%s' ~ stored '%s' (sim %.2f)",
-                            job.title[:30], ids[0], sim)
+                logger.info(
+                    "Duplicate: '%s' ~ stored '%s' (sim %.2f)",
+                    job.title[:30],
+                    ids[0],
+                    sim,
+                )
                 return True
     except Exception as e:
         logger.error("dedup query failed: %s", e)
@@ -79,7 +84,9 @@ def add(job) -> None:
         col.upsert(
             ids=[job.id],
             embeddings=[_embed(job)],
-            metadatas=[{"title": job.title, "company": job.company, "source": job.source}],
+            metadatas=[
+                {"title": job.title, "company": job.company, "source": job.source}
+            ],
         )
     except Exception as e:
         logger.error("vector add failed: %s", e)

@@ -9,7 +9,7 @@ instead of printed text.
 
 Reuse note:
     A fetched ``Job.description`` is plain text and can be passed straight
-    into ``src.extractors.extract_jd`` (or ``extract_all``) — see
+    into ``src.extractors.extract_jd`` (or ``extract_all``) - see
     PROJECT_STATE.md for the full reuse map.
 """
 
@@ -53,9 +53,9 @@ class Job:
     url: str
     description: str
     language: str
-    id: str = ""          # stable identifier for dedupe (source-specific)
-    source: str = ""      # e.g. "adzuna", "arbeitnow"
-    posted_at: str = ""   # publication time (unix epoch as string), if known
+    id: str = ""  # stable identifier for dedupe (source-specific)
+    source: str = ""  # e.g. "adzuna", "arbeitnow"
+    posted_at: str = ""  # publication time (unix epoch as string), if known
 
 
 def _clean_html(raw: str) -> str:
@@ -104,7 +104,7 @@ def _detect_language(text: str) -> str:
     try:
         return detect(text)
     except LangDetectException:
-        logger.warning("Language detection failed — defaulting to 'unknown'")
+        logger.warning("Language detection failed - defaulting to 'unknown'")
         return "unknown"
 
 
@@ -155,7 +155,7 @@ def fetch_adzuna_jobs(
                    or the request fails.
     """
     if not ADZUNA_APP_ID or not ADZUNA_APP_KEY:
-        logger.error("Missing ADZUNA_APP_ID / ADZUNA_APP_KEY — cannot fetch jobs")
+        logger.error("Missing ADZUNA_APP_ID / ADZUNA_APP_KEY - cannot fetch jobs")
         return []
 
     url = BASE_URL_TEMPLATE.format(country=country)
@@ -174,8 +174,12 @@ def fetch_adzuna_jobs(
         try:
             response = requests.get(url, params=params, timeout=15)
             if response.status_code in (429, 500, 502, 503, 504) and attempt < 2:
-                logger.warning("Adzuna %s for '%s' — retry %d",
-                               response.status_code, query, attempt + 1)
+                logger.warning(
+                    "Adzuna %s for '%s' - retry %d",
+                    response.status_code,
+                    query,
+                    attempt + 1,
+                )
                 time.sleep(1.0 * (attempt + 1))
                 continue
             response.raise_for_status()
@@ -226,7 +230,7 @@ def fetch_adzuna_multi(
 
     for i, title in enumerate(titles):
         if i:
-            time.sleep(0.3)   # gentle throttle to avoid Adzuna rate-limit (503)
+            time.sleep(0.3)  # gentle throttle to avoid Adzuna rate-limit (503)
         for job in fetch_adzuna_jobs(
             query=title, location=location, results=per_title, country=country
         ):
@@ -235,14 +239,17 @@ def fetch_adzuna_multi(
                 seen.add(key)
                 out.append(job)
 
-    logger.info("Adzuna multi-title: %d unique jobs across %d titles",
-                len(out), len(titles))
+    logger.info(
+        "Adzuna multi-title: %d unique jobs across %d titles", len(out), len(titles)
+    )
     return out
 
 
 if __name__ == "__main__":
-    # Manual smoke test — prints a compact view of fetched jobs.
-    for job in fetch_adzuna_jobs(query="python developer", location="berlin", results=3):
-        print(f"[{job.language}] {job.title} — {job.company} ({job.location})")
+    # Manual smoke test - prints a compact view of fetched jobs.
+    for job in fetch_adzuna_jobs(
+        query="python developer", location="berlin", results=3
+    ):
+        print(f"[{job.language}] {job.title} - {job.company} ({job.location})")
         print(f"  {job.url}")
         print("-" * 60)

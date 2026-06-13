@@ -1,11 +1,11 @@
-﻿# src/matcher/scores/experience.py
+# src/matcher/scores/experience.py
 """
 Experience scoring for JOBsFitAI.
 
 Two-step approach:
-    Step 1 — Relevance filter: identify which experience entries
+    Step 1 - Relevance filter: identify which experience entries
              are relevant to the JD using semantic similarity.
-    Step 2 — Score: semantic similarity between relevant experience
+    Step 2 - Score: semantic similarity between relevant experience
              text and JD experience requirements.
 
 Why two steps:
@@ -44,15 +44,12 @@ def _build_entry_text(entry: dict) -> str:
     parts = [
         entry.get("title", ""),
         entry.get("company", ""),
-        " ".join(entry.get("responsibilities", []))
+        " ".join(entry.get("responsibilities", [])),
     ]
     return " ".join(p for p in parts if p).strip()
 
 
-def _filter_relevant_entries(
-    experience_entries: list,
-    jd_context: str
-) -> list:
+def _filter_relevant_entries(experience_entries: list, jd_context: str) -> list:
     """
     Filter experience entries by semantic relevance to JD context.
     Entries with similarity >= RELEVANCE_THRESHOLD are kept.
@@ -65,8 +62,8 @@ def _filter_relevant_entries(
     Returns:
         list: Relevant experience entries only
     """
-    model   = load_model()
-    jd_vec  = model.encode(jd_context, convert_to_tensor=True)
+    model = load_model()
+    jd_vec = model.encode(jd_context, convert_to_tensor=True)
 
     relevant = []
 
@@ -78,13 +75,13 @@ def _filter_relevant_entries(
             continue
 
         entry_vec = model.encode(entry_text, convert_to_tensor=True)
-        sim       = util.cos_sim(jd_vec, entry_vec).item()
+        sim = util.cos_sim(jd_vec, entry_vec).item()
 
         logger.debug(
-            "Entry '%s @ %s' — relevance similarity: %.4f",
+            "Entry '%s @ %s' - relevance similarity: %.4f",
             entry.get("title", ""),
             entry.get("company", ""),
-            sim
+            sim,
         )
 
         if sim >= RELEVANCE_THRESHOLD:
@@ -97,9 +94,9 @@ def score_experience(resume: dict, jd: dict) -> float:
     """
     Score candidate experience against JD requirements.
 
-    Step 1 — Filter relevant experience entries via semantic
+    Step 1 - Filter relevant experience entries via semantic
              similarity against JD context.
-    Step 2 — Semantic similarity between relevant experience
+    Step 2 - Semantic similarity between relevant experience
              text and JD experience requirements.
 
     Fallback scores when JD has no explicit requirements:
@@ -113,9 +110,9 @@ def score_experience(resume: dict, jd: dict) -> float:
     Returns:
         float: Experience score 0-100
     """
-    experience_entries      = resume.get("experience_entries", [])
+    experience_entries = resume.get("experience_entries", [])
     experience_requirements = jd.get("experience_requirements", [])
-    jd_responsibilities     = jd.get("responsibilities", [])
+    jd_responsibilities = jd.get("responsibilities", [])
 
     logger.info("Total experience entries : %d", len(experience_entries))
     logger.info("JD experience requirements: %s", experience_requirements)
@@ -131,18 +128,16 @@ def score_experience(resume: dict, jd: dict) -> float:
 
     # --- Step 1: filter relevant entries ---
     if not jd_context:
-        # No JD context available — treat all entries as relevant
-        logger.warning("No JD context available — using all experience entries")
+        # No JD context available - treat all entries as relevant
+        logger.warning("No JD context available - using all experience entries")
         relevant_entries = experience_entries
     else:
-        relevant_entries = _filter_relevant_entries(
-            experience_entries, jd_context
-        )
+        relevant_entries = _filter_relevant_entries(experience_entries, jd_context)
 
     logger.info(
         "Relevant experience entries: %d / %d",
         len(relevant_entries),
-        len(experience_entries)
+        len(experience_entries),
     )
 
     for entry in relevant_entries:
@@ -150,34 +145,37 @@ def score_experience(resume: dict, jd: dict) -> float:
             "Relevant: '%s @ %s' (%.1f years)",
             entry.get("title", ""),
             entry.get("company", ""),
-            entry.get("duration_years", 0)
+            entry.get("duration_years", 0),
         )
 
     # --- Step 2: score against requirements ---
     if not experience_requirements:
-        # JD has no explicit requirements — return neutral/low score
+        # JD has no explicit requirements - return neutral/low score
         if relevant_entries:
-            logger.info("No explicit requirements — relevant experience found, returning neutral 60")
+            logger.info(
+                "No explicit requirements - relevant experience found, returning neutral 60"
+            )
             return 60.0
         else:
-            logger.warning("No explicit requirements and no relevant experience — returning 20")
+            logger.warning(
+                "No explicit requirements and no relevant experience - returning 20"
+            )
             return 20.0
 
     # Build candidate text from the relevant entries. If the relevance
     # filter excluded everything, fall back to ALL entries rather than
-    # zeroing the score — a candidate with real experience should still be
+    # zeroing the score - a candidate with real experience should still be
     # scored against the requirements, not penalized for a strict pre-filter.
     scoring_entries = relevant_entries or experience_entries
     if not relevant_entries:
         logger.info(
-            "No entries passed the relevance filter — scoring all %d entries instead",
-            len(experience_entries)
+            "No entries passed the relevance filter - scoring all %d entries instead",
+            len(experience_entries),
         )
 
-    candidate_text = " ".join([
-        _build_entry_text(entry)
-        for entry in scoring_entries
-    ]).strip()
+    candidate_text = " ".join(
+        [_build_entry_text(entry) for entry in scoring_entries]
+    ).strip()
 
     if not candidate_text:
         logger.warning("No experience text available to score")
@@ -186,13 +184,10 @@ def score_experience(resume: dict, jd: dict) -> float:
     requirements_text = " ".join(experience_requirements).strip()
 
     # Semantic similarity
-    model    = load_model()
-    vecs     = model.encode(
-        [candidate_text, requirements_text],
-        convert_to_tensor=True
-    )
-    sim      = util.cos_sim(vecs[0], vecs[1]).item()
-    score    = round(max(sim, 0) * 100, 1)
+    model = load_model()
+    vecs = model.encode([candidate_text, requirements_text], convert_to_tensor=True)
+    sim = util.cos_sim(vecs[0], vecs[1]).item()
+    score = round(max(sim, 0) * 100, 1)
 
     logger.info("Experience score: %s", score)
     return score

@@ -1,4 +1,4 @@
-﻿# src/utils/logger.py
+# src/utils/logger.py
 
 """
 Central logging configuration for JobsFitAI.
@@ -7,14 +7,14 @@ Usage in any module:
     from src.utils.logger import get_logger
     logger = get_logger(__name__)
 
-    logger.info("Extraction complete — %d chars", len(text))
+    logger.info("Extraction complete - %d chars", len(text))
     logger.warning("Page %d empty", page_num)
     logger.error("Failed: %s", error)
     logger.debug("Raw JSON: %s", data)
 
 Log output:
-    Console  — INFO and above (coloured)
-    File     — DEBUG and above (logs/jobsfitai.log, rotating 5MB x 3 backups)
+    Console  - INFO and above (coloured)
+    File     - DEBUG and above (logs/jobsfitai.log, rotating 5MB x 3 backups)
 
 Log level controlled via config.yaml:
     logging:
@@ -25,9 +25,9 @@ import logging
 import logging.handlers
 from pathlib import Path
 
-LOG_DIR      = Path("logs")
-LOG_FILE     = LOG_DIR / "jobsfitai.log"
-MAX_BYTES    = 5 * 1024 * 1024
+LOG_DIR = Path("logs")
+LOG_FILE = LOG_DIR / "jobsfitai.log"
+MAX_BYTES = 5 * 1024 * 1024
 BACKUP_COUNT = 3
 
 FILE_FORMAT = "%(asctime)s | %(levelname)-7s | %(name)-15s | %(message)s"
@@ -38,15 +38,28 @@ DATE_FORMAT = "%H:%M:%S"
 # job_matcher, app, …) log clean one-line INFO summaries and are NOT muted.
 # Set config logging.level to DEBUG to see all detail again.
 _QUIET_INTERNAL = [
-    "skills", "responsibilities", "experiences", "experience",
-    "education", "languages", "certifications",
-    "extract", "resume_prompt", "jd_prompt",
-    "router", "embedding_model", "config", "validator",
-    "pdf_parser", "docx_parser", "text_cleaner",
-    "summary", "match_store",
+    "skills",
+    "responsibilities",
+    "experiences",
+    "experience",
+    "education",
+    "languages",
+    "certifications",
+    "extract",
+    "resume_prompt",
+    "jd_prompt",
+    "router",
+    "embedding_model",
+    "config",
+    "validator",
+    "pdf_parser",
+    "docx_parser",
+    "text_cleaner",
+    "summary",
+    "match_store",
 ]
 
-# Module-level flag — survives re-imports in same process
+# Module-level flag - survives re-imports in same process
 _INITIALISED = False
 
 
@@ -57,17 +70,17 @@ class _ColourFormatter(logging.Formatter):
     """
 
     COLOURS = {
-        logging.DEBUG:    "\033[36m",
-        logging.INFO:     "\033[32m",
-        logging.WARNING:  "\033[33m",
-        logging.ERROR:    "\033[31m",
+        logging.DEBUG: "\033[36m",
+        logging.INFO: "\033[32m",
+        logging.WARNING: "\033[33m",
+        logging.ERROR: "\033[31m",
         logging.CRITICAL: "\033[35m",
     }
     RESET = "\033[0m"
 
     def format(self, record):
         colour = self.COLOURS.get(record.levelno, "")
-        reset  = self.RESET
+        reset = self.RESET
         fmt = (
             f"%(asctime)s | {colour}%(levelname)-7s{reset}"
             " | %(name)-15s | %(message)s"
@@ -79,10 +92,10 @@ class _ColourFormatter(logging.Formatter):
 def _setup_logging(level: str = "DEBUG") -> None:
     """
     Configure root logger with console + rotating file handlers.
-    Guarded by _INITIALISED flag — safe to call multiple times.
+    Guarded by _INITIALISED flag - safe to call multiple times.
 
     Args:
-        level (str): Log level — DEBUG | INFO | WARNING | ERROR
+        level (str): Log level - DEBUG | INFO | WARNING | ERROR
     """
     global _INITIALISED
 
@@ -95,7 +108,9 @@ def _setup_logging(level: str = "DEBUG") -> None:
     root.handlers.clear()
 
     numeric_level = getattr(logging, level.upper(), logging.DEBUG)
-    root.setLevel(numeric_level)  # root level matches config — filters debug when INFO set
+    root.setLevel(
+        numeric_level
+    )  # root level matches config - filters debug when INFO set
 
     # Console handler
     console = logging.StreamHandler()
@@ -107,9 +122,9 @@ def _setup_logging(level: str = "DEBUG") -> None:
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     file_handler = logging.handlers.RotatingFileHandler(
         LOG_FILE,
-        maxBytes    = MAX_BYTES,
-        backupCount = BACKUP_COUNT,
-        encoding    = "utf-8",
+        maxBytes=MAX_BYTES,
+        backupCount=BACKUP_COUNT,
+        encoding="utf-8",
     )
     file_handler.setLevel(logging.DEBUG)
     file_handler.setFormatter(logging.Formatter(FILE_FORMAT, datefmt=DATE_FORMAT))
@@ -117,18 +132,34 @@ def _setup_logging(level: str = "DEBUG") -> None:
 
     # Silence noisy third party loggers
     noisy_loggers = [
-        "nicegui", "uvicorn", "uvicorn.access", "uvicorn.error",
-        "fastapi", "httpx", "httpcore", "multipart",
-        "sentence_transformers", "transformers", "torch",
-        "PIL", "pdfplumber", "chromadb", "chromadb.telemetry",
-        "pdfminer", "pdfminer.pdfpage", "pdfminer.pdfinterp",
-        "pdfminer.pdfdocument", "pdfminer.pdfparser",
-        "pdfminer.cmapdb", "pdfminer.encodingdb", "pdfminer.converter",
+        "nicegui",
+        "uvicorn",
+        "uvicorn.access",
+        "uvicorn.error",
+        "fastapi",
+        "httpx",
+        "httpcore",
+        "multipart",
+        "sentence_transformers",
+        "transformers",
+        "torch",
+        "PIL",
+        "pdfplumber",
+        "chromadb",
+        "chromadb.telemetry",
+        "pdfminer",
+        "pdfminer.pdfpage",
+        "pdfminer.pdfinterp",
+        "pdfminer.pdfdocument",
+        "pdfminer.pdfparser",
+        "pdfminer.cmapdb",
+        "pdfminer.encodingdb",
+        "pdfminer.converter",
     ]
     for noisy in noisy_loggers:
         logging.getLogger(noisy).setLevel(logging.WARNING)
 
-    # These warn even at WARNING (e.g. HF unauthenticated-request notice) — mute to ERROR.
+    # These warn even at WARNING (e.g. HF unauthenticated-request notice) - mute to ERROR.
     for q in ("huggingface_hub", "huggingface_hub.utils._http", "safetensors"):
         logging.getLogger(q).setLevel(logging.ERROR)
 
@@ -145,10 +176,10 @@ def _setup_logging(level: str = "DEBUG") -> None:
 def get_logger(name: str) -> logging.Logger:
     """
     Get a named logger for a module.
-    Initialises logging on first call — subsequent calls are instant.
+    Initialises logging on first call - subsequent calls are instant.
 
     Args:
-        name (str): Module name — pass __name__
+        name (str): Module name - pass __name__
 
     Returns:
         logging.Logger: Configured logger instance
@@ -161,6 +192,7 @@ def get_logger(name: str) -> logging.Logger:
         level = "DEBUG"
         try:
             from src.utils.config import LOG_LEVEL
+
             level = LOG_LEVEL
         except Exception:
             pass

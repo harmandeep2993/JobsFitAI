@@ -16,3 +16,5 @@ prompts.skillwise_prompt.py
 .claude
 CLAUDE.md
 EXECUTION_PLAN.md
+.pre-commit-config.yaml
+scripts/

@@ -1,5 +1,5 @@
 // assets/js/toast.js
-// Slide-in toast notifications — replaces all alert() calls
+// Slide-in toast notifications - replaces all alert() calls
 
 (function () {
   function container() {

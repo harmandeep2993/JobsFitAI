@@ -1,6 +1,6 @@
 # config.example.yaml
 # Copy this to config.yaml and adjust values.
-# API keys are loaded from .env — do not hardcode keys here.
+# API keys are loaded from .env - do not hardcode keys here.
 # The active provider/model can also be changed at runtime from the
 # Settings tab in the UI (in-memory; resets to these defaults on restart).
 
@@ -50,7 +50,7 @@ huggingface_provider:
   model: "meta-llama/Llama-3.1-8B-Instruct"
 
 
-# Ollama — local only, no API key required
+# Ollama - local only, no API key required
 ollama_provider:
   provider_name: "ollama"
   url:        "http://localhost:11434/api/generate"
@@ -89,7 +89,7 @@ matcher:
     partial:   40
 
 
-# Job search — target roles and entry-level filtering for the Matches dashboard
+# Job search - target roles and entry-level filtering for the Matches dashboard
 job_search:
   default_country: "de"
   per_title_results: 50         # Adzuna results per title query (max 50); LLM gate filters them

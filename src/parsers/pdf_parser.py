@@ -21,6 +21,7 @@ logger = get_logger(__name__)
 
 # Tier 1: pdfplumber
 
+
 def _extract_pdfplumber(file_path: str) -> str:
     """
     Extract text using pdfplumber.
@@ -47,7 +48,7 @@ def _extract_pdfplumber(file_path: str) -> str:
         return "\n\n".join(pages).strip()
 
     except ImportError:
-        logger.warning("pdfplumber not installed — skipping tier 1")
+        logger.warning("pdfplumber not installed - skipping tier 1")
         return ""
     except Exception as e:
         logger.error("pdfplumber failed: %s", e)
@@ -55,6 +56,7 @@ def _extract_pdfplumber(file_path: str) -> str:
 
 
 # Tier 2: PyMuPDF
+
 
 def _extract_pymupdf(file_path: str) -> str:
     """
@@ -84,7 +86,7 @@ def _extract_pymupdf(file_path: str) -> str:
         return "\n\n".join(pages).strip()
 
     except ImportError:
-        logger.warning("PyMuPDF (fitz) not installed — skipping tier 2")
+        logger.warning("PyMuPDF (fitz) not installed - skipping tier 2")
         return ""
     except Exception as e:
         logger.error("PyMuPDF failed: %s", e)
@@ -92,6 +94,7 @@ def _extract_pymupdf(file_path: str) -> str:
 
 
 # Tier 3: OCR
+
 
 def _extract_ocr(file_path: str) -> str:
     """
@@ -109,10 +112,10 @@ def _extract_ocr(file_path: str) -> str:
         import pytesseract
         from pdf2image import convert_from_path
 
-        logger.info("Attempting OCR extraction — this may take a moment...")
+        logger.info("Attempting OCR extraction - this may take a moment...")
 
         images = convert_from_path(file_path, dpi=300)
-        pages  = []
+        pages = []
 
         for i, image in enumerate(images):
             page_text = pytesseract.image_to_string(image, lang="eng")
@@ -124,7 +127,9 @@ def _extract_ocr(file_path: str) -> str:
         return "\n\n".join(pages).strip()
 
     except ImportError:
-        logger.warning("OCR dependencies not installed (pytesseract/pdf2image) — skipping tier 3")
+        logger.warning(
+            "OCR dependencies not installed (pytesseract/pdf2image) - skipping tier 3"
+        )
         return ""
     except Exception as e:
         logger.error("OCR failed: %s", e)
@@ -132,6 +137,7 @@ def _extract_ocr(file_path: str) -> str:
 
 
 # Quality check
+
 
 def _is_good_extraction(text: str) -> bool:
     """
@@ -148,16 +154,17 @@ def _is_good_extraction(text: str) -> bool:
         return False
 
     printable = sum(1 for c in text if c.isprintable())
-    ratio     = printable / len(text)
+    ratio = printable / len(text)
 
     if ratio < 0.70:
-        logger.warning("Text quality poor — printable ratio: %.2f", ratio)
+        logger.warning("Text quality poor - printable ratio: %.2f", ratio)
         return False
 
     return True
 
 
 # Public API
+
 
 def parse_pdf(file_path: str) -> str:
     """
@@ -175,7 +182,7 @@ def parse_pdf(file_path: str) -> str:
 
     Raises:
         FileNotFoundError : File does not exist
-        ValueError        : PDF is unreadable — all tiers failed
+        ValueError        : PDF is unreadable - all tiers failed
     """
     path = Path(file_path)
 
@@ -192,23 +199,23 @@ def parse_pdf(file_path: str) -> str:
     text = _extract_pdfplumber(file_path)
 
     if _is_good_extraction(text):
-        logger.info("Tier 1 succeeded — %d chars extracted", len(text))
+        logger.info("Tier 1 succeeded - %d chars extracted", len(text))
         return text
 
     # Tier 2
-    logger.warning("Tier 1 insufficient — trying tier 2: PyMuPDF")
+    logger.warning("Tier 1 insufficient - trying tier 2: PyMuPDF")
     text = _extract_pymupdf(file_path)
 
     if _is_good_extraction(text):
-        logger.info("Tier 2 succeeded — %d chars extracted", len(text))
+        logger.info("Tier 2 succeeded - %d chars extracted", len(text))
         return text
 
     # Tier 3
-    logger.warning("Tier 2 insufficient — trying tier 3: OCR")
+    logger.warning("Tier 2 insufficient - trying tier 3: OCR")
     text = _extract_ocr(file_path)
 
     if _is_good_extraction(text):
-        logger.info("Tier 3 (OCR) succeeded — %d chars extracted", len(text))
+        logger.info("Tier 3 (OCR) succeeded - %d chars extracted", len(text))
         return text
 
     # All tiers failed

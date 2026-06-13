@@ -1,12 +1,12 @@
-﻿# src/parsers/resume_parser.py
+# src/parsers/resume_parser.py
 
 """
 Resume parsing entry point for JobsFitAI.
 
 Orchestrates the full parsing pipeline:
-    1. Validate   — check file before attempting extraction
-    2. Extract    — route to correct parser based on file type
-    3. Clean      — normalize and clean extracted text
+    1. Validate   - check file before attempting extraction
+    2. Extract    - route to correct parser based on file type
+    3. Clean      - normalize and clean extracted text
 
 Supported formats: PDF, DOCX, DOC, TXT
 
@@ -23,13 +23,13 @@ from src.parsers.docx_parser import parse_docx
 from src.parsers.text_cleaner import clean
 from src.utils.logger import get_logger
 
-# 
+#
 logger = get_logger(__name__)
 
 
 def extract_all_text(file_path: str) -> str:
     """
-    Full parsing pipeline — validate, extract, and clean resume text.
+    Full parsing pipeline - validate, extract, and clean resume text.
 
     Args:
         file_path (str): Path to the uploaded resume file

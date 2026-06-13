@@ -6,7 +6,6 @@ Uses an LLM to extract structured requirements from a job description.
 Includes light post-processing to normalize all string values to lowercase.
 """
 
-import json
 from src.utils.router import call_llm, parse_json_response
 from src.utils.config import JD_MAX_CHARS
 from src.prompts import get_jd_prompt
@@ -20,7 +19,7 @@ def _lowercase_all(data):
     Recursively convert all string values in a nested structure to lowercase.
 
     Args:
-        data: dict, list, or str — any nested combination
+        data: dict, list, or str - any nested combination
 
     Returns:
         Same structure with all strings lowercased and stripped
@@ -35,32 +34,32 @@ def _lowercase_all(data):
         return {k: _lowercase_all(v) for k, v in data.items()}
 
     else:
-        # Numbers, booleans, None — preserved as-is (expected, not an error).
+        # Numbers, booleans, None - preserved as-is (expected, not an error).
         return data
 
 
 _JD_FIELD_TYPES: dict = {
-    "job":                     dict,
-    "required_skills":         list,
-    "preferred_skills":        list,
-    "responsibilities":        list,
+    "job": dict,
+    "required_skills": list,
+    "preferred_skills": list,
+    "responsibilities": list,
     "experience_requirements": list,
-    "education_requirements":  list,
-    "languages":               list,
-    "certifications":          list,
-    "job_summary":             str,
+    "education_requirements": list,
+    "languages": list,
+    "certifications": list,
+    "job_summary": str,
 }
 
 _JD_DEFAULTS: dict = {
-    "job":                     {},
-    "required_skills":         [],
-    "preferred_skills":        [],
-    "responsibilities":        [],
+    "job": {},
+    "required_skills": [],
+    "preferred_skills": [],
+    "responsibilities": [],
     "experience_requirements": [],
-    "education_requirements":  [],
-    "languages":               [],
-    "certifications":          [],
-    "job_summary":             "",
+    "education_requirements": [],
+    "languages": [],
+    "certifications": [],
+    "job_summary": "",
 }
 
 
@@ -69,12 +68,14 @@ def _validate_jd_schema(result: dict) -> dict:
     for field, expected_type in _JD_FIELD_TYPES.items():
         val = result.get(field)
         if val is None:
-            logger.debug("JD field '%s' missing — using default", field)
+            logger.debug("JD field '%s' missing - using default", field)
             result[field] = _JD_DEFAULTS[field]
         elif not isinstance(val, expected_type):
             logger.warning(
-                "JD field '%s' has unexpected type %s (expected %s) — using default",
-                field, type(val).__name__, expected_type.__name__,
+                "JD field '%s' has unexpected type %s (expected %s) - using default",
+                field,
+                type(val).__name__,
+                expected_type.__name__,
             )
             result[field] = _JD_DEFAULTS[field]
     return result
@@ -114,21 +115,20 @@ def extract_jd(jd_text: str) -> dict:
         ValueError: If LLM response is not a valid dict
     """
     if not jd_text or not jd_text.strip():
-        logger.warning("Empty JD text received — returning empty dict")
+        logger.warning("Empty JD text received - returning empty dict")
         return {}
 
-    # Truncate to max allowed chars — safeguard for LLM input limits
+    # Truncate to max allowed chars - safeguard for LLM input limits
     if len(jd_text) > JD_MAX_CHARS:
         logger.warning(
-            "JD text truncated from %d to %d characters",
-            len(jd_text), JD_MAX_CHARS
+            "JD text truncated from %d to %d characters", len(jd_text), JD_MAX_CHARS
         )
         jd_text = jd_text[:JD_MAX_CHARS]
 
     prompt = get_jd_prompt(jd_text)
-    _res   = call_llm(prompt)
+    _res = call_llm(prompt)
     response = _res.text if (_res and _res.text) else None
-    result   = parse_json_response(response)
+    result = parse_json_response(response)
 
     if not isinstance(result, dict):
         logger.error("LLM response is not a dict: %s", result)
@@ -141,7 +141,7 @@ def extract_jd(jd_text: str) -> dict:
     if empty_keys:
         logger.debug("Empty JD fields: %s", empty_keys)
 
-    n_req  = len(result.get("required_skills", []))
+    n_req = len(result.get("required_skills", []))
     n_resp = len(result.get("responsibilities", []))
     logger.info("JD extracted: %d required skills, %d responsibilities", n_req, n_resp)
     return result

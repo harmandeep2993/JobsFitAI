@@ -21,6 +21,7 @@ logger = get_logger(__name__)
 
 # Unicode normalization
 
+
 def _normalize_unicode(text: str) -> str:
     """
     Normalize unicode characters to ASCII-compatible equivalents.
@@ -43,7 +44,9 @@ def _normalize_unicode(text: str) -> str:
     text = text.replace("\u2013", "-").replace("\u2014", "-")  # en-dash, em-dash
 
     # Replace bullet point variants with a standard dash
-    text = text.replace("\u2022", "-").replace("\u2023", "-")  # bullet, triangular bullet
+    text = text.replace("\u2022", "-").replace(
+        "\u2023", "-"
+    )  # bullet, triangular bullet
     text = text.replace("\u25cf", "-").replace("\u25cb", "-")  # filled/empty circle
 
     # Replace non-breaking space with regular space
@@ -53,6 +56,7 @@ def _normalize_unicode(text: str) -> str:
 
 
 # Broken word repair
+
 
 def _fix_broken_words(text: str) -> str:
     """
@@ -69,11 +73,12 @@ def _fix_broken_words(text: str) -> str:
         str: Text with broken words rejoined
     """
     # Pattern: word-\nnextword → wordnextword
-    text = re.sub(r'(\w)-\n(\w)', r'\1\2', text)
+    text = re.sub(r"(\w)-\n(\w)", r"\1\2", text)
     return text
 
 
 # Whitespace cleanup
+
 
 def _clean_whitespace(text: str) -> str:
     """
@@ -110,6 +115,7 @@ def _clean_whitespace(text: str) -> str:
 
 # Non-printable character removal
 
+
 def _remove_non_printable(text: str) -> str:
     """
     Remove non-printable and control characters from text.
@@ -122,14 +128,12 @@ def _remove_non_printable(text: str) -> str:
         str: Text with non-printable characters removed
     """
     # Keep printable chars plus newline and tab
-    cleaned = "".join(
-        ch for ch in text
-        if ch.isprintable() or ch in ("\n", "\t")
-    )
+    cleaned = "".join(ch for ch in text if ch.isprintable() or ch in ("\n", "\t"))
     return cleaned
 
 
 # Repeated punctuation cleanup
+
 
 def _clean_punctuation(text: str) -> str:
     """
@@ -144,18 +148,19 @@ def _clean_punctuation(text: str) -> str:
         str: Text with cleaned punctuation
     """
     # Remove lines that are only punctuation/symbols (separator lines)
-    text = re.sub(r'^\s*[=\-_*#|~]{3,}\s*$', '', text, flags=re.MULTILINE)
+    text = re.sub(r"^\s*[=\-_*#|~]{3,}\s*$", "", text, flags=re.MULTILINE)
 
     # Replace multiple dots with single space
-    text = re.sub(r'\.{3,}', ' ', text)
+    text = re.sub(r"\.{3,}", " ", text)
 
     # Replace multiple spaces with single space
-    text = re.sub(r'[ \t]{2,}', ' ', text)
+    text = re.sub(r"[ \t]{2,}", " ", text)
 
     return text
 
 
 # Public API
+
 
 def clean(text: str) -> str:
     """
@@ -189,7 +194,7 @@ def clean(text: str) -> str:
     text = _clean_whitespace(text)
 
     logger.info(
-        "Text cleaning complete — %d chars → %d chars (%.1f%% reduction)",
+        "Text cleaning complete - %d chars → %d chars (%.1f%% reduction)",
         original_len,
         len(text),
         (1 - len(text) / original_len) * 100 if original_len > 0 else 0,

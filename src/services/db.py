@@ -1,11 +1,11 @@
-﻿# src/services/db.py
+# src/services/db.py
 """
 SQLite persistence for JobsFitAI.
 
 A single local database file (data/jobsfitai.db, gitignored) holds scored
 job matches and the current extracted resume, so both survive restarts.
 
-Connections are short-lived (one per operation) for thread safety — NiceGUI
+Connections are short-lived (one per operation) for thread safety - NiceGUI
 runs endpoint work in a threadpool.
 """
 
@@ -77,7 +77,7 @@ def init() -> None:
             """
         )
         # Every job id we've ever encountered (incl. rejected), so we never
-        # re-fetch or re-classify the same posting — the main token saver.
+        # re-fetch or re-classify the same posting - the main token saver.
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS seen_jobs (
@@ -123,7 +123,9 @@ def init() -> None:
             """
         )
         # Migrate existing resumes table that predates extracted_json column.
-        resume_cols = [r[1] for r in conn.execute("PRAGMA table_info(resumes)").fetchall()]
+        resume_cols = [
+            r[1] for r in conn.execute("PRAGMA table_info(resumes)").fetchall()
+        ]
         if "extracted_json" not in resume_cols:
             conn.execute("ALTER TABLE resumes ADD COLUMN extracted_json TEXT")
         # Analysis history tied to stored resumes.

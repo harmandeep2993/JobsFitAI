@@ -1,4 +1,4 @@
-/* components.css – all UI components */
+/* components.css - all UI components */
 
 /* ── Card ─────────────────────────────────────────── */
 .card {
@@ -367,7 +367,7 @@
   background: linear-gradient(90deg, var(--accent), #ff8c6a);
 }
 
-/* SVG gauge ring — wrapper */
+/* SVG gauge ring - wrapper */
 .jt-score {
   width: 44px;
   height: 44px;
@@ -418,14 +418,14 @@
 .jt-score-val.sc-poor    { color: var(--red);   }
 .jt-score-val.sc-na      { color: var(--t3);    }
 
-/* score color classes — still used in results.css detail badge */
+/* score color classes - still used in results.css detail badge */
 .sc-exc     { color: var(--green); }
 .sc-good    { color: var(--blue);  }
 .sc-partial { color: var(--amber); }
 .sc-poor    { color: var(--red);   }
 .sc-na      { color: var(--t3);    }
 
-/* chips — inline row next to company */
+/* chips - inline row next to company */
 .jt-chips {
   display: flex;
   align-items: center;
@@ -1514,7 +1514,7 @@
 /* JD Clear doesn't need auto-margin since counter takes it */
 .az-pact-jd { margin-left: 0; }
 
-/* Upload zone inside panel — borderless, fills body */
+/* Upload zone inside panel - borderless, fills body */
 .az-panel-resume .up-zone {
   flex: 1;
   height: auto;
@@ -1595,7 +1595,7 @@
   padding-bottom: 32px;
 }
 
-/* Clipboard icon in JD empty state — top: 100px so the icon base lands ~6px above the 140px text line */
+/* Clipboard icon in JD empty state - top: 100px so the icon base lands ~6px above the 140px text line */
 .jd-empty-icon {
   display: none;
   position: absolute;
@@ -1615,7 +1615,7 @@
   box-shadow: 0 0 0 3px var(--accent-s);
 }
 
-/* JD counter moved to panel header — not absolute */
+/* JD counter moved to panel header - not absolute */
 .az-panel-hd .jd-counter {
   position: static;
   margin-left: auto;

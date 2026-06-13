@@ -24,23 +24,24 @@ MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
 
 
 ALLOWED_MIME_TYPES = {
-    ".pdf":  ["application/pdf"],
+    ".pdf": ["application/pdf"],
     ".docx": [
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         "application/zip",  # DOCX files are ZIP archives
     ],
-    ".txt":  ["text/plain"],
+    ".txt": ["text/plain"],
 }
 
 # Magic bytes (file headers) for format verification
 FILE_SIGNATURES = {
-    ".pdf":  b"%PDF",
-    ".docx": b"PK\x03\x04",  # ZIP header — DOCX is a ZIP archive
+    ".pdf": b"%PDF",
+    ".docx": b"PK\x03\x04",  # ZIP header - DOCX is a ZIP archive
     # ".doc":  b"\xd0\xcf\x11\xe0",  # Microsoft Compound Document
 }
 
 
 # Individual validators
+
 
 def _check_exists(path: Path) -> None:
     """
@@ -99,7 +100,9 @@ def _check_extension(path: Path) -> None:
     # check .doc extension after the supported check
     # because .doc is not supported by python-docx and we want to allow it with a warning
     if ext == ".doc":
-        logger.warning(".doc format has limited support — convert to .docx for best results.")
+        logger.warning(
+            ".doc format has limited support - convert to .docx for best results."
+        )
 
     if ext not in SUPPORTED_EXTENSIONS:
         raise ValueError(
@@ -123,26 +126,30 @@ def _check_mime_type(path: Path) -> None:
     """
     try:
         import magic
+
         mime = magic.from_file(str(path), mime=True)
-        ext  = path.suffix.lower()
+        ext = path.suffix.lower()
 
         allowed = ALLOWED_MIME_TYPES.get(ext, [])
 
         if mime not in allowed:
-            logger.warning("MIME type mismatch — extension: %s, detected: %s", ext, mime)
+            logger.warning(
+                "MIME type mismatch - extension: %s, detected: %s", ext, mime
+            )
             raise ValueError(
                 f"File content does not match extension. "
                 f"Expected {ext} file but detected: {mime}"
             )
 
         logger.info("MIME type verified: %s", mime)
-    
+
     except ValueError:
         raise
     except ImportError:
-        logger.debug("python-magic not installed — skipping MIME type check")
+        logger.debug("python-magic not installed - skipping MIME type check")
     except Exception as e:
-        logger.warning("MIME check failed unexpectedly: %s — skipping", e)
+        logger.warning("MIME check failed unexpectedly: %s - skipping", e)
+
 
 def _check_signature(path: Path) -> None:
     """
@@ -185,6 +192,7 @@ def _check_signature(path: Path) -> None:
 
 # Public API
 
+
 def validate(file_path: str) -> None:
     """
     Run all validation checks on an uploaded resume file.
@@ -200,7 +208,7 @@ def validate(file_path: str) -> None:
         file_path (str): Path to the uploaded file
 
     Returns:
-        None — raises on any validation failure
+        None - raises on any validation failure
 
     Raises:
         FileNotFoundError : File does not exist
