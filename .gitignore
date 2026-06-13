@@ -15,3 +15,4 @@ logs
 prompts.skillwise_prompt.py
 .claude
 CLAUDE.md
+EXECUTION_PLAN.md
