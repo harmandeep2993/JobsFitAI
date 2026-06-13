@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="/assets/css/layout.css"/>
   <link rel="stylesheet" href="/assets/css/components.css"/>
   <link rel="stylesheet" href="/assets/css/results.css"/>
+  <link rel="stylesheet" href="/assets/css/ats.css"/>
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 </head>
 <body>
@@ -26,6 +27,13 @@
           <circle cx="7" cy="7" r="5"/><path d="M11 11l3 3"/>
         </svg>
         <span>Resume Analyzer</span>
+      </div>
+      <div class="sb-item" id="nav-ats" onclick="showView('ats')">
+        <svg class="sb-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M8 1L2 4v4c0 3.3 2.5 5.8 6 7 3.5-1.2 6-3.7 6-7V4L8 1z"/>
+          <polyline points="5,8.5 7,10.5 11,5.5"/>
+        </svg>
+        <span>ATS Maker</span>
       </div>
       <div class="sb-item" id="nav-matches" onclick="showView('matches')">
         <svg class="sb-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
@@ -197,6 +205,9 @@
           </div>
         </div>
       </div><!-- /view-analyzer -->
+
+      <!-- ── ATS Maker ─────────────────────────────────── -->
+      <div id="view-ats" class="view" style="display:none;"></div><!-- /view-ats -->
 
       <!-- ── Job Matches ────────────────────────────────── -->
       <div id="view-matches" class="view">
@@ -455,6 +466,7 @@
 <script src="/assets/js/upload.js"></script>
 <script src="/assets/js/analysis.js"></script>
 <script src="/assets/js/rewrite.js"></script>
+<script src="/assets/js/ats.js"></script>
 <script src="/assets/js/fetch.js"></script>
 <script src="/assets/js/settings.js"></script>
 <script src="/assets/js/matches.js"></script>
