@@ -9,11 +9,12 @@ import math
 from src.utils import session
 from src.frontend.components import score_col, prog_grad, make_tags, safe_html
 
-_GAUGE_R    = 17
+_GAUGE_R = 17
 _GAUGE_CIRC = round(2 * math.pi * _GAUGE_R, 2)  # 106.81
 
 
 # ── Error panel ──────────────────────────────────────────────
+
 
 def render_error_panel(title: str, message: str) -> str:
     """Render a user-facing error inside the results nb-card style.
@@ -50,32 +51,52 @@ def _ico(d, s=16):
         f'stroke-linejoin="round">{d}</svg>'
     )
 
-_ICO_CHECK_CIRCLE = _ico('<circle cx="8" cy="8" r="6"/><polyline points="5,8.5 7,10.5 11,5.5"/>')
-_ICO_INFO_CIRCLE  = _ico('<circle cx="8" cy="8" r="6"/><line x1="8" y1="5.5" x2="8" y2="9"/><circle cx="8" cy="11" r=".6" fill="currentColor" stroke="none"/>')
-_ICO_ALERT        = _ico('<path d="M8 2L1.5 14h13L8 2z"/><line x1="8" y1="7" x2="8" y2="10"/><circle cx="8" cy="12.5" r=".6" fill="currentColor" stroke="none"/>')
-_ICO_BRIEFCASE    = _ico('<rect x="2" y="6" width="12" height="8" rx="1.5"/><path d="M5.5 6V4.5A1.5 1.5 0 0 1 7 3h2a1.5 1.5 0 0 1 1.5 1.5V6"/><line x1="2" y1="10" x2="14" y2="10"/>')
-_ICO_PENCIL       = _ico('<path d="M11.5 2.5l2 2-8 8H3.5V10.5l8-8z"/><line x1="9.5" y1="4.5" x2="11.5" y2="6.5"/>')
-_ICO_SCHOOL       = _ico('<polygon points="8,2.5 1,7 8,11.5 15,7"/><path d="M5 9.5V12c0 1 1.3 1.5 3 1.5s3-.5 3-1.5V9.5"/>')
-_ICO_SEND         = _ico('<line x1="14" y1="2" x2="2" y2="8"/><line x1="14" y1="2" x2="8" y2="14"/><line x1="14" y1="2" x2="6" y2="10"/>')
-_ICO_MATCH_SM     = _ico('<polyline points="3,8.5 6,11.5 13,4.5"/>', s=13)
-_ICO_GAP_SM       = _ico('<line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/>', s=13)
+
+_ICO_CHECK_CIRCLE = _ico(
+    '<circle cx="8" cy="8" r="6"/><polyline points="5,8.5 7,10.5 11,5.5"/>'
+)
+_ICO_INFO_CIRCLE = _ico(
+    '<circle cx="8" cy="8" r="6"/><line x1="8" y1="5.5" x2="8" y2="9"/><circle cx="8" cy="11" r=".6" fill="currentColor" stroke="none"/>'
+)
+_ICO_ALERT = _ico(
+    '<path d="M8 2L1.5 14h13L8 2z"/><line x1="8" y1="7" x2="8" y2="10"/><circle cx="8" cy="12.5" r=".6" fill="currentColor" stroke="none"/>'
+)
+_ICO_BRIEFCASE = _ico(
+    '<rect x="2" y="6" width="12" height="8" rx="1.5"/><path d="M5.5 6V4.5A1.5 1.5 0 0 1 7 3h2a1.5 1.5 0 0 1 1.5 1.5V6"/><line x1="2" y1="10" x2="14" y2="10"/>'
+)
+_ICO_PENCIL = _ico(
+    '<path d="M11.5 2.5l2 2-8 8H3.5V10.5l8-8z"/><line x1="9.5" y1="4.5" x2="11.5" y2="6.5"/>'
+)
+_ICO_SCHOOL = _ico(
+    '<polygon points="8,2.5 1,7 8,11.5 15,7"/><path d="M5 9.5V12c0 1 1.3 1.5 3 1.5s3-.5 3-1.5V9.5"/>'
+)
+_ICO_SEND = _ico(
+    '<line x1="14" y1="2" x2="2" y2="8"/><line x1="14" y1="2" x2="8" y2="14"/><line x1="14" y1="2" x2="6" y2="10"/>'
+)
+_ICO_MATCH_SM = _ico('<polyline points="3,8.5 6,11.5 13,4.5"/>', s=13)
+_ICO_GAP_SM = _ico(
+    '<line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/>', s=13
+)
 
 
 def get_direction(score):
-    if score >= 80: return "cg", "▲ Strong match"
-    if score >= 60: return "cb", "◆ Good match"
-    if score >= 40: return "ca", "◆ Partial match"
+    if score >= 80:
+        return "cg", "▲ Strong match"
+    if score >= 60:
+        return "cb", "◆ Good match"
+    if score >= 40:
+        return "ca", "◆ Partial match"
     return "cr", "▼ Poor match"
 
 
 PROG_LABELS = {
-    "required_skills":  "Required Skills",
+    "required_skills": "Required Skills",
     "responsibilities": "Responsibilities",
-    "experience":       "Experience",
-    "education":        "Education",
+    "experience": "Experience",
+    "education": "Education",
     "preferred_skills": "Preferred Skills",
-    "languages":        "Languages",
-    "certifications":   "Certifications",
+    "languages": "Languages",
+    "certifications": "Certifications",
 }
 
 
@@ -89,10 +110,10 @@ def render_metrics(score, matched_req, missing_req, c_yrs):
         missing_req (list):  Missing required skills
         c_yrs       (float): Candidate total experience years
     """
-    sc           = score_col(score)
+    sc = score_col(score)
     d_cls, d_txt = get_direction(score)
-    total_req    = len(matched_req) + len(missing_req)
-    exp_note     = f"{c_yrs} yrs experience"
+    total_req = len(matched_req) + len(missing_req)
+    exp_note = f"{c_yrs} yrs experience"
 
     return f"""
     <div class="metrics-grid fade-in">
@@ -122,7 +143,7 @@ def render_metrics(score, matched_req, missing_req, c_yrs):
 
 
 _SUM_SECTIONS = [
-    ("profile",   "Your Profile",           _ICO_BRIEFCASE,    "sum-sec--profile"),
+    ("profile", "Your Profile", _ICO_BRIEFCASE, "sum-sec--profile"),
     ("strengths", "Strengths for This Role", _ICO_CHECK_CIRCLE, "sum-sec--strengths"),
 ]
 
@@ -130,8 +151,8 @@ _SUM_SECTIONS = [
 def render_summary(summary_text, score=0, label="", matched_req=None, missing_req=None):
     import json as _json
 
-    tier   = score_tier(score)
-    gauge  = _gauge(score, tier)
+    tier = score_tier(score)
+    gauge = _gauge(score, tier)
 
     # Try to parse JSON (new LLM format)
     sections = None
@@ -143,15 +164,13 @@ def render_summary(summary_text, score=0, label="", matched_req=None, missing_re
         except (ValueError, TypeError):
             pass
 
-    # Hero card — gauge ring + verdict label
+    # Hero card - gauge ring + verdict label
     hero = (
-        f'<div class="sum-hero">'
-        + gauge +
-        f'<div class="sum-hero-info">'
+        '<div class="sum-hero">' + gauge + f'<div class="sum-hero-info">'
         f'<div class="sum-hero-label {tier}">{safe_html(label)}</div>'
         f'<div class="sum-hero-sub">{score}% overall match</div>'
-        f'</div>'
-        f'</div>'
+        f"</div>"
+        f"</div>"
     )
 
     if sections:
@@ -160,15 +179,15 @@ def render_summary(summary_text, score=0, label="", matched_req=None, missing_re
             bullets = sections.get(key, [])
             if not bullets:
                 continue
-            items_html = "".join(f'<li>{b}</li>' for b in bullets)
+            items_html = "".join(f"<li>{b}</li>" for b in bullets)
             cards.append(
                 f'<div class="sum-sec {mod}">'
                 f'<div class="sum-sec-hd">'
                 f'<span class="sum-sec-ico">{ico}</span>'
                 f'<span class="sum-sec-ttl">{heading}</span>'
-                f'</div>'
+                f"</div>"
                 f'<ul class="sum-sec-list">{items_html}</ul>'
-                f'</div>'
+                f"</div>"
             )
         body = "".join(cards)
     else:
@@ -176,17 +195,17 @@ def render_summary(summary_text, score=0, label="", matched_req=None, missing_re
         text = summary_text if summary_text else "<p>Summary not available.</p>"
         body = f'<div class="sum-body">{text}</div>'
 
-    return (
-        f'<div id="jf-summary" class="jf-panel fade-in">'
-        + hero
-        + body
-        + f'</div>'
-    )
+    return '<div id="jf-summary" class="jf-panel fade-in">' + hero + body + "</div>"
 
 
 SCORE_ORDER = [
-    "required_skills", "responsibilities", "experience",
-    "education", "preferred_skills", "languages", "certifications",
+    "required_skills",
+    "responsibilities",
+    "experience",
+    "education",
+    "preferred_skills",
+    "languages",
+    "certifications",
 ]
 
 
@@ -199,33 +218,53 @@ def _gauge(v, tier):
         f'<circle class="jt-gauge-arc {tier}" cx="22" cy="22" r="{_GAUGE_R}"'
         f' stroke-dasharray="{_GAUGE_CIRC}" stroke-dashoffset="{_GAUGE_CIRC}"'
         f' data-offset="{offset}"/>'
-        f'</svg>'
+        f"</svg>"
         f'<span class="jt-score-val {tier}">{v}%</span>'
-        f'</div>'
+        f"</div>"
     )
 
 
 def _bd_why(k, v, c_yrs=0):
     if k == "responsibilities":
-        if v >= 80: return "Your CV language closely mirrors the role's day-to-day duties"
-        if v >= 60: return "Decent keyword overlap. A few more JD phrases would strengthen this further"
-        if v >= 40: return "Limited overlap with job duties. Mirror the JD wording in your bullet points"
+        if v >= 80:
+            return "Your CV language closely mirrors the role's day-to-day duties"
+        if v >= 60:
+            return "Decent keyword overlap. A few more JD phrases would strengthen this further"
+        if v >= 40:
+            return "Limited overlap with job duties. Mirror the JD wording in your bullet points"
         return "Low alignment. Rewrite bullet points to reflect the role's language and responsibilities"
     if k == "experience":
         yrs = f"{c_yrs} yr{'s' if c_yrs != 1 else ''}"
-        if v >= 80: return f"Your {yrs} of experience aligns well with what this role expects"
-        if v >= 60: return f"Your {yrs} meets most requirements; the role may expect more seniority"
-        if v >= 40: return f"Your {yrs} is below typical expectations. Focus on impact over tenure"
+        if v >= 80:
+            return f"Your {yrs} of experience aligns well with what this role expects"
+        if v >= 60:
+            return f"Your {yrs} meets most requirements; the role may expect more seniority"
+        if v >= 40:
+            return (
+                f"Your {yrs} is below typical expectations. Focus on impact over tenure"
+            )
         return f"Significant experience gap. This role expects considerably more than {yrs}"
     if k == "education":
-        if v >= 80: return "Your educational background meets or exceeds the role's stated requirements"
-        if v >= 60: return "Education partially meets requirements. Emphasise relevant coursework"
-        if v >= 40: return "Education may fall short. Certifications or projects can compensate"
+        if v >= 80:
+            return "Your educational background meets or exceeds the role's stated requirements"
+        if v >= 60:
+            return (
+                "Education partially meets requirements. Emphasise relevant coursework"
+            )
+        if v >= 40:
+            return "Education may fall short. Certifications or projects can compensate"
         return "Education gap. The role specifies qualifications not visible in your profile"
     if k == "certifications":
-        if v >= 80: return "Your certifications cover what this role requires"
-        if v >= 60: return "Some certifications match. The role may expect additional credentials"
-        if v >= 40: return "Limited certification match. Check for specific credentials required"
+        if v >= 80:
+            return "Your certifications cover what this role requires"
+        if v >= 60:
+            return (
+                "Some certifications match. The role may expect additional credentials"
+            )
+        if v >= 40:
+            return (
+                "Limited certification match. Check for specific credentials required"
+            )
         return "Missing certifications that this role may require"
     return ""
 
@@ -237,7 +276,7 @@ def _bd_tag_row(label, items, css):
         f'<div class="bd-tag-row">'
         f'<span class="bd-tag-lbl">{label}</span>'
         f'<div class="tags-row">{make_tags(items, css)}</div>'
-        f'</div>'
+        f"</div>"
     )
 
 
@@ -248,67 +287,76 @@ _ICO_CHEVRON = (
 )
 
 
-def render_breakdown(scores, matched_req, missing_req, matched_pref, missing_pref, c_langs, r_langs, c_yrs=0):
+def render_breakdown(
+    scores,
+    matched_req,
+    missing_req,
+    matched_pref,
+    missing_pref,
+    c_langs,
+    r_langs,
+    c_yrs=0,
+):
     items = []
 
     for k in SCORE_ORDER:
         if k not in scores:
             continue
-        v    = int(round(scores[k]))
-        lbl  = PROG_LABELS.get(k, k)
+        v = int(round(scores[k]))
+        lbl = PROG_LABELS.get(k, k)
         tier = score_tier(v)
-        grd  = prog_grad(v)
+        grd = prog_grad(v)
         gauge = _gauge(v, tier)
 
         # Detail content (shown on expand)
         if k == "required_skills":
-            detail = (
-                _bd_tag_row("Matched", matched_req, "tg")
-                + _bd_tag_row("Missing", missing_req, "tr")
+            detail = _bd_tag_row("Matched", matched_req, "tg") + _bd_tag_row(
+                "Missing", missing_req, "tr"
             )
         elif k == "preferred_skills":
-            detail = (
-                _bd_tag_row("Have", matched_pref, "tg")
-                + _bd_tag_row("Missing", missing_pref, "ta")
+            detail = _bd_tag_row("Have", matched_pref, "tg") + _bd_tag_row(
+                "Missing", missing_pref, "ta"
             )
         elif k == "languages":
-            c_lower      = {l.lower() for l in c_langs}
-            lang_matched = [l for l in r_langs if l.lower() in c_lower]
-            lang_missing = [l for l in r_langs if l.lower() not in c_lower]
+            c_lower = {lang.lower() for lang in c_langs}
+            lang_matched = [lang for lang in r_langs if lang.lower() in c_lower]
+            lang_missing = [lang for lang in r_langs if lang.lower() not in c_lower]
             detail = (
-                _bd_tag_row("Candidate",        c_langs,      "tg")
-                + _bd_tag_row("Matched",         lang_matched, "tg")
-                + _bd_tag_row("Missing",         lang_missing, "tr")
+                _bd_tag_row("Candidate", c_langs, "tg")
+                + _bd_tag_row("Matched", lang_matched, "tg")
+                + _bd_tag_row("Missing", lang_missing, "tr")
             )
         else:
-            why    = _bd_why(k, v, c_yrs)
+            why = _bd_why(k, v, c_yrs)
             detail = f'<p class="bd-reason">{safe_html(why)}</p>' if why else ""
 
         detail_html = (
-            f'<div class="bd-item-detail">'
-            f'<div class="bd-item-detail-inner">{detail}</div>'
-            f'</div>'
-        ) if detail else ""
+            (
+                f'<div class="bd-item-detail">'
+                f'<div class="bd-item-detail-inner">{detail}</div>'
+                f"</div>"
+            )
+            if detail
+            else ""
+        )
 
         items.append(
             f'<div class="bd-item" data-open="false">'
-            # Header row — always visible, click to toggle
+            # Header row - always visible, click to toggle
             f'<div class="bd-item-hd" onclick="bdToggle(this.closest(\'.bd-item\'))">'
             f'<div class="bd-item-left">'
             f'<span class="bd-dot {tier}"></span>'
             f'<span class="bd-item-lbl">{safe_html(lbl)}</span>'
-            f'</div>'
+            f"</div>"
             f'<div class="bd-item-right">'
-            + gauge +
-            (f'<span class="bd-chevron">{_ICO_CHEVRON}</span>' if detail else '')
-            + f'</div>'
-            f'</div>'
-            # Progress bar — always visible
+            + gauge
+            + (f'<span class="bd-chevron">{_ICO_CHEVRON}</span>' if detail else "")
+            + f"</div>"
+            f"</div>"
+            # Progress bar - always visible
             f'<div class="bd-item-bar">'
             f'<div class="bd-bar"><div class="bd-bar-fill" style="width:{v}%;background:{grd};"></div></div>'
-            f'</div>'
-            + detail_html
-            + f'</div>'
+            f"</div>" + detail_html + "</div>"
         )
 
     return (
@@ -317,60 +365,64 @@ def render_breakdown(scores, matched_req, missing_req, matched_pref, missing_pre
         '<div class="tab-item"        onclick="jfTab(this,\'jf-breakdown\')">Breakdown</div>'
         '<div class="tab-item"        onclick="jfTab(this,\'jf-keywords\')">Keywords</div>'
         '<div class="tab-item"        onclick="jfTab(this,\'jf-reco\')">Recommendations</div>'
-        '</div>'
+        "</div>"
         '<div id="jf-breakdown" class="jf-panel" style="display:none;">'
         '<div class="bd-panel-hd">'
         '<span class="bd-panel-title">Score Breakdown</span>'
         '<button class="bd-expand-all" onclick="bdToggleAll(this)">Expand all</button>'
-        '</div>'
-        '<div class="bd-list">' + "".join(items) + '</div>'
-        '</div>'
+        "</div>"
+        '<div class="bd-list">' + "".join(items) + "</div>"
+        "</div>"
     )
 
 
 def render_keywords(matched_req, missing_req, matched_pref, missing_pref):
-    total   = len(matched_req) + len(missing_req) + len(matched_pref) + len(missing_pref)
+    total = len(matched_req) + len(missing_req) + len(matched_pref) + len(missing_pref)
     covered = len(matched_req) + len(matched_pref)
 
     if total == 0:
         return (
             '<div id="jf-keywords" class="jf-panel" style="display:none;">'
             '<p class="kw-empty">No keyword data extracted from this job description.</p>'
-            '</div>'
+            "</div>"
         )
 
-    pct  = round((covered / total) * 100)
+    pct = round((covered / total) * 100)
     tier = score_tier(pct)
-    grd  = prog_grad(pct)
+    grd = prog_grad(pct)
 
     coverage = (
         f'<div class="kw-card kw-coverage">'
         f'<div class="kw-coverage-hd">'
         f'<span class="kw-coverage-lbl">Keyword Coverage</span>'
         f'<span class="kw-coverage-pct {tier}">{covered} of {total} keywords matched</span>'
-        f'</div>'
+        f"</div>"
         f'<div class="bd-bar"><div class="bd-bar-fill" style="width:{pct}%;background:{grd};"></div></div>'
-        f'</div>'
+        f"</div>"
     )
 
     def kw_section(heading, matched, missing, miss_css="tr"):
         if not matched and not missing:
             return ""
-        matched_tags = "".join(f'<span class="tag tg">{safe_html(s)}</span>' for s in matched)
-        missing_tags = "".join(f'<span class="tag {miss_css}">{safe_html(s)}</span>' for s in missing)
+        matched_tags = "".join(
+            f'<span class="tag tg">{safe_html(s)}</span>' for s in matched
+        )
+        missing_tags = "".join(
+            f'<span class="tag {miss_css}">{safe_html(s)}</span>' for s in missing
+        )
         return (
             f'<div class="kw-card">'
             f'<div class="kw-section-hd">{heading}</div>'
             f'<div class="kw-tags">{matched_tags}{missing_tags}</div>'
-            f'</div>'
+            f"</div>"
         )
 
     return (
-        f'<div id="jf-keywords" class="jf-panel kw-panel" style="display:none;">'
+        '<div id="jf-keywords" class="jf-panel kw-panel" style="display:none;">'
         + coverage
         + kw_section("Required Skills", matched_req, missing_req, "tr")
         + kw_section("Preferred Skills", matched_pref, missing_pref, "ta")
-        + f'</div>'
+        + "</div>"
     )
 
 
@@ -385,8 +437,8 @@ def render_skills_gap(matched_req, missing_req, matched_pref, missing_pref):
         missing_pref (list): Missing preferred skills
     """
     sections = [
-        ("Required - Matched",  matched_req,  "tg"),
-        ("Required - Missing",  missing_req,  "tr"),
+        ("Required - Matched", matched_req, "tg"),
+        ("Required - Missing", missing_req, "tr"),
         ("Preferred - Matched", matched_pref, "tg"),
         ("Preferred - Missing", missing_pref, "ta"),
     ]
@@ -395,7 +447,7 @@ def render_skills_gap(matched_req, missing_req, matched_pref, missing_pref):
         f'<div class="gap-block">'
         f'<div class="gap-lbl">{safe_html(lbl)}</div>'
         f'<div class="tags-row">{make_tags(items, css)}</div>'
-        f'</div>'
+        f"</div>"
         for lbl, items, css in sections
     )
 
@@ -427,11 +479,12 @@ def render_languages(c_langs, r_langs):
     """
 
 
-def render_recommendations(score, missing_req, missing_pref, c_yrs,
-                            c_edu, r_edu_list, scores):
+def render_recommendations(
+    score, missing_req, missing_pref, c_yrs, c_edu, r_edu_list, scores
+):
     """
     Build recommendations panel HTML.
-    Rule-based — no LLM needed.
+    Rule-based - no LLM needed.
 
     Args:
         score        (float): Final match score
@@ -451,95 +504,124 @@ def render_recommendations(score, missing_req, missing_pref, c_yrs,
             f'<div class="reco-body">'
             f'<div class="reco-title">{title}</div>'
             f'<div class="reco-text">{body}</div>'
-            f'</div>'
-            f'</div>'
+            f"</div>"
+            f"</div>"
         )
 
     # Required skills gap - highest priority
     if missing_req:
-        tags = "".join(f"<span class='tag tr'>{safe_html(s)}</span>" for s in missing_req[:6])
-        items.append(_rcard(
-            "high", _ICO_ALERT, "Acquire the Missing Required Skills",
-            f'These skills appear in the job requirements but are not visible in your profile. '
-            f'Closing these gaps directly raises your match score and helps pass ATS screening.'
-            f'<div class="tags-row" style="margin-top:8px;">{tags}</div>'
-        ))
+        tags = "".join(
+            f"<span class='tag tr'>{safe_html(s)}</span>" for s in missing_req[:6]
+        )
+        items.append(
+            _rcard(
+                "high",
+                _ICO_ALERT,
+                "Acquire the Missing Required Skills",
+                f"These skills appear in the job requirements but are not visible in your profile. "
+                f"Closing these gaps directly raises your match score and helps pass ATS screening."
+                f'<div class="tags-row" style="margin-top:8px;">{tags}</div>',
+            )
+        )
 
     # Preferred skills gap
     if missing_pref:
-        tags = "".join(f"<span class='tag ta'>{safe_html(s)}</span>" for s in missing_pref[:5])
-        items.append(_rcard(
-            "med", _ICO_BRIEFCASE, "Strengthen with Preferred Skills",
-            f'These are listed as nice-to-have. Adding any of them increases your '
-            f'competitiveness over candidates who only meet the bare minimum.'
-            f'<div class="tags-row" style="margin-top:8px;">{tags}</div>'
-        ))
+        tags = "".join(
+            f"<span class='tag ta'>{safe_html(s)}</span>" for s in missing_pref[:5]
+        )
+        items.append(
+            _rcard(
+                "med",
+                _ICO_BRIEFCASE,
+                "Strengthen with Preferred Skills",
+                f"These are listed as nice-to-have. Adding any of them increases your "
+                f"competitiveness over candidates who only meet the bare minimum."
+                f'<div class="tags-row" style="margin-top:8px;">{tags}</div>',
+            )
+        )
 
     # CV language alignment
     resp_score = scores.get("responsibilities", 100)
     if resp_score < 50:
-        items.append(_rcard(
-            "med", _ICO_PENCIL, "Mirror the Job Description Language",
-            "Your CV phrasing does not closely match the role's requirements. "
-            "Rewrite your bullet points to use the same verbs and terms the JD uses. "
-            "ATS systems score candidates higher when language aligns."
-        ))
+        items.append(
+            _rcard(
+                "med",
+                _ICO_PENCIL,
+                "Mirror the Job Description Language",
+                "Your CV phrasing does not closely match the role's requirements. "
+                "Rewrite your bullet points to use the same verbs and terms the JD uses. "
+                "ATS systems score candidates higher when language aligns.",
+            )
+        )
 
     # Education gap
     if r_edu_list and c_edu:
         r_edu_text = " ".join(r_edu_list).lower()
         deg_hierarchy = ["phd", "msc", "bsc", "bachelor", "diploma"]
-        r_level = next(
-            (i for i, d in enumerate(deg_hierarchy) if d in r_edu_text), 99
-        )
+        r_level = next((i for i, d in enumerate(deg_hierarchy) if d in r_edu_text), 99)
         c_degrees = [e.get("degree", "").lower() for e in c_edu]
         c_level = min(
-            (i for i, d in enumerate(deg_hierarchy)
-             if any(d in cd for cd in c_degrees)),
+            (
+                i
+                for i, d in enumerate(deg_hierarchy)
+                if any(d in cd for cd in c_degrees)
+            ),
             default=99,
         )
         if c_level > r_level:
-            items.append(_rcard(
-                "low", _ICO_SCHOOL, "Compensate for the Education Gap",
-                f"The role specifies {safe_html(r_edu_list[0])} as a requirement. "
-                "Emphasise relevant certifications, self-study, or project work "
-                "that demonstrates equivalent knowledge and practical ability."
-            ))
+            items.append(
+                _rcard(
+                    "low",
+                    _ICO_SCHOOL,
+                    "Compensate for the Education Gap",
+                    f"The role specifies {safe_html(r_edu_list[0])} as a requirement. "
+                    "Emphasise relevant certifications, self-study, or project work "
+                    "that demonstrates equivalent knowledge and practical ability.",
+                )
+            )
 
     # Positive outcome cards
     if score >= 80:
-        items.append(_rcard(
-            "good", _ICO_SEND, "Your Profile is a Strong Fit",
-            "You meet the core requirements well. Write a focused cover letter that ties "
-            "your specific experience directly to the role's needs, then apply with confidence."
-        ))
+        items.append(
+            _rcard(
+                "good",
+                _ICO_SEND,
+                "Your Profile is a Strong Fit",
+                "You meet the core requirements well. Write a focused cover letter that ties "
+                "your specific experience directly to the role's needs, then apply with confidence.",
+            )
+        )
     elif score >= 60 and not missing_req:
-        items.append(_rcard(
-            "good", _ICO_CHECK_CIRCLE, "A Good Fit - Apply and Address Gaps in Your Cover Letter",
-            "You meet the essential requirements. Use your cover letter to speak directly "
-            "to any preferred skills you are working toward."
-        ))
+        items.append(
+            _rcard(
+                "good",
+                _ICO_CHECK_CIRCLE,
+                "A Good Fit - Apply and Address Gaps in Your Cover Letter",
+                "You meet the essential requirements. Use your cover letter to speak directly "
+                "to any preferred skills you are working toward.",
+            )
+        )
 
     if not items:
         return (
             '<div id="jf-reco" class="jf-panel" style="display:none;">'
             '<p class="reco-empty">No specific gaps identified. Review the Breakdown tab for detail.</p>'
-            '</div>'
+            "</div>"
         )
 
-    word   = f'recommendation{"s" if len(items) != 1 else ""}'
+    word = f'recommendation{"s" if len(items) != 1 else ""}'
     header = (
         f'<div class="reco-panel-hd">'
         f'<span class="reco-panel-count">{len(items)}</span>'
-        f' {word}'
-        f'</div>'
+        f" {word}"
+        f"</div>"
     )
 
     return (
-        f'<div id="jf-reco" class="jf-panel" style="display:none;">'
+        '<div id="jf-reco" class="jf-panel" style="display:none;">'
         + header
         + "".join(items)
-        + '</div>'
+        + "</div>"
     )
 
 
@@ -549,76 +631,92 @@ def render_swot(swot):
         return (
             '<div id="jf-swot" class="jf-panel" style="display:none;">'
             '<p style="color:var(--t3);font-size:13px;">SWOT analysis unavailable.</p>'
-            '</div>'
+            "</div>"
         )
 
     def quad(title, items, mod, icon):
         bullets = "".join(
-            f'<li class="swot-item">{safe_html(item)}</li>'
-            for item in items
+            f'<li class="swot-item">{safe_html(item)}</li>' for item in items
         )
         return (
             f'<div class="swot-quad swot-{mod}">'
             f'<div class="swot-quad-hd"><span class="swot-icon">{icon}</span>{safe_html(title)}</div>'
             f'<ul class="swot-list">{bullets}</ul>'
-            f'</div>'
+            f"</div>"
         )
 
     grid = (
-        quad("Strengths",     swot.get("strengths",     []), "s", "💪")
-        + quad("Weaknesses",    swot.get("weaknesses",    []), "w", "⚠️")
+        quad("Strengths", swot.get("strengths", []), "s", "💪")
+        + quad("Weaknesses", swot.get("weaknesses", []), "w", "⚠️")
         + quad("Opportunities", swot.get("opportunities", []), "o", "🚀")
-        + quad("Threats",       swot.get("threats",       []), "t", "🎯")
+        + quad("Threats", swot.get("threats", []), "t", "🎯")
     )
 
     return (
         f'<div id="jf-swot" class="jf-panel" style="display:none;">'
         f'<div class="swot-grid">{grid}</div>'
-        f'</div>'
+        f"</div>"
     )
 
 
-
-
 def score_tier(score):
-    if score >= 80: return "sc-exc"
-    if score >= 60: return "sc-good"
-    if score >= 40: return "sc-partial"
+    if score >= 80:
+        return "sc-exc"
+    if score >= 60:
+        return "sc-good"
+    if score >= 40:
+        return "sc-partial"
     return "sc-poor"
 
 
-
-def _bd_items_html(scores, matched_req, missing_req, matched_pref, missing_pref, c_langs, r_langs, c_yrs=0):
+def _bd_items_html(
+    scores,
+    matched_req,
+    missing_req,
+    matched_pref,
+    missing_pref,
+    c_langs,
+    r_langs,
+    c_yrs=0,
+):
     items = []
     for k in SCORE_ORDER:
         if k not in scores:
             continue
-        v     = int(round(scores[k]))
-        lbl   = PROG_LABELS.get(k, k)
-        tier  = score_tier(v)
-        grd   = prog_grad(v)
+        v = int(round(scores[k]))
+        lbl = PROG_LABELS.get(k, k)
+        tier = score_tier(v)
+        grd = prog_grad(v)
         gauge = _gauge(v, tier)
 
         if k == "required_skills":
-            detail = _bd_tag_row("Matched", matched_req, "tg") + _bd_tag_row("Missing", missing_req, "tr")
+            detail = _bd_tag_row("Matched", matched_req, "tg") + _bd_tag_row(
+                "Missing", missing_req, "tr"
+            )
         elif k == "preferred_skills":
-            detail = _bd_tag_row("Have", matched_pref, "tg") + _bd_tag_row("Missing", missing_pref, "ta")
+            detail = _bd_tag_row("Have", matched_pref, "tg") + _bd_tag_row(
+                "Missing", missing_pref, "ta"
+            )
         elif k == "languages":
-            c_lower      = {l.lower() for l in c_langs}
-            lang_matched = [l for l in r_langs if l.lower() in c_lower]
-            lang_missing = [l for l in r_langs if l.lower() not in c_lower]
+            c_lower = {lang.lower() for lang in c_langs}
+            lang_matched = [lang for lang in r_langs if lang.lower() in c_lower]
+            lang_missing = [lang for lang in r_langs if lang.lower() not in c_lower]
             detail = (
                 _bd_tag_row("Candidate", c_langs, "tg")
-                + _bd_tag_row("Matched",  lang_matched, "tg")
-                + _bd_tag_row("Missing",  lang_missing, "tr")
+                + _bd_tag_row("Matched", lang_matched, "tg")
+                + _bd_tag_row("Missing", lang_missing, "tr")
             )
         else:
-            why    = _bd_why(k, v, c_yrs)
+            why = _bd_why(k, v, c_yrs)
             detail = f'<p class="bd-reason">{safe_html(why)}</p>' if why else ""
 
         detail_html = (
-            f'<div class="bd-item-detail"><div class="bd-item-detail-inner">{detail}</div></div>'
-        ) if detail else ""
+            (
+                f'<div class="bd-item-detail"><div class="bd-item-detail-inner">{detail}</div></div>'
+            )
+            if detail
+            else ""
+        )
 
         items.append(
             f'<div class="bd-item" data-open="false">'
@@ -626,21 +724,21 @@ def _bd_items_html(scores, matched_req, missing_req, matched_pref, missing_pref,
             f'<div class="bd-item-left">'
             f'<span class="bd-dot {tier}"></span>'
             f'<span class="bd-item-lbl">{safe_html(lbl)}</span>'
-            f'</div>'
+            f"</div>"
             f'<div class="bd-item-right">'
             + gauge
-            + (f'<span class="bd-chevron">{_ICO_CHEVRON}</span>' if detail else '')
-            + f'</div></div>'
+            + (f'<span class="bd-chevron">{_ICO_CHEVRON}</span>' if detail else "")
+            + f"</div></div>"
             f'<div class="bd-item-bar">'
             f'<div class="bd-bar"><div class="bd-bar-fill" style="width:{v}%;background:{grd};"></div></div>'
-            f'</div>'
-            + detail_html
-            + f'</div>'
+            f"</div>" + detail_html + "</div>"
         )
     return "".join(items)
 
 
-def _reco_cards_html(score, missing_req, missing_pref, c_yrs, c_edu, r_edu_list, scores):
+def _reco_cards_html(
+    score, missing_req, missing_pref, c_yrs, c_edu, r_edu_list, scores
+):
     def _rc(level, icon, title, body):
         return (
             f'<div class="reco-card reco-{level}">'
@@ -648,45 +746,88 @@ def _reco_cards_html(score, missing_req, missing_pref, c_yrs, c_edu, r_edu_list,
             f'<div class="reco-body">'
             f'<div class="reco-title">{title}</div>'
             f'<div class="reco-text">{body}</div>'
-            f'</div></div>'
+            f"</div></div>"
         )
 
     cards = []
 
     if missing_req:
-        tags = "".join(f"<span class='tag tr'>{safe_html(s)}</span>" for s in missing_req[:6])
-        cards.append(_rc("high", _ICO_ALERT, "Acquire the Missing Required Skills",
-            f'These skills appear in the job requirements but are absent from your profile. '
-            f'<div class="tags-row" style="margin-top:8px;">{tags}</div>'))
+        tags = "".join(
+            f"<span class='tag tr'>{safe_html(s)}</span>" for s in missing_req[:6]
+        )
+        cards.append(
+            _rc(
+                "high",
+                _ICO_ALERT,
+                "Acquire the Missing Required Skills",
+                f"These skills appear in the job requirements but are absent from your profile. "
+                f'<div class="tags-row" style="margin-top:8px;">{tags}</div>',
+            )
+        )
 
     if missing_pref:
-        tags = "".join(f"<span class='tag ta'>{safe_html(s)}</span>" for s in missing_pref[:5])
-        cards.append(_rc("med", _ICO_BRIEFCASE, "Strengthen with Preferred Skills",
-            f'Nice-to-have skills that increase competitiveness over minimum-qualified candidates.'
-            f'<div class="tags-row" style="margin-top:8px;">{tags}</div>'))
+        tags = "".join(
+            f"<span class='tag ta'>{safe_html(s)}</span>" for s in missing_pref[:5]
+        )
+        cards.append(
+            _rc(
+                "med",
+                _ICO_BRIEFCASE,
+                "Strengthen with Preferred Skills",
+                f"Nice-to-have skills that increase competitiveness over minimum-qualified candidates."
+                f'<div class="tags-row" style="margin-top:8px;">{tags}</div>',
+            )
+        )
 
     if scores.get("responsibilities", 100) < 50:
-        cards.append(_rc("med", _ICO_PENCIL, "Mirror the Job Description Language",
-            "Rewrite bullet points to use the same verbs and terms the JD uses. "
-            "ATS systems score candidates higher when language aligns."))
+        cards.append(
+            _rc(
+                "med",
+                _ICO_PENCIL,
+                "Mirror the Job Description Language",
+                "Rewrite bullet points to use the same verbs and terms the JD uses. "
+                "ATS systems score candidates higher when language aligns.",
+            )
+        )
 
     if r_edu_list and c_edu:
         r_edu_text = " ".join(r_edu_list).lower()
-        deg_hier   = ["phd", "msc", "bsc", "bachelor", "diploma"]
-        r_level    = next((i for i, d in enumerate(deg_hier) if d in r_edu_text), 99)
-        c_degrees  = [e.get("degree", "").lower() for e in c_edu]
-        c_level    = min((i for i, d in enumerate(deg_hier) if any(d in cd for cd in c_degrees)), default=99)
+        deg_hier = ["phd", "msc", "bsc", "bachelor", "diploma"]
+        r_level = next((i for i, d in enumerate(deg_hier) if d in r_edu_text), 99)
+        c_degrees = [e.get("degree", "").lower() for e in c_edu]
+        c_level = min(
+            (i for i, d in enumerate(deg_hier) if any(d in cd for cd in c_degrees)),
+            default=99,
+        )
         if c_level > r_level:
-            cards.append(_rc("low", _ICO_SCHOOL, "Compensate for the Education Gap",
-                f"The role specifies {safe_html(r_edu_list[0])}. "
-                "Emphasise certifications, self-study, or projects that demonstrate equivalent knowledge."))
+            cards.append(
+                _rc(
+                    "low",
+                    _ICO_SCHOOL,
+                    "Compensate for the Education Gap",
+                    f"The role specifies {safe_html(r_edu_list[0])}. "
+                    "Emphasise certifications, self-study, or projects that demonstrate equivalent knowledge.",
+                )
+            )
 
     if score >= 80:
-        cards.append(_rc("good", _ICO_SEND, "Your Profile is a Strong Fit",
-            "Write a focused cover letter and apply with confidence."))
+        cards.append(
+            _rc(
+                "good",
+                _ICO_SEND,
+                "Your Profile is a Strong Fit",
+                "Write a focused cover letter and apply with confidence.",
+            )
+        )
     elif score >= 60 and not missing_req:
-        cards.append(_rc("good", _ICO_CHECK_CIRCLE, "A Good Fit - Apply and Address Gaps in Your Cover Letter",
-            "Use your cover letter to speak directly to preferred skills you are working toward."))
+        cards.append(
+            _rc(
+                "good",
+                _ICO_CHECK_CIRCLE,
+                "A Good Fit - Apply and Address Gaps in Your Cover Letter",
+                "Use your cover letter to speak directly to preferred skills you are working toward.",
+            )
+        )
 
     if not cards:
         return '<p class="rv2-empty">No specific gaps identified - review the Breakdown for detail.</p>'
@@ -696,19 +837,17 @@ def _reco_cards_html(score, missing_req, missing_pref, c_yrs, c_edu, r_edu_list,
 def _render_summary_panel(score, label, tier, summary_data):
     gauge = _gauge(score, tier)
     hero = (
-        f'<div class="sum-hero">'
-        + gauge
-        + f'<div class="sum-hero-info">'
+        '<div class="sum-hero">' + gauge + f'<div class="sum-hero-info">'
         f'<div class="sum-hero-label {tier}">{safe_html(label)}</div>'
         f'<div class="sum-hero-sub">{score}% overall match</div>'
-        f'</div>'
-        f'</div>'
+        f"</div>"
+        f"</div>"
     )
 
     secs = ""
     for key, css, icon, title in [
-        ("profile",   "sum-sec--profile",   _ICO_BRIEFCASE,    "Your Profile"),
-        ("strengths", "sum-sec--strengths",  _ICO_CHECK_CIRCLE, "Strengths"),
+        ("profile", "sum-sec--profile", _ICO_BRIEFCASE, "Your Profile"),
+        ("strengths", "sum-sec--strengths", _ICO_CHECK_CIRCLE, "Strengths"),
     ]:
         pts = summary_data.get(key, [])
         if not pts:
@@ -719,87 +858,113 @@ def _render_summary_panel(score, label, tier, summary_data):
             f'<div class="sum-sec-hd">'
             f'<span class="sum-sec-ico">{icon}</span>'
             f'<span class="sum-sec-ttl">{safe_html(title)}</span>'
-            f'</div>'
+            f"</div>"
             f'<ul class="sum-sec-list">{items}</ul>'
-            f'</div>'
+            f"</div>"
         )
 
     if not secs:
         secs = (
             '<div class="sum-sec sum-sec--profile">'
             '<div class="sum-sec-hd"><span class="sum-sec-ttl">Profile</span></div>'
-            '<ul class="sum-sec-list"><li style="color:var(--t3)">Summary not available — run the analysis first.</li></ul>'
-            '</div>'
+            '<ul class="sum-sec-list"><li style="color:var(--t3)">Summary not available - run the analysis first.</li></ul>'
+            "</div>"
         )
 
     return f'<div id="jf-summary" class="jf-panel">{hero}{secs}</div>'
 
 
-def _render_breakdown_panel(scores, matched_req, missing_req, matched_pref, missing_pref, c_langs, r_langs, c_yrs):
-    ctrl  = (
+def _render_breakdown_panel(
+    scores,
+    matched_req,
+    missing_req,
+    matched_pref,
+    missing_pref,
+    c_langs,
+    r_langs,
+    c_yrs,
+):
+    ctrl = (
         '<div class="bd-panel-hd">'
         '<span class="bd-panel-title">Score breakdown</span>'
         '<button class="bd-expand-all" onclick="bdToggleAll(this)">Expand all</button>'
-        '</div>'
+        "</div>"
     )
-    items = _bd_items_html(scores, matched_req, missing_req, matched_pref, missing_pref, c_langs, r_langs, c_yrs)
+    items = _bd_items_html(
+        scores,
+        matched_req,
+        missing_req,
+        matched_pref,
+        missing_pref,
+        c_langs,
+        r_langs,
+        c_yrs,
+    )
     return (
         f'<div id="jf-breakdown" class="jf-panel" style="display:none;">'
         f'{ctrl}<div class="bd-list">{items}</div>'
-        f'</div>'
+        f"</div>"
     )
 
 
 def _render_keywords_panel(matched_req, missing_req, matched_pref, missing_pref):
-    kw_total   = len(matched_req) + len(missing_req) + len(matched_pref) + len(missing_pref)
+    kw_total = (
+        len(matched_req) + len(missing_req) + len(matched_pref) + len(missing_pref)
+    )
     kw_covered = len(matched_req) + len(matched_pref)
-    kw_pct     = round((kw_covered / kw_total) * 100) if kw_total > 0 else 0
-    tier       = score_tier(kw_pct)
-    grd        = prog_grad(kw_pct)
+    kw_pct = round((kw_covered / kw_total) * 100) if kw_total > 0 else 0
+    tier = score_tier(kw_pct)
+    grd = prog_grad(kw_pct)
 
     def _section(title, items, tag_css):
         if not items:
             return ""
-        tags = "".join(f'<span class="tag {tag_css}">{safe_html(s)}</span>' for s in items)
-        return f'<div class="kw-section-hd">{title}</div><div class="kw-tags">{tags}</div>'
+        tags = "".join(
+            f'<span class="tag {tag_css}">{safe_html(s)}</span>' for s in items
+        )
+        return (
+            f'<div class="kw-section-hd">{title}</div><div class="kw-tags">{tags}</div>'
+        )
 
     coverage = (
         f'<div class="kw-coverage">'
         f'<div class="kw-coverage-hd">'
         f'<span class="kw-coverage-lbl">Overall keyword coverage</span>'
         f'<span class="kw-coverage-pct {tier}">{kw_pct}%</span>'
-        f'</div>'
+        f"</div>"
         f'<div class="bd-bar"><div class="bd-bar-fill" style="width:{kw_pct}%;background:{grd};"></div></div>'
-        f'</div>'
+        f"</div>"
     )
     sections = (
-        _section("Required — matched",  matched_req,  "tg")
-        + _section("Required — missing",  missing_req,  "tr")
-        + _section("Preferred — matched", matched_pref, "tg")
-        + _section("Preferred — missing", missing_pref, "ta")
+        _section("Required - matched", matched_req, "tg")
+        + _section("Required - missing", missing_req, "tr")
+        + _section("Preferred - matched", matched_pref, "tg")
+        + _section("Preferred - missing", missing_pref, "ta")
     )
     return (
         f'<div id="jf-keywords" class="jf-panel" style="display:none;">'
         f'<div class="kw-panel"><div class="kw-card">{coverage}{sections}</div></div>'
-        f'</div>'
+        f"</div>"
     )
 
 
-def build_results_html(results: dict, resume_json: dict, jd_json: dict, summary: str = "") -> str:
+def build_results_html(
+    results: dict, resume_json: dict, jd_json: dict, summary: str = ""
+) -> str:
     import json as _json
 
-    score        = results.get("overall_score", 0)
-    label        = results.get("label", "")
-    scores       = results.get("section_scores", {})
-    matched_req  = results.get("matched_required", [])
-    missing_req  = results.get("missing_required", [])
+    score = results.get("overall_score", 0)
+    label = results.get("label", "")
+    scores = results.get("section_scores", {})
+    matched_req = results.get("matched_required", [])
+    missing_req = results.get("missing_required", [])
     matched_pref = results.get("matched_preferred", [])
     missing_pref = results.get("missing_preferred", [])
 
-    c_yrs      = resume_json.get("meta", {}).get("total_experience_years", 0)
-    c_langs    = resume_json.get("languages", [])
-    r_langs    = jd_json.get("languages", [])
-    c_edu      = resume_json.get("education", [])
+    c_yrs = resume_json.get("meta", {}).get("total_experience_years", 0)
+    c_langs = resume_json.get("languages", [])
+    r_langs = jd_json.get("languages", [])
+    c_edu = resume_json.get("education", [])
     r_edu_list = jd_json.get("education_requirements", [])
 
     tier = score_tier(score)
@@ -819,54 +984,75 @@ def build_results_html(results: dict, resume_json: dict, jd_json: dict, summary:
         '<div class="tab-item" onclick="jfTab(this,\'jf-breakdown\')">Breakdown</div>'
         '<div class="tab-item" onclick="jfTab(this,\'jf-keywords\')">Keywords</div>'
         '<div class="tab-item" onclick="jfTab(this,\'jf-reco\')">Recommendations</div>'
-        '</div>'
+        "</div>"
     )
 
-    summary_panel   = _render_summary_panel(score, label, tier, summary_data)
-    breakdown_panel = _render_breakdown_panel(scores, matched_req, missing_req,
-                                              matched_pref, missing_pref, c_langs, r_langs, c_yrs)
-    keywords_panel  = _render_keywords_panel(matched_req, missing_req, matched_pref, missing_pref)
-    reco_panel      = (
-        f'<div id="jf-reco" class="jf-panel" style="display:none;">'
-        + _reco_cards_html(score, missing_req, missing_pref, c_yrs, c_edu, r_edu_list, scores)
-        + '</div>'
+    summary_panel = _render_summary_panel(score, label, tier, summary_data)
+    breakdown_panel = _render_breakdown_panel(
+        scores,
+        matched_req,
+        missing_req,
+        matched_pref,
+        missing_pref,
+        c_langs,
+        r_langs,
+        c_yrs,
+    )
+    keywords_panel = _render_keywords_panel(
+        matched_req, missing_req, matched_pref, missing_pref
+    )
+    reco_panel = (
+        '<div id="jf-reco" class="jf-panel" style="display:none;">'
+        + _reco_cards_html(
+            score, missing_req, missing_pref, c_yrs, c_edu, r_edu_list, scores
+        )
+        + "</div>"
     )
 
     callout = (
         '<div class="callout">'
         '<span class="callout-icon">'
         + _ICO_INFO_CIRCLE
-        + '</span><span>Results are AI-generated. Scores are probabilistic — use as a guide, not a definitive judgement.</span>'
-        '</div>'
+        + "</span><span>Results are AI-generated. Scores are probabilistic - use as a guide, not a definitive judgement.</span>"
+        "</div>"
     )
     export_row = (
         '<div class="res-export-row">'
-        '<span class="foot-note">' + str(score) + '% &middot; ' + label + ' &middot; ' + session.get_model() + '</span>'
+        '<span class="foot-note">'
+        + str(score)
+        + "% &middot; "
+        + label
+        + " &middot; "
+        + session.get_model()
+        + "</span>"
         '<div class="res-export-btns">'
         '<button class="res-export-btn" onclick="copyResults()" title="Copy summary to clipboard">'
         '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'
         '<rect x="5" y="1" width="9" height="11" rx="1.5"/>'
         '<rect x="1" y="4" width="9" height="11" rx="1.5"/>'
-        '</svg>'
-        'Copy</button>'
+        "</svg>"
+        "Copy</button>"
         '<button class="res-export-btn" onclick="window.print()" title="Print report">'
         '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'
         '<path d="M4 6V1h8v5"/>'
         '<rect x="1" y="6" width="14" height="7" rx="1"/>'
         '<path d="M4 10h8M4 13h5"/>'
-        '</svg>'
-        'Print</button>'
-        '</div>'
-        '</div>'
+        "</svg>"
+        "Print</button>"
+        "</div>"
+        "</div>"
     )
 
     return (
         '<div class="res-section">'
         '<div class="nb-card">'
-        + tab_row + summary_panel + breakdown_panel + keywords_panel + reco_panel
-        + '</div>'
-        + callout + export_row
-        + '</div>'
+        + tab_row
+        + summary_panel
+        + breakdown_panel
+        + keywords_panel
+        + reco_panel
+        + "</div>"
+        + callout
+        + export_row
+        + "</div>"
     )
-
-
