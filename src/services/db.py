@@ -141,6 +141,16 @@ def init() -> None:
             )
             """
         )
+        # SHA-256 keyed cache of full analysis results (score, label, html).
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS analysis_cache (
+                hash        TEXT PRIMARY KEY,
+                result_json TEXT NOT NULL,
+                created_at  TEXT NOT NULL
+            )
+            """
+        )
     logger.info("SQLite ready at %s", DB_PATH)
 
 
