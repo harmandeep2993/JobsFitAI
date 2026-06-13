@@ -116,7 +116,8 @@ Rules:
 - No percentages, no em-dashes, no emojis, no score numbers
 - Be specific — name actual skills, not vague phrases"""
 
-    response = call_llm(prompt)
+    _res     = call_llm(prompt)
+    response = _res.text if (_res and _res.text) else None
 
     if response and len(response.strip()) > 20:
         import json, re
@@ -203,7 +204,8 @@ Return ONLY valid JSON, nothing else:
   "threats":       ["phrase 1", "phrase 2", "phrase 3"]
 }}"""
 
-    response = call_llm(prompt)
+    _res     = call_llm(prompt)
+    response = _res.text if (_res and _res.text) else None
 
     if response:
         match_obj = re.search(r'\{[\s\S]*\}', response)
