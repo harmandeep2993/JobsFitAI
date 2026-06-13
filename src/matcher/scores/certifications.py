@@ -1,6 +1,6 @@
-# src/matcher/scores/certifications.py
+﻿# src/matcher/scores/certifications.py
 """
-Certification scoring for JOBfitAI.
+Certification scoring for JOBsFitAI.
 
 Compares candidate certifications against JD required certifications
 using semantic similarity.

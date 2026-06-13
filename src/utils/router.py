@@ -1,6 +1,6 @@
-# src/utils/router.py
+﻿# src/utils/router.py
 """
-Unified LLM router for JobFitAI.
+Unified LLM router for JobsFitAI.
 All extractors call call_llm() and check_llm() only.
 Never import providers directly outside this file.
 

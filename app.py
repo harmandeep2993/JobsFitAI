@@ -1,7 +1,7 @@
-# app.py
+﻿# app.py
 
 """
-Application entry point for JobFitAI.
+Application entry point for JobsFitAI.
 
 Responsibilities:
 - Serve the static frontend (templates/index.html + assets/)
@@ -52,7 +52,7 @@ from src.services.summary import generate_summary
 from src.utils.config import SEARCH_PER_TITLE, MAX_AGE_DAYS
 
 
-app = FastAPI(title="JobFitAI")
+app = FastAPI(title="JobsFitAI")
 
 # Static assets
 app.mount("/assets", StaticFiles(directory="assets"), name="assets")
@@ -746,7 +746,7 @@ async def api_match_export() -> StreamingResponse:
         ])
 
     buf.seek(0)
-    filename = "jobfitai_matches.csv"
+    filename = "jobsfitai_matches.csv"
     return StreamingResponse(
         iter([buf.getvalue()]),
         media_type="text/csv",
@@ -845,7 +845,7 @@ if __name__ == "__main__":
     if _port_in_use(PORT):
         import sys
         print(
-            f"\n[JobFitAI] Port {PORT} is already in use — an old server is still running.\n"
+            f"\n[JobsFitAI] Port {PORT} is already in use — an old server is still running.\n"
             f"           Stop it first, then re-run:\n"
             f"           Windows    : taskkill /F /IM python.exe\n"
             f"           macOS/Linux: kill $(lsof -ti tcp:{PORT})\n"

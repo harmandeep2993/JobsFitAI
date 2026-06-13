@@ -1,6 +1,6 @@
-# src/matcher/scores/skills.py
+﻿# src/matcher/scores/skills.py
 """
-Skill scoring functions for JOBfitAI.
+Skill scoring functions for JOBsFitAI.
 
 Covers:
     score_required_skills()  — semantic match, threshold 0.75

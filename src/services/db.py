@@ -1,8 +1,8 @@
-# src/services/db.py
+﻿# src/services/db.py
 """
-SQLite persistence for JobFitAI.
+SQLite persistence for JobsFitAI.
 
-A single local database file (data/jobfitai.db, gitignored) holds scored
+A single local database file (data/jobsfitai.db, gitignored) holds scored
 job matches and the current extracted resume, so both survive restarts.
 
 Connections are short-lived (one per operation) for thread safety — NiceGUI
@@ -17,7 +17,7 @@ from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-DB_PATH = Path("data/jobfitai.db")
+DB_PATH = Path("data/jobsfitai.db")
 
 
 @contextmanager

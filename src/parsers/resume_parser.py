@@ -1,7 +1,7 @@
-# src/parsers/resume_parser.py
+﻿# src/parsers/resume_parser.py
 
 """
-Resume parsing entry point for JobFitAI.
+Resume parsing entry point for JobsFitAI.
 
 Orchestrates the full parsing pipeline:
     1. Validate   — check file before attempting extraction

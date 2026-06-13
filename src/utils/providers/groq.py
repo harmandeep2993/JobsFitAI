@@ -1,6 +1,6 @@
-# src/utils/providers/groq.py
+﻿# src/utils/providers/groq.py
 """
-Groq API provider for JobFitAI.
+Groq API provider for JobsFitAI.
 Groq uses OpenAI-compatible chat completions API.
 Get API key: https://console.groq.com
 """
