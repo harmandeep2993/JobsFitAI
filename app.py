@@ -46,7 +46,7 @@ from src.services.job_matcher import (
     rescore_all,
     fetch_combined,
 )
-from src.services import match_store, event_store, vector_store, settings_store, resume_store, analysis_store
+from src.services import match_store, event_store, vector_store, settings_store, resume_store, analysis_store, db
 import json as _json
 from src.services.summary import generate_summary
 from src.utils.config import SEARCH_PER_TITLE, MAX_AGE_DAYS
@@ -367,6 +367,41 @@ async def api_analyze(request: Request) -> JSONResponse:
         "score": results.get("overall_score", 0),
         "label": results.get("label", ""),
         "html":  html,
+    })
+
+
+# ── History ───────────────────────────────────────────────
+
+@app.get("/api/history")
+async def api_history() -> JSONResponse:
+    """Return all history sources: analyser runs, fetcher runs, applications."""
+    with db.connect() as conn:
+        analyses = conn.execute(
+            """SELECT a.jd_snippet, a.score, a.label, a.scored_at,
+                      r.label AS resume_label, r.slot
+               FROM analyses a
+               LEFT JOIN resumes r ON r.id = a.resume_id
+               ORDER BY a.scored_at DESC LIMIT 100"""
+        ).fetchall()
+
+        fetcher_runs = conn.execute(
+            """SELECT detail, created_at FROM events
+               WHERE type = 'run' ORDER BY id DESC LIMIT 100"""
+        ).fetchall()
+
+        applications = conn.execute(
+            """SELECT e.created_at AS applied_at, m.title, m.company, m.url, m.score, m.label
+               FROM events e
+               LEFT JOIN matches m ON m.id = e.job_id
+               WHERE e.type = 'applied'
+               ORDER BY e.id DESC LIMIT 100"""
+        ).fetchall()
+
+    return JSONResponse({
+        "ok":           True,
+        "analyses":     [dict(r) for r in analyses],
+        "fetcher_runs": [dict(r) for r in fetcher_runs],
+        "applications": [dict(r) for r in applications],
     })
 
 
