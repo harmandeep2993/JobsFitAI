@@ -39,7 +39,7 @@ Open `http://localhost:8000`. The single-page app is served from `templates/inde
 | `src/matcher/matcher.py` | Scoring engine — `match()` → `{overall_score, section_scores, matched_*, missing_*}` |
 | `src/extractors/resume.py` | LLM extraction of structured data from resume text |
 | `src/extractors/jd.py` | LLM extraction of structured data from a job description |
-| `src/utils/router.py` | `call_llm()` — single entry point for all LLM calls |
+| `src/utils/router.py` | `call_llm()` — single entry point for all LLM calls; returns `LLMResult`, handles retry + Groq fallback |
 | `src/utils/session.py` | In-memory resume + provider state for the job-match session |
 | `src/utils/config.py` | Loads `config.yaml` — `SEARCH_PER_TITLE`, `MAX_AGE_DAYS`, provider defaults |
 | `assets/css/theme.css` | CSS custom properties (all design tokens) |
@@ -165,6 +165,40 @@ GET /api/match/run  (fires background task)
       → match_store.upsert(), event_store.mark_seen()
   → event_store.log_event("run", detail=JSON)
 ```
+
+---
+
+## LLM router (`src/utils/router.py`)
+
+All LLM calls go through `call_llm(prompt)` — never import provider SDKs elsewhere.
+
+### Return type
+
+`call_llm()` returns `LLMResult | None`:
+
+```python
+@dataclass
+class LLMResult:
+    text:          str | None   # response text; None when all providers failed
+    provider_used: str          # "openai" | "groq" | "ollama" | "none"
+    attempts:      int          # total provider.call() invocations across all retries
+    degraded:      bool         # True when fell back to Groq OR text is None
+```
+
+Callers extract text with: `_res = call_llm(prompt); response = _res.text if (_res and _res.text) else None`
+
+### Retry and fallback
+
+1. Trim prompt so `prompt_tokens + LLM_MAX_OUTPUT_TOKENS <= 5800` (4 chars/token, truncates from the END)
+2. Try primary provider up to 4 attempts - backoff 1s / 2s / 4s / 8s + random jitter
+3. If primary exhausts retries: Groq (`llama-3.1-8b-instant`) fallback with the same retry logic
+4. If Groq also fails: return `LLMResult(text=None, degraded=True)`, never raise an exception
+
+Groq fallback is skipped when the primary IS Groq. `degraded=True` signals the answer came from the fallback or failed entirely.
+
+### 6000-token ceiling
+
+Hard limit: prompt + response combined must not exceed 6000 tokens. The router enforces `_MAX_TOTAL = 5800` (200-token safety margin). Oversized prompts are truncated before any provider call - the instruction at the top is always preserved since truncation happens from the END.
 
 ---
 
