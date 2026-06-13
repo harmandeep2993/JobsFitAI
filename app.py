@@ -351,16 +351,23 @@ async def api_analyze(request: Request) -> JSONResponse:
     if not results:
         return JSONResponse({"ok": False, "error": "scoring_failed"}, status_code=500)
 
-    html = build_results_html(results, resume_json, jd_json, summary or "")
+    try:
+        html = build_results_html(results, resume_json, jd_json, summary or "")
+    except Exception as e:
+        logger.error("build_results_html failed: %s", e, exc_info=True)
+        return JSONResponse({"ok": False, "error": "results_render_failed"}, status_code=500)
 
-    # Persist analysis history for stored resumes.
+    # Persist analysis history for stored resumes (non-fatal).
     if resume_id:
-        analysis_store.save(
-            resume_id,
-            jd_text[:120],
-            results.get("overall_score", 0),
-            results.get("label", ""),
-        )
+        try:
+            analysis_store.save(
+                resume_id,
+                jd_text[:120],
+                results.get("overall_score", 0),
+                results.get("label", ""),
+            )
+        except Exception as e:
+            logger.error("analysis_store.save failed: %s", e)
 
     return JSONResponse({
         "ok":    True,
