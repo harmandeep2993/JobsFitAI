@@ -112,7 +112,7 @@
   flex-shrink: 0;
 }
 
-/* Primary Optimise button */
+/* Primary generate button */
 .ats-run-btn {
   display: inline-flex;
   align-items: center;
@@ -191,7 +191,195 @@
   border-radius: var(--radius-s);
 }
 
-/* ── Section wrapper ──────────────────────────────────── */
+/* ── Coverage stat (compact) ──────────────────────────── */
+
+.ats-cov-stat {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  background: var(--bg-r);
+  border: 1px solid var(--bd);
+  border-radius: var(--radius);
+  box-shadow: var(--sha-s);
+  font-size: 12.5px;
+}
+
+.ats-cov-stat-lbl {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--t3);
+  margin-right: 4px;
+}
+
+.ats-cov-before-val {
+  font-family: 'DM Mono', monospace;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--t2);
+}
+
+.ats-cov-after-val {
+  font-family: 'DM Mono', monospace;
+  font-size: 14px;
+  font-weight: 700;
+}
+.ats-cov-after-val.sc-exc     { color: var(--green); }
+.ats-cov-after-val.sc-good    { color: var(--blue); }
+.ats-cov-after-val.sc-partial { color: var(--amber); }
+.ats-cov-after-val.sc-poor    { color: var(--red); }
+
+.ats-cov-gain {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--green);
+  background: var(--green-bg);
+  border: 1px solid var(--green-bd);
+  border-radius: 99px;
+  padding: 1px 8px;
+}
+
+.ats-cov-detail {
+  margin-left: auto;
+  font-size: 11.5px;
+  color: var(--t3);
+  font-family: 'DM Mono', monospace;
+}
+
+/* ── Generated resume card ────────────────────────────── */
+
+.ats-resume-card {
+  background: var(--bg-r);
+  border: 1px solid var(--bd);
+  border-radius: var(--radius);
+  box-shadow: var(--sha-s);
+  overflow: hidden;
+}
+
+.ats-resume-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 16px;
+  background: var(--bg-c);
+  border-bottom: 1px solid var(--bd-s);
+}
+
+.ats-resume-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--t3);
+}
+
+.ats-copy-resume-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--t1);
+  background: var(--bg-r);
+  border: 1px solid var(--bd);
+  border-radius: var(--radius-s);
+  cursor: pointer;
+  transition: background .12s, color .12s, border-color .12s;
+  font-family: inherit;
+  white-space: nowrap;
+}
+.ats-copy-resume-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+/* ── Resume body ──────────────────────────────────────── */
+
+.ats-resume-body {
+  padding: 24px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.ats-resume-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ATS-standard section heading - bold, uppercase, with bottom rule */
+.ats-resume-sh {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--t1);
+  padding-bottom: 5px;
+  border-bottom: 2px solid var(--bd);
+}
+
+.ats-resume-summary {
+  font-size: 13.5px;
+  line-height: 1.65;
+  color: var(--t1);
+  margin: 0;
+}
+
+/* ── Role entries ─────────────────────────────────────── */
+
+.ats-resume-role {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ats-role-hd {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--t1);
+  line-height: 1.4;
+}
+
+.ats-role-sep {
+  font-weight: 400;
+  color: var(--t3);
+  margin: 0 2px;
+}
+
+.ats-role-bullets {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ats-role-bullets li {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--t1);
+}
+
+/* ── Skills ───────────────────────────────────────────── */
+
+.ats-skills-text {
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--t1);
+  margin: 0;
+}
+
+/* ── Education entries ────────────────────────────────── */
+
+.ats-edu-entry {
+  font-size: 13px;
+  color: var(--t1);
+  line-height: 1.5;
+}
+
+/* ── Section wrapper (used by Quick Scan + warnings) ──── */
 
 .ats-section {
   background: var(--bg-r);
@@ -215,70 +403,27 @@
   color: var(--t3);
 }
 
-/* ── Coverage ─────────────────────────────────────────── */
+/* ── Warnings section (collapsible) ──────────────────── */
 
-.ats-coverage-rows {
+.ats-warn-toggle {
+  cursor: pointer;
+  user-select: none;
+}
+.ats-warn-toggle:hover { color: var(--t2); }
+
+.ats-warn-chevron {
+  margin-left: auto;
+  transition: transform .2s;
+  flex-shrink: 0;
+}
+
+.ats-warn-list {
+  display: none;
+}
+.ats-warn-list--open {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 14px 16px;
-}
-
-.ats-coverage-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.ats-cov-lbl {
-  font-size: 11.5px;
-  font-weight: 600;
-  color: var(--t3);
-  min-width: 42px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  font-family: 'DM Mono', monospace;
-}
-
-.ats-bar {
-  flex: 1;
-  height: 8px;
-  background: var(--bg-c);
-  border-radius: 99px;
-  overflow: hidden;
-  border: 1px solid var(--bd-s);
-}
-
-.ats-bar-fill {
-  height: 100%;
-  border-radius: 99px;
-  transition: width .65s cubic-bezier(.22,.68,0,1.2);
-}
-
-.ats-bar-fill--before {
-  background: var(--t3);
-}
-
-.ats-bar-fill--after {
-  background: var(--green);
-}
-
-.ats-cov-pct {
-  font-size: 12px;
-  font-weight: 700;
-  font-family: 'DM Mono', monospace;
-  color: var(--t2);
-  min-width: 36px;
-  text-align: right;
-}
-.ats-cov-pct--after { color: var(--green); }
-
-.ats-cov-count {
-  font-size: 11px;
-  color: var(--t3);
-  font-family: 'DM Mono', monospace;
-  min-width: 42px;
-  text-align: right;
+  gap: 1px;
 }
 
 /* ── Flag list ────────────────────────────────────────── */
@@ -330,109 +475,4 @@
   font-weight: 400;
   color: var(--t2);
   line-height: 1.5;
-}
-
-/* ── Rewrite groups ───────────────────────────────────── */
-
-.ats-rewrite-groups {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-}
-
-.ats-rewrite-group {
-  border-top: 1px solid var(--bd-s);
-}
-.ats-rewrite-group:first-child { border-top: none; }
-
-.ats-rewrite-hd {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 9px 14px;
-  background: var(--bg-c);
-  border-bottom: 1px solid var(--bd-s);
-}
-
-.ats-rewrite-hd-text {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--t1);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.ats-rewrite-company {
-  font-weight: 500;
-  color: var(--t3);
-  text-transform: none;
-  letter-spacing: 0;
-}
-
-.ats-rewrite-items {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-}
-
-/* ── Bullet items ─────────────────────────────────────── */
-
-.ats-bullet-item {
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--bd-s);
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.ats-bullet-item:last-child { border-bottom: none; }
-
-.ats-bullet-item--changed {
-  border-left: 3px solid var(--green);
-  padding-left: 11px;
-}
-
-.ats-bullet-before {
-  font-size: 12.5px;
-  color: var(--t3);
-  text-decoration: line-through;
-  text-decoration-color: var(--bd);
-  line-height: 1.5;
-}
-
-.ats-bullet-after-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-}
-
-.ats-bullet-after {
-  flex: 1;
-  font-size: 13px;
-  color: var(--t1);
-  font-weight: 500;
-  line-height: 1.55;
-}
-
-/* ── Copy button (mirrors rw-copy-btn) ────────────────── */
-
-.ats-copy-btn {
-  flex-shrink: 0;
-  padding: 2px 10px;
-  font-size: 11.5px;
-  font-weight: 600;
-  background: var(--bg-c);
-  border: 1px solid var(--bd);
-  border-radius: var(--radius-s);
-  color: var(--t2);
-  cursor: pointer;
-  transition: background .12s, color .12s, border-color .12s;
-  font-family: inherit;
-  white-space: nowrap;
-}
-.ats-copy-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
-
-.ats-copy-all-btn {
-  font-size: 11px;
-  padding: 2px 8px;
 }

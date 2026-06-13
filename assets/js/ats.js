@@ -1,5 +1,6 @@
 // assets/js/ats.js
-// ATS Maker view - optimise resume bullets against a job description.
+// ATS Maker view - generate a complete ATS-optimised resume from a stored
+// resume and a pasted job description.
 
 var _atsInitDone  = false;
 var _atsResumeId  = null;  // currently selected resume id
@@ -46,7 +47,7 @@ function _atsBuildShell() {
       '</div>' +
       '<div>' +
         '<h1 class="az-hero-title">ATS <em>Maker</em></h1>' +
-        '<p class="az-hero-sub">Optimise your resume bullets against a job description to pass ATS screening</p>' +
+        '<p class="az-hero-sub">Generate a complete ATS-optimised resume tailored to the job description</p>' +
       '</div>' +
     '</div>' +
 
@@ -88,7 +89,7 @@ function _atsBuildShell() {
             'Quick Scan' +
           '</button>' +
           '<button class="ats-run-btn" id="ats-run-btn" onclick="atGenerate()" disabled>' +
-            'Optimise' +
+            'Generate ATS Resume' +
             '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
               '<path d="M3 8h10M9 4l4 4-4 4"/>' +
             '</svg>' +
@@ -178,7 +179,6 @@ window.atsSelectResume = function(id, name) {
   _atsResumeId = id;
   window._atsResumeId = id;
 
-  // Update visual selection
   document.querySelectorAll('#ats-resume-picker .az-rv-card').forEach(function(c) {
     c.classList.toggle('selected', c.getAttribute('onclick').indexOf(id) !== -1);
   });
@@ -190,7 +190,6 @@ window.atsSelectResume = function(id, name) {
 // ── JD binding ────────────────────────────────────────────
 
 function _atsBindJD() {
-  // Bind after shell is in DOM - use event delegation on view container
   var view = document.getElementById('view-ats');
   if (!view) return;
 
@@ -244,10 +243,10 @@ window.atGenerate = function() {
   if (jd.length < 50) { if (typeof toast === 'function') toast('Paste a job description (at least 50 characters).', 'warn'); return; }
 
   var results = document.getElementById('ats-results');
-  if (results) results.innerHTML = '<div class="ats-loading">Optimising bullets&hellip; this may take a moment.</div>';
+  if (results) results.innerHTML = '<div class="ats-loading">Generating ATS-optimised resume&hellip; this may take a moment.</div>';
 
   var runBtn = document.getElementById('ats-run-btn');
-  if (runBtn) { runBtn.disabled = true; runBtn.textContent = 'Working…'; }
+  if (runBtn) { runBtn.disabled = true; runBtn.textContent = 'Generating…'; }
 
   fetch('/api/ats/optimise', {
     method:  'POST',
@@ -258,7 +257,7 @@ window.atGenerate = function() {
     .then(function(d) {
       if (!d.ok) {
         if (results) results.innerHTML =
-          '<div class="ats-error">' + _atsEsc(d.error || 'Optimisation failed. Please try again.') + '</div>';
+          '<div class="ats-error">' + _atsEsc(d.error || 'Generation failed. Please try again.') + '</div>';
         return;
       }
       atRenderResults(d);
@@ -268,10 +267,11 @@ window.atGenerate = function() {
         '<div class="ats-error">Request failed: ' + _atsEsc(String(e)) + '</div>';
     })
     .finally(function() {
+      var runBtn = document.getElementById('ats-run-btn');
       if (runBtn) {
         runBtn.disabled = false;
         runBtn.innerHTML =
-          'Optimise' +
+          'Generate ATS Resume' +
           '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
             '<path d="M3 8h10M9 4l4 4-4 4"/>' +
           '</svg>';
@@ -308,12 +308,13 @@ window.atCheck = function() {
         '<div class="ats-error">Request failed: ' + _atsEsc(String(e)) + '</div>';
     })
     .finally(function() {
+      var scanBtn = document.getElementById('ats-scan-btn');
       if (scanBtn) { scanBtn.disabled = false; scanBtn.textContent = 'Quick Scan'; }
       _atsUpdateButtons();
     });
 };
 
-// ── Results rendering ─────────────────────────────────────
+// ── Generate results rendering ────────────────────────────
 
 window.atRenderResults = function(d) {
   var results = document.getElementById('ats-results');
@@ -321,29 +322,28 @@ window.atRenderResults = function(d) {
 
   var html = '<div class="ats-results-inner">';
 
-  // Coverage section
+  // Compact coverage stat at the top
   if (d.coverage_before && d.coverage_after) {
-    html += _atsCoverageHTML(d.coverage_before, d.coverage_after);
+    html += _atsCoverageStatHTML(d.coverage_before, d.coverage_after);
   }
 
-  // Section flags
-  if (d.section_flags && d.section_flags.length) {
-    html += _atsSectionFlagsHTML(d.section_flags);
+  // Full generated resume card (main output)
+  if (d.resume) {
+    html += _atsResumeHTML(d.resume, d.plain_text || '');
   }
 
-  // Formatting flags
-  if (d.formatting_flags && d.formatting_flags.length) {
-    html += _atsFormattingFlagsHTML(d.formatting_flags);
-  }
-
-  // Rewritten bullets
-  if (d.rewrites && d.rewrites.length) {
-    html += _atsRewritesHTML(d.rewrites);
+  // Collapsible warnings - only if there are actual issues
+  var missingSections = (d.section_flags || []).filter(function(f) { return !f.found; });
+  var fmtFlags = d.formatting_flags || [];
+  if (missingSections.length || fmtFlags.length) {
+    html += _atsWarningsHTML(missingSections, fmtFlags);
   }
 
   html += '</div>';
   results.innerHTML = html;
 };
+
+// ── Quick Scan results rendering ──────────────────────────
 
 window.atRenderCheckResults = function(d) {
   var results = document.getElementById('ats-results');
@@ -367,50 +367,172 @@ window.atRenderCheckResults = function(d) {
   results.innerHTML = html;
 };
 
-// ── Coverage bar ──────────────────────────────────────────
+// ── Coverage stat (compact) ───────────────────────────────
 
-function _atsCoverageHTML(before, after) {
+function _atsCoverageStatHTML(before, after) {
   var bPct = before.pct || 0;
   var aPct = after.pct  || 0;
+  var gain = aPct - bPct;
+  var tierCls = aPct >= 80 ? 'sc-exc' : aPct >= 60 ? 'sc-good' : aPct >= 40 ? 'sc-partial' : 'sc-poor';
+  var gainHtml = gain > 0
+    ? '<span class="ats-cov-gain">+' + gain + '%</span>'
+    : '';
 
   return (
-    '<div class="ats-section ats-coverage">' +
-      '<div class="ats-section-hd">' +
-        '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
-          '<path d="M1 8h14M8 1v14"/>' +
-        '</svg>' +
-        '<span>Keyword Coverage</span>' +
-      '</div>' +
-      '<div class="ats-coverage-rows">' +
-        '<div class="ats-coverage-row">' +
-          '<span class="ats-cov-lbl">Before</span>' +
-          '<div class="ats-bar">' +
-            '<div class="ats-bar-fill ats-bar-fill--before" style="width:' + bPct + '%"></div>' +
-          '</div>' +
-          '<span class="ats-cov-pct">' + bPct + '%</span>' +
-          '<span class="ats-cov-count">' + before.matched.length + '/' + before.total + '</span>' +
-        '</div>' +
-        '<div class="ats-coverage-row">' +
-          '<span class="ats-cov-lbl">After</span>' +
-          '<div class="ats-bar">' +
-            '<div class="ats-bar-fill ats-bar-fill--after" style="width:' + aPct + '%"></div>' +
-          '</div>' +
-          '<span class="ats-cov-pct ats-cov-pct--after">' + aPct + '%</span>' +
-          '<span class="ats-cov-count">' + after.matched.length + '/' + after.total + '</span>' +
-        '</div>' +
-      '</div>' +
+    '<div class="ats-cov-stat">' +
+      '<span class="ats-cov-stat-lbl">JD keyword coverage</span>' +
+      '<span class="ats-cov-before-val">' + bPct + '%</span>' +
+      '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+        '<path d="M3 8h10M9 4l4 4-4 4"/>' +
+      '</svg>' +
+      '<span class="ats-cov-after-val ' + tierCls + '">' + aPct + '%</span>' +
+      gainHtml +
+      '<span class="ats-cov-detail">' + after.matched.length + ' / ' + after.total + ' keywords matched</span>' +
     '</div>'
   );
 }
 
-// ── Section flags ─────────────────────────────────────────
+// ── Full resume card ──────────────────────────────────────
+
+function _atsResumeHTML(resume, plainText) {
+  var copyBtn =
+    '<button class="ats-copy-resume-btn" onclick="atCopyResume(this)" data-text="' + _atsEscAttr(plainText) + '">' +
+      '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+        '<rect x="5" y="5" width="9" height="10" rx="1.5"/>' +
+        '<path d="M11 5V3.5A1.5 1.5 0 0 0 9.5 2h-6A1.5 1.5 0 0 0 2 3.5v8A1.5 1.5 0 0 0 3.5 13H5"/>' +
+      '</svg>' +
+      'Copy full resume' +
+    '</button>';
+
+  var toolbar =
+    '<div class="ats-resume-toolbar">' +
+      '<span class="ats-resume-label">ATS-Optimised Resume</span>' +
+      copyBtn +
+    '</div>';
+
+  var body = '<div class="ats-resume-body">';
+
+  // Professional Summary
+  if (resume.summary) {
+    body +=
+      '<div class="ats-resume-section">' +
+        '<div class="ats-resume-sh">Professional Summary</div>' +
+        '<p class="ats-resume-summary">' + _atsEsc(resume.summary) + '</p>' +
+      '</div>';
+  }
+
+  // Work Experience
+  if (resume.experience && resume.experience.length) {
+    body += '<div class="ats-resume-section"><div class="ats-resume-sh">Work Experience</div>';
+    (resume.experience || []).forEach(function(role) {
+      var headerParts = [role.title, role.company, role.dates].filter(Boolean).map(_atsEsc);
+      var header = headerParts.join(' <span class="ats-role-sep">|</span> ');
+      var bullets = (role.bullets || []).map(function(b) {
+        return '<li>' + _atsEsc(b) + '</li>';
+      }).join('');
+      body +=
+        '<div class="ats-resume-role">' +
+          (header ? '<div class="ats-role-hd">' + header + '</div>' : '') +
+          (bullets ? '<ul class="ats-role-bullets">' + bullets + '</ul>' : '') +
+        '</div>';
+    });
+    body += '</div>';
+  }
+
+  // Skills
+  if (resume.skills && resume.skills.length) {
+    body +=
+      '<div class="ats-resume-section">' +
+        '<div class="ats-resume-sh">Skills</div>' +
+        '<p class="ats-skills-text">' + resume.skills.map(_atsEsc).join(', ') + '</p>' +
+      '</div>';
+  }
+
+  // Education
+  if (resume.education && resume.education.length) {
+    body += '<div class="ats-resume-section"><div class="ats-resume-sh">Education</div>';
+    (resume.education || []).forEach(function(edu) {
+      var parts = [edu.degree, edu.institution, edu.year].filter(Boolean).map(_atsEsc);
+      if (parts.length) {
+        body += '<div class="ats-edu-entry">' + parts.join(' <span class="ats-role-sep">|</span> ') + '</div>';
+      }
+    });
+    body += '</div>';
+  }
+
+  body += '</div>'; // .ats-resume-body
+
+  return (
+    '<div class="ats-resume-card">' +
+      toolbar +
+      body +
+    '</div>'
+  );
+}
+
+// ── Collapsible warnings ──────────────────────────────────
+
+function _atsWarningsHTML(missingSections, formattingFlags) {
+  var count = missingSections.length + formattingFlags.length;
+  var warnIcon =
+    '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      '<path d="M8 1L1 14h14L8 1z"/>' +
+      '<line x1="8" y1="6" x2="8" y2="10"/>' +
+      '<circle cx="8" cy="12.5" r=".5" fill="currentColor"/>' +
+    '</svg>';
+
+  var rows = '';
+  missingSections.forEach(function(f) {
+    rows +=
+      '<div class="ats-flag-item ats-flag-warn">' +
+        warnIcon +
+        '<div class="ats-flag-body">' +
+          '<span class="ats-flag-name">Missing section: ' + _atsEsc(f.name) + '</span>' +
+          (f.suggestion ? '<span class="ats-flag-suggestion">' + _atsEsc(f.suggestion) + '</span>' : '') +
+        '</div>' +
+      '</div>';
+  });
+  formattingFlags.forEach(function(f) {
+    rows +=
+      '<div class="ats-flag-item ats-flag-warn">' +
+        warnIcon +
+        '<div class="ats-flag-body"><span class="ats-flag-name">' + _atsEsc(f) + '</span></div>' +
+      '</div>';
+  });
+
+  var chevron =
+    '<svg class="ats-warn-chevron" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      '<path d="M4 6l4 4 4-4"/>' +
+    '</svg>';
+
+  return (
+    '<div class="ats-section ats-warnings-section">' +
+      '<div class="ats-section-hd ats-warn-toggle" onclick="atsToggleWarnings(this)">' +
+        warnIcon +
+        '<span>' + count + ' formatting warning' + (count !== 1 ? 's' : '') + ' detected in original resume</span>' +
+        chevron +
+      '</div>' +
+      '<div class="ats-warn-list">' + rows + '</div>' +
+    '</div>'
+  );
+}
+
+window.atsToggleWarnings = function(hd) {
+  var list = hd.parentElement && hd.parentElement.querySelector('.ats-warn-list');
+  if (!list) return;
+  var open = list.classList.toggle('ats-warn-list--open');
+  var chevron = hd.querySelector('.ats-warn-chevron');
+  if (chevron) chevron.style.transform = open ? 'rotate(180deg)' : '';
+};
+
+// ── Section flags (used by Quick Scan) ───────────────────
 
 function _atsSectionFlagsHTML(flags) {
   var rows = flags.map(function(f) {
     if (f.found) {
       return (
         '<div class="ats-flag-item ats-flag-ok">' +
-          '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+          '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
             '<path d="M2 8l4 4 8-8"/>' +
           '</svg>' +
           '<span class="ats-flag-name">' + _atsEsc(f.name) + '</span>' +
@@ -422,7 +544,7 @@ function _atsSectionFlagsHTML(flags) {
       : '';
     return (
       '<div class="ats-flag-item ats-flag-warn">' +
-        '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+        '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
           '<path d="M8 1L1 14h14L8 1z"/>' +
           '<line x1="8" y1="6" x2="8" y2="10"/>' +
           '<circle cx="8" cy="12.5" r=".5" fill="currentColor"/>' +
@@ -438,7 +560,7 @@ function _atsSectionFlagsHTML(flags) {
   return (
     '<div class="ats-section">' +
       '<div class="ats-section-hd">' +
-        '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+        '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
           '<rect x="2" y="2" width="12" height="12" rx="2"/>' +
           '<line x1="5" y1="8" x2="11" y2="8"/>' +
           '<line x1="8" y1="5" x2="8" y2="11"/>' +
@@ -450,13 +572,13 @@ function _atsSectionFlagsHTML(flags) {
   );
 }
 
-// ── Formatting flags ──────────────────────────────────────
+// ── Formatting flags (used by Quick Scan) ─────────────────
 
 function _atsFormattingFlagsHTML(flags) {
   var rows = flags.map(function(f) {
     return (
       '<div class="ats-flag-item ats-flag-warn">' +
-        '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+        '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
           '<path d="M8 1L1 14h14L8 1z"/>' +
           '<line x1="8" y1="6" x2="8" y2="10"/>' +
           '<circle cx="8" cy="12.5" r=".5" fill="currentColor"/>' +
@@ -471,7 +593,7 @@ function _atsFormattingFlagsHTML(flags) {
   return (
     '<div class="ats-section">' +
       '<div class="ats-section-hd">' +
-        '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+        '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
           '<line x1="3" y1="5" x2="13" y2="5"/>' +
           '<line x1="3" y1="8" x2="13" y2="8"/>' +
           '<line x1="3" y1="11" x2="9" y2="11"/>' +
@@ -483,67 +605,19 @@ function _atsFormattingFlagsHTML(flags) {
   );
 }
 
-// ── Rewritten bullets ─────────────────────────────────────
-
-function _atsRewritesHTML(rewrites) {
-  var groups = rewrites.map(function(group) {
-    var items = (group.items || []).map(function(item) {
-      var beforeRow = (item.changed && item.before)
-        ? '<div class="ats-bullet-before">' + _atsEsc(item.before) + '</div>'
-        : '';
-      var dataAttr = _atsEscAttr(item.after || '');
-      return (
-        '<div class="ats-bullet-item' + (item.changed ? ' ats-bullet-item--changed' : '') + '">' +
-          beforeRow +
-          '<div class="ats-bullet-after-row">' +
-            '<div class="ats-bullet-after">' + _atsEsc(item.after || '') + '</div>' +
-            '<button class="ats-copy-btn" onclick="atCopyBullet(this)" data-text="' + dataAttr + '" title="Copy bullet">Copy</button>' +
-          '</div>' +
-        '</div>'
-      );
-    }).join('');
-
-    // "Copy all" gathers all after-text for this group
-    var allText = (group.items || []).map(function(i) { return i.after || ''; }).filter(Boolean).join('\n');
-    var copyAllAttr = _atsEscAttr(allText);
-
-    return (
-      '<div class="ats-rewrite-group">' +
-        '<div class="ats-rewrite-hd">' +
-          '<div class="ats-rewrite-hd-text">' +
-            _atsEsc(group.role || '') +
-            (group.company ? ' <span class="ats-rewrite-company">at ' + _atsEsc(group.company) + '</span>' : '') +
-          '</div>' +
-          (allText ? '<button class="ats-copy-btn ats-copy-all-btn" onclick="atCopyBullet(this)" data-text="' + copyAllAttr + '" title="Copy all bullets">Copy all</button>' : '') +
-        '</div>' +
-        '<div class="ats-rewrite-items">' + items + '</div>' +
-      '</div>'
-    );
-  }).join('');
-
-  return (
-    '<div class="ats-section">' +
-      '<div class="ats-section-hd">' +
-        '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
-          '<path d="M9.5 2.5l2 2L4 12H2v-2L9.5 2.5z"/>' +
-        '</svg>' +
-        '<span>Optimised Bullets</span>' +
-      '</div>' +
-      '<div class="ats-rewrite-groups">' + groups + '</div>' +
-    '</div>'
-  );
-}
-
 // ── Copy ──────────────────────────────────────────────────
 
-window.atCopyBullet = function(btn) {
+window.atCopyResume = function(btn) {
   var text = btn.getAttribute('data-text') || '';
-  if (!text) return;
+  if (!text) {
+    if (typeof toast === 'function') toast('No resume content to copy.', 'warn');
+    return;
+  }
+  var origHtml = btn.innerHTML;
   if (navigator.clipboard) {
     navigator.clipboard.writeText(text).then(function() {
-      var orig = btn.textContent;
       btn.textContent = 'Copied!';
-      setTimeout(function() { btn.textContent = orig; }, 1400);
+      setTimeout(function() { btn.innerHTML = origHtml; }, 1400);
     }).catch(function() {
       if (typeof toast === 'function') toast('Could not copy - please copy manually.', 'warn');
     });
@@ -554,8 +628,7 @@ window.atCopyBullet = function(btn) {
     ta.select();
     document.execCommand('copy');
     document.body.removeChild(ta);
-    var orig = btn.textContent;
     btn.textContent = 'Copied!';
-    setTimeout(function() { btn.textContent = orig; }, 1400);
+    setTimeout(function() { btn.innerHTML = origHtml; }, 1400);
   }
 };
