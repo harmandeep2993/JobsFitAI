@@ -984,6 +984,7 @@ def build_results_html(
         '<div class="tab-item" onclick="jfTab(this,\'jf-breakdown\')">Breakdown</div>'
         '<div class="tab-item" onclick="jfTab(this,\'jf-keywords\')">Keywords</div>'
         '<div class="tab-item" onclick="jfTab(this,\'jf-reco\')">Recommendations</div>'
+        '<div class="tab-item" onclick="jfTab(this,\'jf-rewrite\');rwEnsureLoaded()">Improve</div>'
         "</div>"
     )
 
@@ -1043,6 +1044,26 @@ def build_results_html(
         "</div>"
     )
 
+    rewrite_panel = (
+        '<div id="jf-rewrite" class="jf-panel" style="display:none;">'
+        '<div class="rw-intro">'
+        '<div class="rw-intro-text">'
+        "Generate JD-aligned bullets from all your stored resumes. "
+        "Existing bullets are rewritten to match the role's language; "
+        "roles with no bullets get suggested starting points."
+        "</div>"
+        '<button class="rw-run-btn" id="rw-run-btn" onclick="rwGenerate()">'
+        '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" '
+        'stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;">'
+        '<polygon points="3,2 13,8 3,14"/>'
+        "</svg>"
+        "Generate Improved Bullets"
+        "</button>"
+        "</div>"
+        '<div id="rw-output"></div>'
+        "</div>"
+    )
+
     return (
         '<div class="res-section">'
         '<div class="nb-card">'
@@ -1051,6 +1072,7 @@ def build_results_html(
         + breakdown_panel
         + keywords_panel
         + reco_panel
+        + rewrite_panel
         + "</div>"
         + callout
         + export_row

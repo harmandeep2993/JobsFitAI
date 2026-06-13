@@ -230,6 +230,10 @@ window.startAnalysis = function() {
           animateBdRings();
           _cacheSet(cacheKey, d.html);
         }
+        // Store for rewrite tab - needs JD text, gaps and strengths from this result
+        window._rwJd        = jd;
+        window._rwGaps      = d.gaps      || [];
+        window._rwStrengths = d.strengths || [];
         toast('Analysis complete - ' + Math.round(d.score) + '% match (' + d.label + ')', 'ok', 4000);
       });
     })
