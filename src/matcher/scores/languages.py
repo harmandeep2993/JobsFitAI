@@ -1,6 +1,6 @@
-# src/matcher/scores/languages.py
+﻿# src/matcher/scores/languages.py
 """
-Language scoring for JOBfitAI.
+Language scoring for JOBsFitAI.
 
 Compares candidate languages against JD required languages.
 

@@ -1,6 +1,6 @@
-# src/matcher/scores/education.py
+﻿# src/matcher/scores/education.py
 """
-Education scoring for JOBfitAI.
+Education scoring for JOBsFitAI.
 
 Compares candidate education against JD education requirements
 using semantic similarity.

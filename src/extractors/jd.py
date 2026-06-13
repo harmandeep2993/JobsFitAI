@@ -125,8 +125,9 @@ def extract_jd(jd_text: str) -> dict:
         )
         jd_text = jd_text[:JD_MAX_CHARS]
 
-    prompt   = get_jd_prompt(jd_text)
-    response = call_llm(prompt)
+    prompt = get_jd_prompt(jd_text)
+    _res   = call_llm(prompt)
+    response = _res.text if (_res and _res.text) else None
     result   = parse_json_response(response)
 
     if not isinstance(result, dict):

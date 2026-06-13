@@ -1,4 +1,4 @@
-# src/services/summary.py
+﻿# src/services/summary.py
 # Generates a concise candidate summary using LLM
 # Called after scoring — uses score data for accurate narrative
 
@@ -86,7 +86,7 @@ def generate_summary(resume_json, jd_json, results):
     edu_lbl  = "strong" if edu_score  >= 70 else "moderate" if edu_score  >= 40 else "weak"
     resp_lbl = "strong" if resp_score >= 70 else "moderate" if resp_score >= 40 else "weak"
 
-    prompt = f"""You are generating a candidate-facing job fit analysis for JobFitAI.
+    prompt = f"""You are generating a candidate-facing job fit analysis for JobsFitAI.
 
 ROLE: {role}
 OVERALL FIT: {overall_fit}
@@ -116,7 +116,8 @@ Rules:
 - No percentages, no em-dashes, no emojis, no score numbers
 - Be specific — name actual skills, not vague phrases"""
 
-    response = call_llm(prompt)
+    _res     = call_llm(prompt)
+    response = _res.text if (_res and _res.text) else None
 
     if response and len(response.strip()) > 20:
         import json, re
@@ -203,7 +204,8 @@ Return ONLY valid JSON, nothing else:
   "threats":       ["phrase 1", "phrase 2", "phrase 3"]
 }}"""
 
-    response = call_llm(prompt)
+    _res     = call_llm(prompt)
+    response = _res.text if (_res and _res.text) else None
 
     if response:
         match_obj = re.search(r'\{[\s\S]*\}', response)

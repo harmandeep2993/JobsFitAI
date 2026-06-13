@@ -1,7 +1,7 @@
-# src/utils/logger.py
+﻿# src/utils/logger.py
 
 """
-Central logging configuration for JobFitAI.
+Central logging configuration for JobsFitAI.
 
 Usage in any module:
     from src.utils.logger import get_logger
@@ -14,7 +14,7 @@ Usage in any module:
 
 Log output:
     Console  — INFO and above (coloured)
-    File     — DEBUG and above (logs/jobfitai.log, rotating 5MB x 3 backups)
+    File     — DEBUG and above (logs/jobsfitai.log, rotating 5MB x 3 backups)
 
 Log level controlled via config.yaml:
     logging:
@@ -26,7 +26,7 @@ import logging.handlers
 from pathlib import Path
 
 LOG_DIR      = Path("logs")
-LOG_FILE     = LOG_DIR / "jobfitai.log"
+LOG_FILE     = LOG_DIR / "jobsfitai.log"
 MAX_BYTES    = 5 * 1024 * 1024
 BACKUP_COUNT = 3
 

@@ -1,7 +1,7 @@
-# app.py
+﻿# app.py
 
 """
-Application entry point for JobFitAI.
+Application entry point for JobsFitAI.
 
 Responsibilities:
 - Serve the static frontend (templates/index.html + assets/)
@@ -46,13 +46,13 @@ from src.services.job_matcher import (
     rescore_all,
     fetch_combined,
 )
-from src.services import match_store, event_store, vector_store, settings_store, resume_store
+from src.services import match_store, event_store, vector_store, settings_store, resume_store, analysis_store, db
 import json as _json
 from src.services.summary import generate_summary
 from src.utils.config import SEARCH_PER_TITLE, MAX_AGE_DAYS
 
 
-app = FastAPI(title="JobFitAI")
+app = FastAPI(title="JobsFitAI")
 
 # Static assets
 app.mount("/assets", StaticFiles(directory="assets"), name="assets")
@@ -189,6 +189,21 @@ async def api_resumes_label(resume_id: str, request: Request) -> JSONResponse:
         return JSONResponse({"ok": False, "error": "label required"}, status_code=400)
     resume_store.set_label(_USER, resume_id, label)
     return JSONResponse({"ok": True})
+
+
+@app.post("/api/resumes/{resume_id}/use-for-matching")
+async def api_resumes_use_for_matching(resume_id: str) -> JSONResponse:
+    """Load a stored resume into the job-matching session so Job Matches uses it."""
+    row = resume_store.get(_USER, resume_id)
+    if not row:
+        return JSONResponse({"ok": False, "error": "not found"}, status_code=404)
+    extracted = row.get("extracted_json")
+    if not extracted:
+        return JSONResponse({"ok": False, "error": "not_extracted_yet"}, status_code=400)
+    resume_json = _json.loads(extracted)
+    session.set_resume(resume_json, row.get("label") or row.get("original_name", "Resume"))
+    rescored = await run_in_threadpool(rescore_all)
+    return JSONResponse({"ok": True, "rescored": rescored})
 
 
 @app.post("/api/resumes/recommend")
@@ -336,12 +351,64 @@ async def api_analyze(request: Request) -> JSONResponse:
     if not results:
         return JSONResponse({"ok": False, "error": "scoring_failed"}, status_code=500)
 
-    html = build_results_html(results, resume_json, jd_json, summary or "")
+    try:
+        html = build_results_html(results, resume_json, jd_json, summary or "")
+    except Exception as e:
+        logger.error("build_results_html failed: %s", e, exc_info=True)
+        return JSONResponse({"ok": False, "error": "results_render_failed"}, status_code=500)
+
+    # Persist analysis history for stored resumes (non-fatal).
+    if resume_id:
+        try:
+            analysis_store.save(
+                resume_id,
+                jd_text[:120],
+                results.get("overall_score", 0),
+                results.get("label", ""),
+            )
+        except Exception as e:
+            logger.error("analysis_store.save failed: %s", e)
+
     return JSONResponse({
         "ok":    True,
         "score": results.get("overall_score", 0),
         "label": results.get("label", ""),
         "html":  html,
+    })
+
+
+# ── History ───────────────────────────────────────────────
+
+@app.get("/api/history")
+async def api_history() -> JSONResponse:
+    """Return all history sources: analyser runs, fetcher runs, applications."""
+    with db.connect() as conn:
+        analyses = conn.execute(
+            """SELECT a.jd_snippet, a.score, a.label, a.scored_at,
+                      r.label AS resume_label, r.slot
+               FROM analyses a
+               LEFT JOIN resumes r ON r.id = a.resume_id
+               ORDER BY a.scored_at DESC LIMIT 100"""
+        ).fetchall()
+
+        fetcher_runs = conn.execute(
+            """SELECT detail, created_at FROM events
+               WHERE type = 'run' ORDER BY id DESC LIMIT 100"""
+        ).fetchall()
+
+        applications = conn.execute(
+            """SELECT e.created_at AS applied_at, m.title, m.company, m.url, m.score, m.label
+               FROM events e
+               LEFT JOIN matches m ON m.id = e.job_id
+               WHERE e.type = 'applied'
+               ORDER BY e.id DESC LIMIT 100"""
+        ).fetchall()
+
+    return JSONResponse({
+        "ok":           True,
+        "analyses":     [dict(r) for r in analyses],
+        "fetcher_runs": [dict(r) for r in fetcher_runs],
+        "applications": [dict(r) for r in applications],
     })
 
 
@@ -746,7 +813,7 @@ async def api_match_export() -> StreamingResponse:
         ])
 
     buf.seek(0)
-    filename = "jobfitai_matches.csv"
+    filename = "jobsfitai_matches.csv"
     return StreamingResponse(
         iter([buf.getvalue()]),
         media_type="text/csv",
@@ -819,6 +886,21 @@ async def _backfill_extractions() -> None:
 
 @app.on_event("startup")
 async def _start_scheduler() -> None:
+    global _sched_last
+    # Seed _sched_last from the last run event so server restarts don't
+    # trigger an immediate re-fetch when the interval hasn't elapsed yet.
+    with db.connect() as conn:
+        row = conn.execute(
+            "SELECT created_at FROM events WHERE type='run' ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+    if row:
+        try:
+            last_ts  = datetime.fromisoformat(row["created_at"].replace("Z", "+00:00"))
+            elapsed  = (datetime.now(timezone.utc) - last_ts).total_seconds()
+            _sched_last = time.monotonic() - elapsed
+        except Exception:
+            pass
+
     asyncio.create_task(_auto_fetch_loop())
     asyncio.create_task(_backfill_extractions())
     logger.info(
@@ -845,7 +927,7 @@ if __name__ == "__main__":
     if _port_in_use(PORT):
         import sys
         print(
-            f"\n[JobFitAI] Port {PORT} is already in use — an old server is still running.\n"
+            f"\n[JobsFitAI] Port {PORT} is already in use — an old server is still running.\n"
             f"           Stop it first, then re-run:\n"
             f"           Windows    : taskkill /F /IM python.exe\n"
             f"           macOS/Linux: kill $(lsof -ti tcp:{PORT})\n"

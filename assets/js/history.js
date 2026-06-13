@@ -1,160 +1,279 @@
 // assets/js/history.js
-// History tab — every job ever scored, shown as a sortable table.
+// History view - 3 tabs: Analyser | Fetcher | Applications
 
-window._histData   = [];
-window._histFilter = 'all';   // all | applied | open
-window._histSort   = 'score'; // score | newest | company
-window._histSortDir = -1;     // -1 = desc, 1 = asc
-
-window.loadHistory = function() {
-  fetch('/api/match/state')
-    .then(function(r) { return r.json(); })
-    .then(function(d) {
-      if (!d.ok) return;
-      window._histData = d.results || [];
-      renderHistory();
-    })
-    .catch(function() {});
-};
-
-window.setHistFilter = function(f) {
-  window._histFilter = f;
-  document.querySelectorAll('#hist-filters .hist-fbtn').forEach(function(b) {
-    b.classList.toggle('active', b.dataset.f === f);
-  });
-  renderHistory();
-};
-
-window.setHistSort = function(col) {
-  if (window._histSort === col) {
-    window._histSortDir *= -1;
-  } else {
-    window._histSort = col;
-    window._histSortDir = col === 'company' ? 1 : -1;
-  }
-  renderHistory();
-};
-
-function sortArrow(col) {
-  if (window._histSort !== col) return '<span class="ht-arr">⇅</span>';
-  return window._histSortDir === -1
-    ? '<span class="ht-arr active">↓</span>'
-    : '<span class="ht-arr active">↑</span>';
+function _hEsc(s) {
+  return String(s || '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-function mtEscH(s) {
-  return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;')
-                  .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-
-function relTimeH(posted) {
-  var ts = parseInt(posted, 10);
-  if (!ts) return '';
-  var days = Math.floor((Date.now() / 1000 - ts) / 86400);
-  if (days <= 0)  return 'today';
-  if (days === 1) return '1d ago';
+function _hAgo(iso) {
+  if (!iso) return '';
+  var d = new Date(iso);
+  if (isNaN(d)) return iso.slice(0, 10);
+  var mins = Math.floor((Date.now() - d.getTime()) / 60000);
+  if (mins < 1)   return 'just now';
+  if (mins < 60)  return mins + 'm ago';
+  var hrs = Math.floor(mins / 60);
+  if (hrs < 24)   return hrs + 'h ago';
+  var days = Math.floor(hrs / 24);
   if (days < 7)   return days + 'd ago';
-  var weeks = Math.floor(days / 7);
-  if (weeks < 5)  return weeks + 'w ago';
-  return Math.floor(days / 30) + 'mo ago';
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
-function labelClassH(label, score) {
-  var l = (label || '').toLowerCase();
-  if (l.includes('excellent')) return 'sc-exc';
-  if (l.includes('good'))      return 'sc-good';
-  if (l.includes('partial'))   return 'sc-partial';
-  if (l.includes('poor'))      return 'sc-poor';
+function _hTierCls(score) {
   if (score >= 80) return 'sc-exc';
   if (score >= 60) return 'sc-good';
   if (score >= 40) return 'sc-partial';
   return 'sc-poor';
 }
 
-function renderHistory() {
-  var box = document.getElementById('hist-results');
-  if (!box) return;
+// ── Tab switching ─────────────────────────────────────────
 
-  var all     = window._histData || [];
-  var applied = all.filter(function(x) { return x.applied; });
-  var open    = all.filter(function(x) { return !x.applied; });
+window.hTab = function(el, tabId) {
+  document.querySelectorAll('#hv-tab-row .hv-tab').forEach(function(t) {
+    t.classList.remove('active');
+  });
+  document.querySelectorAll('.hv-panel').forEach(function(p) {
+    p.style.display = 'none';
+  });
+  el.classList.add('active');
+  var panel = document.getElementById(tabId);
+  if (panel) panel.style.display = '';
+};
 
-  // Update filter button counts
-  function setCount(f, n) {
-    var el = document.querySelector('#hist-filters .hist-fbtn[data-f="' + f + '"] .hist-count');
-    if (el) el.textContent = n;
+// ── Load ──────────────────────────────────────────────────
+
+window.loadHistory = window.hvLoad = function() {
+  ['hv-analyser', 'hv-fetcher', 'hv-applications'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.innerHTML = '<div class="hv-loading"><div class="up-spinner" style="width:16px;height:16px;border-width:2px;margin:0 auto;"></div></div>';
+  });
+
+  fetch('/api/history')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (!d.ok) return;
+      _hvRenderAnalyser(d.analyses || []);
+      _hvRenderFetcher(d.fetcher_runs || []);
+      _hvRenderApplications(d.applications || []);
+      _hvUpdateBadge((d.analyses || []).length + (d.applications || []).length);
+    })
+    .catch(function() {
+      ['hv-analyser', 'hv-fetcher', 'hv-applications'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.innerHTML = '<p class="hv-empty">Could not load history.</p>';
+      });
+    });
+};
+
+// ── Analyser tab ──────────────────────────────────────────
+
+function _hvRenderAnalyser(entries) {
+  var el = document.getElementById('hv-analyser');
+  if (!el) return;
+  if (!entries.length) {
+    el.innerHTML = '<p class="hv-empty">No analyses yet. Run your first analysis in the Analyser tab.</p>';
+    return;
   }
-  setCount('all',     all.length);
-  setCount('applied', applied.length);
-  setCount('open',    open.length);
+  el.innerHTML = entries.map(function(e) {
+    var tier = _hTierCls(e.score);
+    var slot = e.slot != null ? '<span class="hv-slot-badge">' + (e.slot + 1) + '</span>' : '';
+    return (
+      '<div class="hv-entry">' +
+        '<div class="hv-entry-left">' +
+          '<span class="hv-icon hv-icon--analyse">' +
+            '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+              '<circle cx="6" cy="6" r="4"/><path d="M11 11l3 3"/>' +
+            '</svg>' +
+          '</span>' +
+        '</div>' +
+        '<div class="hv-entry-body">' +
+          '<div class="hv-entry-title">' + _hEsc(e.jd_snippet || 'Analysis') + '</div>' +
+          '<div class="hv-entry-meta">' +
+            slot + _hEsc(e.resume_label || 'Resume') +
+            ' &middot; ' + _hAgo(e.scored_at) +
+          '</div>' +
+        '</div>' +
+        '<div class="hv-entry-right">' +
+          '<span class="hv-score ' + tier + '">' + Math.round(e.score) + '%</span>' +
+        '</div>' +
+      '</div>'
+    );
+  }).join('');
+}
 
-  var items = all;
-  if (window._histFilter === 'applied') items = applied;
-  else if (window._histFilter === 'open') items = open;
+// ── Fetcher tab ───────────────────────────────────────────
 
-  if (!items.length) {
-    box.innerHTML = '<div class="fetch-empty">Nothing here yet. Score some jobs on the Job Matches tab.</div>';
+function _hvParseFetchDetail(raw) {
+  try {
+    var d = JSON.parse(raw || '{}');
+    if (typeof d === 'object' && d !== null && 'fetched' in d) return d;
+  } catch (e) {}
+  // Fallback: old "X checked, Y relevant, Z scored" string format
+  var p3 = (raw || '').match(/(\d+) checked.*?(\d+) relevant.*?(\d+) scored/);
+  if (p3) return { fetched: null, new: null, recent: +p3[1], relevant: +p3[2], scored: +p3[3], adzuna: null, arbeitnow: null, total_seen: null };
+  var p2 = (raw || '').match(/(\d+) checked.*?(\d+) scored/);
+  if (p2) return { fetched: null, new: null, recent: +p2[1], relevant: null, scored: +p2[2], adzuna: null, arbeitnow: null, total_seen: null };
+  return { fetched: null, new: null, recent: null, relevant: null, scored: 0, adzuna: null, arbeitnow: null, total_seen: null };
+}
+
+function _hTime(iso) {
+  if (!iso) return '';
+  var d = new Date(iso);
+  if (isNaN(d)) return iso.slice(0, 16).replace('T', ' ');
+  return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function _hvFetcherEntryFull(e, d) {
+  var scored = d.scored || 0;
+  var statParts = [];
+  if (d.fetched != null)   statParts.push('<b>' + d.fetched   + '</b> fetched');
+  if (d.new     != null)   statParts.push('<b>' + d.new       + '</b> new');
+  if (d.recent  != null)   statParts.push('<b>' + d.recent    + '</b> recent');
+  if (d.relevant != null)  statParts.push('<b>' + d.relevant  + '</b> passed filter');
+  statParts.push('<b>' + scored + '</b> scored');
+  if (d.total_seen != null) statParts.push(d.total_seen + ' total seen');
+
+  var sources = (d.adzuna != null)
+    ? '<div class="hv-entry-meta hv-entry-sources"><span class="hv-src-row">' +
+        '<span class="hv-src-badge hv-src-az">Adzuna ' + d.adzuna + '</span>' +
+        '<span class="hv-src-badge hv-src-arb">Arbeitnow ' + d.arbeitnow + '</span>' +
+      '</span></div>'
+    : '';
+
+  return (
+    '<div class="hv-entry hv-entry--fetch">' +
+      '<div class="hv-entry-left">' +
+        '<span class="hv-icon hv-icon--fetch">' +
+          '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+            '<path d="M1 8a7 7 0 1 0 14 0"/><path d="M8 1v6l3 3"/>' +
+          '</svg>' +
+        '</span>' +
+      '</div>' +
+      '<div class="hv-entry-body">' +
+        '<div class="hv-entry-title">Fetcher run &middot; <span class="hv-run-time">' + _hTime(e.created_at) + '</span></div>' +
+        '<div class="hv-entry-meta">' + statParts.join(' &middot; ') + '</div>' +
+        sources +
+      '</div>' +
+      '<div class="hv-entry-right">' +
+        '<span class="hv-fetch-badge' + (scored > 0 ? '' : ' hv-fetch-badge--zero') + '">+' + scored + '</span>' +
+      '</div>' +
+    '</div>'
+  );
+}
+
+window.hvToggleZeroRuns = function(btn) {
+  var box = document.getElementById('hv-zero-runs');
+  if (!box) return;
+  var hidden = box.style.display === 'none';
+  box.style.display = hidden ? '' : 'none';
+  btn.textContent = hidden ? 'Hide zero-result runs' : btn.getAttribute('data-label');
+};
+
+function _hvRenderFetcher(entries) {
+  var el = document.getElementById('hv-fetcher');
+  if (!el) return;
+  if (!entries.length) {
+    el.innerHTML = '<p class="hv-empty">No fetcher runs yet. Go to Job Matches and click Run.</p>';
     return;
   }
 
-  // Sort
-  var col = window._histSort || 'score';
-  var dir = window._histSortDir || -1;
-  items = items.slice().sort(function(a, b) {
-    var v;
-    if (col === 'score')   v = ((a.score || 0) - (b.score || 0)) * dir;
-    else if (col === 'newest') v = ((a.posted_at || 0) - (b.posted_at || 0)) * dir;
-    else if (col === 'company') v = (a.company || '').localeCompare(b.company || '') * dir;
-    else v = 0;
-    return v;
-  });
+  // Parse all entries
+  var parsed = entries.map(function(e) { return { e: e, d: _hvParseFetchDetail(e.detail) }; });
 
-  var rows = items.map(function(r) {
-    var sc    = r.status === 'pending' ? '' : (r.status === 'jd_unavailable' ? 'JD?' : Math.round(r.score || 0) + '%');
-    var lc    = r.status === 'pending' || r.status === 'jd_unavailable' ? 'sc-na' : labelClassH(r.label, r.score);
-    var applied = !!r.applied;
+  // Aggregate stats
+  var totalRuns    = parsed.length;
+  var totalScored  = parsed.reduce(function(s, x) { return s + (x.d.scored || 0); }, 0);
+  var totalFetched = parsed.reduce(function(s, x) { return s + (x.d.fetched || 0); }, 0);
+  var lastRun      = parsed[0] ? _hTime(parsed[0].e.created_at) : '—';
+  var lastSeen     = parsed[0] && parsed[0].d.total_seen != null ? parsed[0].d.total_seen : null;
 
-    var detailBtn = r.status === 'jd_unavailable'
-      ? ''
-      : '<button class="ht-open" onclick="openDetail(\'' + mtEscH(r.id) + '\')">Detail</button>';
+  var statsHtml =
+    '<div class="hv-stats-bar">' +
+      '<div class="hv-stat"><span class="hv-stat-val">' + totalRuns + '</span><span class="hv-stat-lbl">total runs</span></div>' +
+      '<div class="hv-stat-div"></div>' +
+      '<div class="hv-stat"><span class="hv-stat-val">' + totalFetched + '</span><span class="hv-stat-lbl">fetched</span></div>' +
+      '<div class="hv-stat-div"></div>' +
+      '<div class="hv-stat"><span class="hv-stat-val hv-stat-scored">' + totalScored + '</span><span class="hv-stat-lbl">scored</span></div>' +
+      (lastSeen != null ? '<div class="hv-stat-div"></div><div class="hv-stat"><span class="hv-stat-val">' + lastSeen + '</span><span class="hv-stat-lbl">total seen</span></div>' : '') +
+      '<div class="hv-stat-last">Last run: ' + lastRun + '</div>' +
+    '</div>';
 
-    var applyBtn =
-      '<button class="ht-apply' + (applied ? ' on' : '') +
-      '" onclick="toggleApplied(\'' + mtEscH(r.id) + '\',' + (applied ? 1 : 0) + ')">' +
-      (applied ? '✓' : 'Mark') + '</button>';
+  // Split: runs with results vs zero-result runs
+  var withResults = parsed.filter(function(x) { return (x.d.scored || 0) > 0; });
+  var zeroRuns    = parsed.filter(function(x) { return (x.d.scored || 0) === 0; });
 
-    return '<tr>' +
-      '<td><span class="ht-score ' + lc + '">' + mtEscH(sc) + '</span></td>' +
-      '<td class="ht-title">' +
-        '<div class="ht-t1">' + mtEscH(r.title || '') + '</div>' +
-        '<div class="ht-t2">' + mtEscH(r.company || '') +
-          (r.location ? ' &middot; ' + mtEscH(r.location) : '') + '</div>' +
-      '</td>' +
-      '<td class="ht-age">' + relTimeH(r.posted_at) + '</td>' +
-      '<td><div class="ht-actions">' + detailBtn + applyBtn + '</div></td>' +
-      '</tr>';
-  }).join('');
+  var resultsHtml = '';
+  if (withResults.length) {
+    resultsHtml = withResults.map(function(x) { return _hvFetcherEntryFull(x.e, x.d); }).join('');
+  } else {
+    resultsHtml = '<p class="hv-empty hv-empty--sub">No runs have scored any jobs yet.</p>';
+  }
 
-  box.innerHTML =
-    '<div class="hist-tbl-wrap"><table class="hist-tbl">' +
-      '<thead><tr>' +
-        '<th onclick="setHistSort(\'score\')">' +
-          'Score ' + sortArrow('score') + '</th>' +
-        '<th onclick="setHistSort(\'company\')">' +
-          'Job / Company ' + sortArrow('company') + '</th>' +
-        '<th onclick="setHistSort(\'newest\')">' +
-          'Posted ' + sortArrow('newest') + '</th>' +
-        '<th>Actions</th>' +
-      '</tr></thead>' +
-      '<tbody>' + rows + '</tbody>' +
-    '</table></div>';
+  var zeroHtml = '';
+  if (zeroRuns.length) {
+    var label = 'Show ' + zeroRuns.length + ' zero-result run' + (zeroRuns.length === 1 ? '' : 's');
+    zeroHtml =
+      '<div class="hv-zero-toggle">' +
+        '<button class="hv-zero-btn" data-label="' + label + '" onclick="hvToggleZeroRuns(this)">' + label + '</button>' +
+      '</div>' +
+      '<div id="hv-zero-runs" style="display:none;">' +
+        zeroRuns.map(function(x) { return _hvFetcherEntryFull(x.e, x.d); }).join('') +
+      '</div>';
+  }
+
+  el.innerHTML = statsHtml + resultsHtml + zeroHtml;
 }
 
-// Load when History elements exist.
-(function bindHistory() {
-  if (document.getElementById('hist-results')) {
-    loadHistory();
-  } else {
-    setTimeout(bindHistory, 100);
+// ── Applications tab ──────────────────────────────────────
+
+function _hvRenderApplications(entries) {
+  var el = document.getElementById('hv-applications');
+  if (!el) return;
+  if (!entries.length) {
+    el.innerHTML = '<p class="hv-empty">No applications tracked yet. Mark jobs as Applied in Job Matches.</p>';
+    return;
   }
-})();
+  el.innerHTML = entries.map(function(e) {
+    var tier = e.score != null ? _hTierCls(e.score) : '';
+    var link = e.url
+      ? ' &middot; <a class="hv-entry-link" href="' + _hEsc(e.url) + '" target="_blank" rel="noopener">View posting</a>'
+      : '';
+    return (
+      '<div class="hv-entry">' +
+        '<div class="hv-entry-left">' +
+          '<span class="hv-icon hv-icon--apply">' +
+            '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+              '<path d="M13 2H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1z"/>' +
+              '<path d="M5 8l2 2 4-4"/>' +
+            '</svg>' +
+          '</span>' +
+        '</div>' +
+        '<div class="hv-entry-body">' +
+          '<div class="hv-entry-title">' + _hEsc(e.title || 'Role') + '</div>' +
+          '<div class="hv-entry-meta">' +
+            _hEsc(e.company || '') +
+            ' &middot; Applied ' + _hAgo(e.applied_at) +
+            link +
+          '</div>' +
+        '</div>' +
+        (e.score != null
+          ? '<div class="hv-entry-right"><span class="hv-score ' + tier + '">' + Math.round(e.score) + '%</span></div>'
+          : '') +
+      '</div>'
+    );
+  }).join('');
+}
+
+// ── Badge ─────────────────────────────────────────────────
+
+function _hvUpdateBadge(count) {
+  var badge = document.getElementById('sb-badge-history');
+  if (!badge) return;
+  badge.textContent = count > 0 ? String(count) : '';
+  badge.style.display = count > 0 ? '' : 'none';
+}
+
+// ── Init ──────────────────────────────────────────────────
+(function() { hvLoad(); })();

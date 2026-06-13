@@ -1,6 +1,6 @@
-# src/matcher/scores/experience.py
+﻿# src/matcher/scores/experience.py
 """
-Experience scoring for JOBfitAI.
+Experience scoring for JOBsFitAI.
 
 Two-step approach:
     Step 1 — Relevance filter: identify which experience entries

@@ -1,6 +1,6 @@
-# src/matcher/scores/__init__.py
+﻿# src/matcher/scores/__init__.py
 """
-Scores package for JOBfitAI.
+Scores package for JOBsFitAI.
 Exports all section scorers for use in matcher.py.
 """
 

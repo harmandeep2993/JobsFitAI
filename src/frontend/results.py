@@ -810,16 +810,33 @@ def build_results_html(results: dict, resume_json: dict, jd_json: dict, summary:
         + '</span><span>Results are AI-generated. Scores are probabilistic — use as a guide, not a definitive judgement.</span>'
         '</div>'
     )
-    footer = f'<div class="foot-note">{score}% &middot; {label} &middot; {session.get_model()}</div>'
+    export_row = (
+        '<div class="res-export-row">'
+        '<span class="foot-note">' + str(score) + '% &middot; ' + label + ' &middot; ' + session.get_model() + '</span>'
+        '<div class="res-export-btns">'
+        '<button class="res-export-btn" onclick="copyResults()" title="Copy summary to clipboard">'
+        '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'
+        '<rect x="5" y="1" width="9" height="11" rx="1.5"/>'
+        '<rect x="1" y="4" width="9" height="11" rx="1.5"/>'
+        '</svg>'
+        'Copy</button>'
+        '<button class="res-export-btn" onclick="window.print()" title="Print report">'
+        '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'
+        '<path d="M4 6V1h8v5"/>'
+        '<rect x="1" y="6" width="14" height="7" rx="1"/>'
+        '<path d="M4 10h8M4 13h5"/>'
+        '</svg>'
+        'Print</button>'
+        '</div>'
+        '</div>'
+    )
 
     return (
         '<div class="res-section">'
         '<div class="nb-card">'
         + tab_row + summary_panel + breakdown_panel + keywords_panel + reco_panel
         + '</div>'
-        + callout + footer
-        + '</div>'
-        + footer
+        + callout + export_row
         + '</div>'
     )
 

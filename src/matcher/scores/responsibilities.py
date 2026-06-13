@@ -1,6 +1,6 @@
-# src/matcher/scores/responsibilities.py
+﻿# src/matcher/scores/responsibilities.py
 """
-Responsibilities scoring for JOBfitAI.
+Responsibilities scoring for JOBsFitAI.
 
 Compares what the candidate has DONE against what the JD REQUIRES.
 

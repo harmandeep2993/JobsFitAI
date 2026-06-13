@@ -54,7 +54,8 @@ def _classify_chunk(chunk: list) -> dict:
     out: dict = {}
     llm_ok = False
     try:
-        data = parse_json_response(call_llm(prompt))
+        _r   = call_llm(prompt)
+        data = parse_json_response(_r.text) if (_r and _r.text) else None
         if isinstance(data, list):
             llm_ok = True
             for obj in data:
@@ -105,7 +106,8 @@ def classify(title: str, snippet: str) -> dict:
     """
     prompt = _PROMPT.format(title=title or "", snippet=(snippet or "")[:600])
     try:
-        data = parse_json_response(call_llm(prompt))
+        _r   = call_llm(prompt)
+        data = parse_json_response(_r.text) if (_r and _r.text) else None
         if isinstance(data, dict) and "relevant" in data:
             return {
                 "relevant":    bool(data.get("relevant")),
