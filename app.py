@@ -558,6 +558,8 @@ async def api_analyze(request: Request) -> JSONResponse:
         "score": results.get("overall_score", 0),
         "label": results.get("label", ""),
         "html": html,
+        "gaps": results.get("missing_required", []),
+        "strengths": results.get("matched_required", []),
     }
     cache_store.set(cache_key, payload)
 
@@ -574,6 +576,33 @@ async def api_analyze(request: Request) -> JSONResponse:
             logger.error("analysis_store.save failed: %s", e)
 
     return JSONResponse({"ok": True, "cached": False, **payload})
+
+
+# ── Resume rewrite ─────────────────────────────────────────
+
+
+@app.post("/api/improve-resume")
+async def api_improve_resume(request: Request) -> JSONResponse:
+    """
+    Generate JD-aligned bullets from all stored resumes.
+
+    Accepts {jd, gaps, strengths}. Pulls extracted JSON from every stored
+    resume slot, merges the data, and returns before/after bullet pairs
+    grouped by source (Experience, Education, Certifications, Projects).
+    """
+    from src.services.rewrite import improve_resume
+
+    body = await request.json()
+    jd_text = (body.get("jd") or "").strip()
+    gaps = body.get("gaps") or []
+    strengths = body.get("strengths") or []
+
+    if len(jd_text) < 30:
+        return JSONResponse({"ok": False, "error": "jd_required"}, status_code=400)
+
+    jd_json = await run_in_threadpool(extract_jd, jd_text)
+    result = await run_in_threadpool(improve_resume, "local", jd_json, gaps, strengths)
+    return JSONResponse(result)
 
 
 # ── History ───────────────────────────────────────────────
