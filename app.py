@@ -11,6 +11,7 @@ Responsibilities:
 """
 
 import csv
+import hashlib
 import io
 import os
 import time
@@ -59,6 +60,7 @@ from src.services import (
     settings_store,
     resume_store,
     analysis_store,
+    cache_store,
     db,
 )
 import json as _json
@@ -472,6 +474,12 @@ async def api_analyze(request: Request) -> JSONResponse:
         logger.warning("JD truncated from %d to %d chars", len(jd_text), JD_MAX_CHARS)
         jd_text = jd_text[:JD_MAX_CHARS]
 
+    cache_key = hashlib.sha256(f"{resume_id or tmp}::{jd_text}".encode()).hexdigest()
+    cached = cache_store.get(cache_key)
+    if cached:
+        logger.info("Cache hit for analysis %s", cache_key[:12])
+        return JSONResponse({"ok": True, "cached": True, **cached})
+
     if not check_llm():
         return JSONResponse({"ok": False, "error": "llm_unavailable"}, status_code=503)
 
@@ -546,6 +554,13 @@ async def api_analyze(request: Request) -> JSONResponse:
             {"ok": False, "error": "results_render_failed"}, status_code=500
         )
 
+    payload = {
+        "score": results.get("overall_score", 0),
+        "label": results.get("label", ""),
+        "html": html,
+    }
+    cache_store.set(cache_key, payload)
+
     # Persist analysis history for stored resumes (non-fatal).
     if resume_id:
         try:
@@ -558,14 +573,7 @@ async def api_analyze(request: Request) -> JSONResponse:
         except Exception as e:
             logger.error("analysis_store.save failed: %s", e)
 
-    return JSONResponse(
-        {
-            "ok": True,
-            "score": results.get("overall_score", 0),
-            "label": results.get("label", ""),
-            "html": html,
-        }
-    )
+    return JSONResponse({"ok": True, "cached": False, **payload})
 
 
 # ── History ───────────────────────────────────────────────
