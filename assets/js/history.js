@@ -111,34 +111,36 @@ function _hvParseFetchDetail(raw) {
     if (typeof d === 'object' && d !== null && 'fetched' in d) return d;
   } catch (e) {}
   // Fallback: old "X checked, Y relevant, Z scored" string format
-  var parts = (raw || '').match(/(\d+) checked.*?(\d+) relevant.*?(\d+) scored/);
-  return parts
-    ? { fetched: '?', new: '?', recent: parseInt(parts[1]), relevant: parseInt(parts[2]),
-        scored: parseInt(parts[3]), adzuna: '?', arbeitnow: '?', total_seen: '?' }
-    : { fetched: '?', new: '?', recent: '?', relevant: '?', scored: 0,
-        adzuna: '?', arbeitnow: '?', total_seen: '?' };
+  var p3 = (raw || '').match(/(\d+) checked.*?(\d+) relevant.*?(\d+) scored/);
+  if (p3) return { fetched: null, new: null, recent: +p3[1], relevant: +p3[2], scored: +p3[3], adzuna: null, arbeitnow: null, total_seen: null };
+  var p2 = (raw || '').match(/(\d+) checked.*?(\d+) scored/);
+  if (p2) return { fetched: null, new: null, recent: +p2[1], relevant: null, scored: +p2[2], adzuna: null, arbeitnow: null, total_seen: null };
+  return { fetched: null, new: null, recent: null, relevant: null, scored: 0, adzuna: null, arbeitnow: null, total_seen: null };
 }
 
-function _hvFetcherEntry(e) {
-  var d = _hvParseFetchDetail(e.detail);
-  var scored = d.scored != null ? d.scored : 0;
+function _hTime(iso) {
+  if (!iso) return '';
+  var d = new Date(iso);
+  if (isNaN(d)) return iso.slice(0, 16).replace('T', ' ');
+  return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
 
-  var sources = '';
-  if (d.adzuna !== '?') {
-    sources = '<span class="hv-src-row">' +
-      '<span class="hv-src-badge hv-src-az">Adzuna ' + d.adzuna + '</span>' +
-      '<span class="hv-src-badge hv-src-arb">Arbeitnow ' + d.arbeitnow + '</span>' +
-      '</span>';
-  }
+function _hvFetcherEntryFull(e, d) {
+  var scored = d.scored || 0;
+  var statParts = [];
+  if (d.fetched != null)   statParts.push('<b>' + d.fetched   + '</b> fetched');
+  if (d.new     != null)   statParts.push('<b>' + d.new       + '</b> new');
+  if (d.recent  != null)   statParts.push('<b>' + d.recent    + '</b> recent');
+  if (d.relevant != null)  statParts.push('<b>' + d.relevant  + '</b> passed filter');
+  statParts.push('<b>' + scored + '</b> scored');
+  if (d.total_seen != null) statParts.push(d.total_seen + ' total seen');
 
-  var stats = [
-    d.fetched !== '?' ? '<b>' + d.fetched + '</b> fetched' : null,
-    d.new     !== '?' ? '<b>' + d.new     + '</b> new'     : null,
-    d.recent  !== '?' ? '<b>' + d.recent  + '</b> recent'  : null,
-    d.relevant !== '?' ? '<b>' + d.relevant + '</b> passed filter' : null,
-    '<b>' + scored + '</b> scored',
-    d.total_seen !== '?' ? d.total_seen + ' total seen' : null,
-  ].filter(Boolean).join(' &middot; ');
+  var sources = (d.adzuna != null)
+    ? '<div class="hv-entry-meta hv-entry-sources"><span class="hv-src-row">' +
+        '<span class="hv-src-badge hv-src-az">Adzuna ' + d.adzuna + '</span>' +
+        '<span class="hv-src-badge hv-src-arb">Arbeitnow ' + d.arbeitnow + '</span>' +
+      '</span></div>'
+    : '';
 
   return (
     '<div class="hv-entry hv-entry--fetch">' +
@@ -150,30 +152,24 @@ function _hvFetcherEntry(e) {
         '</span>' +
       '</div>' +
       '<div class="hv-entry-body">' +
-        '<div class="hv-entry-title">' +
-          'Fetcher run &middot; <span class="hv-run-time">' + _hTime(e.created_at) + '</span>' +
-        '</div>' +
-        '<div class="hv-entry-meta">' + stats + '</div>' +
-        (sources ? '<div class="hv-entry-meta hv-entry-sources">' + sources + '</div>' : '') +
+        '<div class="hv-entry-title">Fetcher run &middot; <span class="hv-run-time">' + _hTime(e.created_at) + '</span></div>' +
+        '<div class="hv-entry-meta">' + statParts.join(' &middot; ') + '</div>' +
+        sources +
       '</div>' +
       '<div class="hv-entry-right">' +
-        (scored > 0
-          ? '<span class="hv-fetch-badge">+' + scored + '</span>'
-          : '<span class="hv-fetch-badge hv-fetch-badge--zero">0</span>') +
+        '<span class="hv-fetch-badge' + (scored > 0 ? '' : ' hv-fetch-badge--zero') + '">+' + scored + '</span>' +
       '</div>' +
     '</div>'
   );
 }
 
-function _hTime(iso) {
-  if (!iso) return '';
-  var d = new Date(iso);
-  if (isNaN(d)) return iso.slice(0, 16).replace('T', ' ');
-  return d.toLocaleString(undefined, {
-    month: 'short', day: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  });
-}
+window.hvToggleZeroRuns = function(btn) {
+  var box = document.getElementById('hv-zero-runs');
+  if (!box) return;
+  var hidden = box.style.display === 'none';
+  box.style.display = hidden ? '' : 'none';
+  btn.textContent = hidden ? 'Hide zero-result runs' : btn.getAttribute('data-label');
+};
 
 function _hvRenderFetcher(entries) {
   var el = document.getElementById('hv-fetcher');
@@ -182,7 +178,52 @@ function _hvRenderFetcher(entries) {
     el.innerHTML = '<p class="hv-empty">No fetcher runs yet. Go to Job Matches and click Run.</p>';
     return;
   }
-  el.innerHTML = entries.map(_hvFetcherEntry).join('');
+
+  // Parse all entries
+  var parsed = entries.map(function(e) { return { e: e, d: _hvParseFetchDetail(e.detail) }; });
+
+  // Aggregate stats
+  var totalRuns    = parsed.length;
+  var totalScored  = parsed.reduce(function(s, x) { return s + (x.d.scored || 0); }, 0);
+  var totalFetched = parsed.reduce(function(s, x) { return s + (x.d.fetched || 0); }, 0);
+  var lastRun      = parsed[0] ? _hTime(parsed[0].e.created_at) : '—';
+  var lastSeen     = parsed[0] && parsed[0].d.total_seen != null ? parsed[0].d.total_seen : null;
+
+  var statsHtml =
+    '<div class="hv-stats-bar">' +
+      '<div class="hv-stat"><span class="hv-stat-val">' + totalRuns + '</span><span class="hv-stat-lbl">total runs</span></div>' +
+      '<div class="hv-stat-div"></div>' +
+      '<div class="hv-stat"><span class="hv-stat-val">' + totalFetched + '</span><span class="hv-stat-lbl">fetched</span></div>' +
+      '<div class="hv-stat-div"></div>' +
+      '<div class="hv-stat"><span class="hv-stat-val hv-stat-scored">' + totalScored + '</span><span class="hv-stat-lbl">scored</span></div>' +
+      (lastSeen != null ? '<div class="hv-stat-div"></div><div class="hv-stat"><span class="hv-stat-val">' + lastSeen + '</span><span class="hv-stat-lbl">total seen</span></div>' : '') +
+      '<div class="hv-stat-last">Last run: ' + lastRun + '</div>' +
+    '</div>';
+
+  // Split: runs with results vs zero-result runs
+  var withResults = parsed.filter(function(x) { return (x.d.scored || 0) > 0; });
+  var zeroRuns    = parsed.filter(function(x) { return (x.d.scored || 0) === 0; });
+
+  var resultsHtml = '';
+  if (withResults.length) {
+    resultsHtml = withResults.map(function(x) { return _hvFetcherEntryFull(x.e, x.d); }).join('');
+  } else {
+    resultsHtml = '<p class="hv-empty hv-empty--sub">No runs have scored any jobs yet.</p>';
+  }
+
+  var zeroHtml = '';
+  if (zeroRuns.length) {
+    var label = 'Show ' + zeroRuns.length + ' zero-result run' + (zeroRuns.length === 1 ? '' : 's');
+    zeroHtml =
+      '<div class="hv-zero-toggle">' +
+        '<button class="hv-zero-btn" data-label="' + label + '" onclick="hvToggleZeroRuns(this)">' + label + '</button>' +
+      '</div>' +
+      '<div id="hv-zero-runs" style="display:none;">' +
+        zeroRuns.map(function(x) { return _hvFetcherEntryFull(x.e, x.d); }).join('') +
+      '</div>';
+  }
+
+  el.innerHTML = statsHtml + resultsHtml + zeroHtml;
 }
 
 // ── Applications tab ──────────────────────────────────────
