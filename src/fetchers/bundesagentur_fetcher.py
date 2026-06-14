@@ -26,8 +26,13 @@ _JOB_URL = "https://www.arbeitsagentur.de/jobsuche/jobdetail/{}"
 _ANGEBOTSART = 1
 
 
-def _fetch_description(hash_id: str) -> str:
-    """Fetch full job description from the detail endpoint."""
+def _fetch_detail(hash_id: str) -> tuple[str, str]:
+    """
+    Fetch description and external URL from the BA detail endpoint.
+
+    Returns (description, externe_url). Either may be empty if the API
+    does not provide it - callers should fall back to scraping externe_url.
+    """
     try:
         resp = requests.get(
             f"{_BASE}/jobdetails/{hash_id}",
@@ -42,13 +47,14 @@ def _fetch_description(hash_id: str) -> str:
             or data.get("angebotsbeschreibung")
             or ""
         )
-        return _clean_html(raw)
+        externe_url = data.get("externeUrl") or data.get("externerLink") or ""
+        return _clean_html(raw), externe_url.strip()
     except requests.RequestException as e:
         logger.warning("BA detail fetch failed for %s: %s", hash_id, e)
-        return ""
+        return "", ""
 
 
-def _parse_job(raw: dict, description: str) -> Job:
+def _parse_job(raw: dict, description: str, externe_url: str = "") -> Job:
     """Convert a BA list entry + fetched description into a normalized Job."""
     hash_id = raw.get("hashId", "")
     title = (raw.get("titel") or "").strip()
@@ -56,12 +62,15 @@ def _parse_job(raw: dict, description: str) -> Job:
     ort = raw.get("arbeitsort") or {}
     location = (ort.get("ort") or "").strip()
     posted_at = _iso_to_epoch(raw.get("aktuelleVeroeffentlichungsdatum") or "")
+    # Prefer the external URL so _enrich() can scrape the real JD page when
+    # the BA detail endpoint returned an empty description.
+    url = externe_url or _JOB_URL.format(hash_id)
 
     return Job(
         title=title,
         company=company,
         location=location,
-        url=_JOB_URL.format(hash_id),
+        url=url,
         description=description,
         language=_detect_language(description or title),
         id=f"ba-{hash_id}",
@@ -120,12 +129,19 @@ def fetch_bundesagentur_jobs(
         if not hash_id:
             continue
 
-        description = _fetch_description(hash_id)
+        description, externe_url = _fetch_detail(hash_id)
         time.sleep(0.2)  # gentle throttle between detail calls
 
-        job = _parse_job(raw, description)
-        if job.description:
-            jobs.append(job)
+        # Always keep the job - even with an empty description. If the real JD
+        # lives on an external site (StepStone etc.) the pipeline's _enrich()
+        # will scrape it; if that also fails the job becomes jd_unavailable and
+        # the user can paste the JD text manually.
+        job = _parse_job(raw, description, externe_url)
+        jobs.append(job)
 
-    logger.info("Bundesagentur: collected %d jobs with descriptions", len(jobs))
+    logger.info(
+        "Bundesagentur: collected %d jobs (%d with descriptions)",
+        len(jobs),
+        sum(1 for j in jobs if j.description),
+    )
     return jobs

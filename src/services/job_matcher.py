@@ -30,8 +30,15 @@ _SNIPPET_LIMIT = 1200
 
 
 def _enrich(job: Job) -> None:
-    """Replace a thin Adzuna snippet with the full JD from its detail page."""
-    if job.source != "adzuna" or len(job.description) >= _SNIPPET_LIMIT:
+    """
+    Replace a thin or empty description with the full JD scraped from the
+    posting URL. Applies to Adzuna snippets and Bundesagentur jobs where the
+    real JD lives on an external site (StepStone, LinkedIn, etc.).
+    """
+    needs_enrich = (
+        job.source == "adzuna" and len(job.description) < _SNIPPET_LIMIT
+    ) or (job.source == "bundesagentur" and len(job.description) < _SNIPPET_LIMIT)
+    if not needs_enrich:
         return
     full = fetch_full_description(job.url)
     if full and len(full) > len(job.description):
