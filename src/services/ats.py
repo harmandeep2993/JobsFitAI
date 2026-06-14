@@ -3,19 +3,21 @@
 ATS Maker service.
 
 Standalone pipeline - no dependency on the Analyzer having run first.
-Takes raw resume text + resume JSON + JD JSON and produces:
-  - exact keyword coverage before and after optimisation
-  - section heading flags (standard ATS-expected headings)
-  - formatting flags (patterns ATS parsers commonly fail on)
-  - rewritten bullets with exact JD keywords injected
+Takes raw resume text + resume JSON + JD JSON and produces a complete
+ATS-optimised resume: professional summary, rewritten experience bullets
+with exact JD keywords injected verbatim, matched skills section, and
+clean education section.
 
-ATS systems do string matching, not semantic matching, so semantic
-similarity from the matcher is not enough - the exact term must appear.
+ATS systems do string matching, not semantic matching - the exact term
+must appear in the text. This is why we inject required skills verbatim
+rather than relying on semantic similarity from the matcher.
+
+Secondary outputs: keyword coverage before/after, section heading flags,
+and formatting warnings for any patterns ATS parsers commonly fail on.
 """
 
 import json
 import re
-from collections import defaultdict
 
 from src.utils.router import call_llm
 from src.utils.logger import get_logger
@@ -156,7 +158,7 @@ def formatting_flags(resume_text: str) -> list[str]:
             "Multiple very long lines detected - likely indicates a multi-column layout. ATS parsers read left-to-right and will scramble column content."
         )
 
-    # Email and phone present check (common ATS rejection reason)
+    # Email present check (common ATS rejection reason)
     if not re.search(r"[\w.+-]+@[\w-]+\.\w+", resume_text):
         flags.append(
             "No email address detected in the extracted text - ensure your email is in plain text, not inside a header image or text box."
@@ -165,144 +167,251 @@ def formatting_flags(resume_text: str) -> list[str]:
     return flags
 
 
-def inject_keywords(
-    resume_json: dict, jd_json: dict, missing_exact: list[str]
-) -> list[dict]:
+def _cert_name(cert: object) -> str:
+    """Extract a string name from a cert that may be a str or a dict."""
+    if isinstance(cert, str):
+        return cert
+    if isinstance(cert, dict):
+        return cert.get("name", "") or cert.get("title", "") or str(cert)
+    return str(cert)
+
+
+def _llm_generate_resume(resume_json: dict, jd_json: dict) -> dict:
     """
-    Rewrite resume experience bullets to embed missing exact JD keywords.
+    Call the LLM once to produce a complete ATS-optimised resume.
 
-    Only processes experience_entries - that is where ATS keyword density
-    matters most. Education and certs are left as-is.
+    Caps inputs to stay within the 6000 token budget:
+    - 3 experience roles, 5 bullets each
+    - 3 education entries
+    - 30 skills
+    - 5 certifications
+    - 3 projects
 
-    Returns a list of {role, company, items: [{before, after, changed}]}.
-    Empty list when there are no bullets or no missing keywords.
+    Returns {summary, experience, skills, education} or a passthrough
+    of the original data if the LLM call fails.
     """
-    if not missing_exact:
-        logger.info("inject_keywords: no missing exact keywords - skipping LLM call")
-        return []
+    job = jd_json.get("job", {})
+    role_title = job.get("title", "the role")
 
-    experience = resume_json.get("experience_entries", [])[:3]
-    if not experience:
-        logger.info("inject_keywords: no experience entries found")
-        return []
+    # Combine required and nice-to-have, cap at 20 for prompt size
+    required = (
+        jd_json.get("required_skills", []) + jd_json.get("nice_to_have_skills", [])
+    )[:20]
 
-    role_title = jd_json.get("job", {}).get("title", "this role")
-    keywords_str = ", ".join(missing_exact[:12])
-
-    # Flatten bullets with role context
-    flat: list[dict] = []
-    for exp in experience:
+    # Cap and shape experience input
+    exp_input = []
+    for exp in resume_json.get("experience_entries", [])[:3]:
         bullets = [
             b
             for b in exp.get("responsibilities", [])
-            if isinstance(b, str) and len(b.strip()) > 10
+            if isinstance(b, str) and len(b.strip()) > 5
         ][:5]
-        for b in bullets:
-            flat.append(
-                {
-                    "id": f"i{len(flat)}",
-                    "role": exp.get("title", ""),
-                    "company": exp.get("company", ""),
-                    "text": b,
-                }
-            )
+        exp_input.append(
+            {
+                "title": exp.get("title", ""),
+                "company": exp.get("company", ""),
+                "dates": exp.get("dates", ""),
+                "bullets": bullets,
+            }
+        )
 
-    if not flat:
-        logger.info("inject_keywords: no bullet text found in experience entries")
-        return []
+    # Cap and shape education input
+    edu_input = []
+    for edu in resume_json.get("education_entries", [])[:3]:
+        edu_input.append(
+            {
+                "degree": edu.get("degree", "") or edu.get("field", ""),
+                "institution": edu.get("institution", "") or edu.get("school", ""),
+                "year": edu.get("year", "") or edu.get("graduation_year", ""),
+            }
+        )
 
-    lines = "\n".join(f'- id:{item["id"]} bullet:"{item["text"]}"' for item in flat)
+    skills = resume_json.get("skills", [])[:30]
+    certs = [_cert_name(c) for c in resume_json.get("certifications", [])[:5]]
+    projects = [
+        p.get("title", "") if isinstance(p, dict) else str(p)
+        for p in resume_json.get("projects", [])[:3]
+    ]
+    name = resume_json.get("name", "Candidate")
 
-    prompt = f"""You are optimising a resume for ATS (Applicant Tracking System) keyword matching.
+    prompt = f"""You are an expert ATS resume writer. Generate a complete, ATS-optimised resume for the candidate applying to this specific role.
 
-ROLE: {role_title}
-MISSING EXACT KEYWORDS (these strings must appear verbatim to pass ATS filters): {keywords_str}
+TARGET ROLE: {role_title}
+REQUIRED SKILLS (embed these EXACT strings verbatim - ATS uses string matching, not semantic): {", ".join(required)}
 
-For each bullet, rewrite to naturally embed as many of the missing keywords as possible.
-Rules:
-- Use the EXACT keyword spelling from the list - ATS does literal string matching
-- Only inject a keyword if it is genuinely relevant to what the bullet describes
-- Keep each bullet under 25 words
-- Stay grounded in what the candidate actually did - do not invent experience
-- Plain hyphens only, no em-dashes
-- If no listed keywords are relevant to a bullet, return it unchanged
+CANDIDATE DATA:
+Name: {name}
+Experience: {json.dumps(exp_input, ensure_ascii=False)}
+Education: {json.dumps(edu_input, ensure_ascii=False)}
+Skills: {json.dumps(skills, ensure_ascii=False)}
+Certifications: {json.dumps(certs, ensure_ascii=False)}
+Projects: {json.dumps(projects, ensure_ascii=False)}
 
-Bullets:
-{lines}
+RULES:
+- Professional Summary: 2-3 sentences, open with the exact target role title, mirror the JD language
+- Work Experience: rewrite bullets to naturally embed as many EXACT required skills as possible
+- Keep each bullet under 25 words, start with an action verb, plain hyphens only
+- Skills: include ALL required skills the candidate genuinely has plus their existing skills, use exact JD terminology
+- Education: copy as-is, clean format
+- Stay grounded - do not invent experience the candidate does not have
+- No em-dashes, no special characters
 
-Return ONLY a valid JSON array, one object per bullet:
-[{{"id": "...", "bullet": "..."}}]"""
+Return ONLY valid JSON (no markdown, no explanation):
+{{"summary": "...", "experience": [{{"title": "...", "company": "...", "dates": "...", "bullets": ["..."]}}], "skills": ["..."], "education": [{{"degree": "...", "institution": "...", "year": "..."}}]}}"""
 
     logger.info(
-        "inject_keywords: sending %d bullets for keyword injection (role=%s)",
-        len(flat),
+        "generate_ats_resume: calling LLM for full resume generation (role=%s, keywords=%d)",
         role_title,
+        len(required),
     )
+
     _res = call_llm(prompt)
     response = _res.text if (_res and _res.text) else None
 
     if not response:
-        logger.warning("inject_keywords: LLM returned no response")
-        return []
+        logger.warning(
+            "generate_ats_resume: LLM returned no response - using passthrough"
+        )
+        return _passthrough_resume(resume_json)
 
-    arr = re.search(r"\[[\s\S]*\]", response)
-    if not arr:
-        logger.warning("inject_keywords: no JSON array in LLM response")
-        return []
+    obj_match = re.search(r"\{[\s\S]*\}", response)
+    if not obj_match:
+        logger.warning(
+            "generate_ats_resume: no JSON object in LLM response - using passthrough"
+        )
+        return _passthrough_resume(resume_json)
 
     try:
-        out = json.loads(arr.group())
+        out = json.loads(obj_match.group())
     except Exception:
-        logger.warning("inject_keywords: JSON parse error")
-        return []
+        logger.warning("generate_ats_resume: JSON parse error - using passthrough")
+        return _passthrough_resume(resume_json)
 
-    bullet_map = {
-        r["id"]: r.get("bullet", "").strip()
-        for r in out
-        if isinstance(r, dict) and "id" in r
+    return {
+        "summary": out.get("summary", ""),
+        "experience": out.get("experience", exp_input),
+        "skills": out.get("skills", skills),
+        "education": out.get("education", edu_input),
     }
 
-    groups: dict[tuple, list] = defaultdict(list)
-    for item in flat:
-        after = bullet_map.get(item["id"], "")
-        before = item["text"]
-        changed = bool(after) and after.lower() != before.lower()
-        groups[(item["role"], item["company"])].append(
+
+def _passthrough_resume(resume_json: dict) -> dict:
+    """
+    Return the original resume data structured for the output without LLM.
+    Used when the LLM call fails so the UI always has something to show.
+    """
+    exp_out = []
+    for exp in resume_json.get("experience_entries", [])[:3]:
+        bullets = [b for b in exp.get("responsibilities", []) if isinstance(b, str)][:5]
+        exp_out.append(
             {
-                "before": before,
-                "after": after if after else before,
-                "changed": changed,
+                "title": exp.get("title", ""),
+                "company": exp.get("company", ""),
+                "dates": exp.get("dates", ""),
+                "bullets": bullets,
             }
         )
+    edu_out = []
+    for edu in resume_json.get("education_entries", [])[:3]:
+        edu_out.append(
+            {
+                "degree": edu.get("degree", "") or edu.get("field", ""),
+                "institution": edu.get("institution", "") or edu.get("school", ""),
+                "year": edu.get("year", "") or edu.get("graduation_year", ""),
+            }
+        )
+    return {
+        "summary": "",
+        "experience": exp_out,
+        "skills": resume_json.get("skills", [])[:30],
+        "education": edu_out,
+    }
 
-    return [
-        {"role": role, "company": company, "items": items_list}
-        for (role, company), items_list in groups.items()
-    ]
+
+def _build_plain_text(resume: dict) -> str:
+    """
+    Build a plain-text resume from the structured LLM output.
+
+    This is the string returned to the frontend for the "Copy full resume"
+    button. Clean ATS-readable format with standard section headings.
+    """
+    parts: list[str] = []
+
+    if resume.get("summary"):
+        parts.append("PROFESSIONAL SUMMARY")
+        parts.append("")
+        parts.append(resume["summary"])
+        parts.append("")
+
+    if resume.get("experience"):
+        parts.append("WORK EXPERIENCE")
+        parts.append("")
+        for role in resume["experience"]:
+            header = " | ".join(
+                p
+                for p in [
+                    role.get("title", ""),
+                    role.get("company", ""),
+                    role.get("dates", ""),
+                ]
+                if p
+            )
+            if header:
+                parts.append(header)
+            for bullet in role.get("bullets", []):
+                if bullet:
+                    parts.append(f"- {bullet}")
+            parts.append("")
+
+    if resume.get("skills"):
+        parts.append("SKILLS")
+        parts.append("")
+        parts.append(", ".join(resume["skills"]))
+        parts.append("")
+
+    if resume.get("education"):
+        parts.append("EDUCATION")
+        parts.append("")
+        for edu in resume["education"]:
+            entry = " | ".join(
+                p
+                for p in [
+                    edu.get("degree", ""),
+                    edu.get("institution", ""),
+                    edu.get("year", ""),
+                ]
+                if p
+            )
+            if entry:
+                parts.append(entry)
+        parts.append("")
+
+    return "\n".join(parts).strip()
 
 
-def ats_optimise(
+def generate_ats_resume(
     resume_text: str,
     resume_json: dict,
     jd_json: dict,
 ) -> dict:
     """
-    Full ATS optimisation pipeline.
+    Full ATS resume generation pipeline.
 
     Steps:
-      1. Exact keyword coverage before rewrite
+      1. Exact keyword coverage against original resume text
       2. Section heading flags
       3. Formatting flags
-      4. Inject missing keywords into experience bullets (LLM)
-      5. Recalculate coverage using the rewritten bullets
+      4. LLM generates complete ATS-optimised resume
+      5. Recalculate coverage from the generated plain text
 
     Returns:
       {
+        resume:          {summary, experience, skills, education},
         coverage_before: {matched, missing, total, pct},
         coverage_after:  {matched, missing, total, pct},
         section_flags:   [{name, found, suggestion}],
         formatting_flags: [str],
-        rewrites:        [{role, company, items: [{before, after, changed}]}],
+        plain_text:      str,
       }
     """
     required = jd_json.get("required_skills", [])
@@ -311,20 +420,14 @@ def ats_optimise(
     sec_flags = section_flags(resume_text)
     fmt_flags = formatting_flags(resume_text)
 
-    # Only ask LLM to inject keywords that are genuinely missing verbatim
-    rewrites = inject_keywords(resume_json, jd_json, cov_before["missing"])
+    generated = _llm_generate_resume(resume_json, jd_json)
+    plain_text = _build_plain_text(generated)
 
-    # Approximate coverage after: check rewritten bullets against required skills
-    rewritten_text = resume_text
-    for group in rewrites:
-        for item in group["items"]:
-            if item.get("changed") and item.get("after"):
-                rewritten_text += " " + item["after"]
-
-    cov_after = exact_coverage(rewritten_text, required)
+    # Coverage after is measured against the full generated plain text
+    cov_after = exact_coverage(plain_text, required) if plain_text else cov_before
 
     logger.info(
-        "ats_optimise: coverage %d%% -> %d%% (%d/%d keywords)",
+        "generate_ats_resume: coverage %d%% -> %d%% (%d/%d keywords)",
         cov_before["pct"],
         cov_after["pct"],
         len(cov_after["matched"]),
@@ -332,19 +435,20 @@ def ats_optimise(
     )
 
     return {
+        "resume": generated,
         "coverage_before": cov_before,
         "coverage_after": cov_after,
         "section_flags": sec_flags,
         "formatting_flags": fmt_flags,
-        "rewrites": rewrites,
+        "plain_text": plain_text,
     }
 
 
 def ats_check(resume_text: str) -> dict:
     """
-    Lightweight scan - no LLM, no keyword injection.
+    Lightweight scan - no LLM, no resume generation.
     Returns section flags and formatting flags only.
-    Used by POST /api/ats/check for a quick scan without running the full pipeline.
+    Used by POST /api/ats/check for a quick structural scan.
     """
     return {
         "section_flags": section_flags(resume_text),

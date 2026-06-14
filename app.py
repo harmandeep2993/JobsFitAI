@@ -611,15 +611,17 @@ async def api_improve_resume(request: Request) -> JSONResponse:
 @app.post("/api/ats/optimise")
 async def api_ats_optimise(request: Request) -> JSONResponse:
     """
-    Full ATS optimisation pipeline.
+    Full ATS resume generation pipeline.
 
     Accepts {resume_id, jd}. Extracts raw resume text from the stored file,
-    runs exact keyword coverage, section/formatting flags, and injects missing
-    exact keywords into experience bullets via LLM.
+    checks keyword coverage and structural flags, then calls the LLM once to
+    produce a complete ATS-optimised resume (summary, experience, skills,
+    education) with exact JD keywords injected verbatim.
 
-    Returns {coverage_before, coverage_after, section_flags, formatting_flags, rewrites}.
+    Returns {resume, coverage_before, coverage_after, section_flags,
+    formatting_flags, plain_text}.
     """
-    from src.services.ats import ats_optimise
+    from src.services.ats import generate_ats_resume
 
     body = await request.json()
     resume_id = (body.get("resume_id") or "").strip()
@@ -655,7 +657,9 @@ async def api_ats_optimise(request: Request) -> JSONResponse:
 
     jd_json = await run_in_threadpool(extract_jd, jd_text)
 
-    result = await run_in_threadpool(ats_optimise, resume_text, resume_json, jd_json)
+    result = await run_in_threadpool(
+        generate_ats_resume, resume_text, resume_json, jd_json
+    )
     return JSONResponse({"ok": True, **result})
 
 
