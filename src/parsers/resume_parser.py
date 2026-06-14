@@ -17,10 +17,10 @@ Usage:
 
 from pathlib import Path
 
-from src.parsers.validator import validate
-from src.parsers.pdf_parser import parse_pdf
 from src.parsers.docx_parser import parse_docx
+from src.parsers.pdf_parser import parse_pdf
 from src.parsers.text_cleaner import clean
+from src.parsers.validator import validate
 from src.utils.logger import get_logger
 
 #

@@ -19,8 +19,8 @@ and formatting warnings for any patterns ATS parsers commonly fail on.
 import json
 import re
 
-from src.utils.router import call_llm
 from src.utils.logger import get_logger
+from src.utils.router import call_llm
 
 logger = get_logger(__name__)
 

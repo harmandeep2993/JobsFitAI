@@ -17,8 +17,8 @@ import re
 from collections import defaultdict
 
 from src.services import resume_store
-from src.utils.router import call_llm
 from src.utils.logger import get_logger
+from src.utils.router import call_llm
 
 logger = get_logger(__name__)
 

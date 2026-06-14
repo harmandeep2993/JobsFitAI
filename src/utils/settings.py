@@ -11,8 +11,8 @@ at runtime (weights sum, positive limits). Extra keys in config.yaml
 are ignored so the file can hold user notes without breaking the app.
 """
 
-import sys
 import logging
+import sys
 
 from pydantic import BaseModel, Field, model_validator
 

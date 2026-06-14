@@ -6,10 +6,10 @@ Uses an LLM to extract structured requirements from a job description.
 Includes light post-processing to normalize all string values to lowercase.
 """
 
-from src.utils.router import call_llm, parse_json_response
-from src.utils.config import JD_MAX_CHARS
 from src.prompts import get_jd_prompt
+from src.utils.config import JD_MAX_CHARS
 from src.utils.logger import get_logger
+from src.utils.router import call_llm, parse_json_response
 
 logger = get_logger(__name__)
 

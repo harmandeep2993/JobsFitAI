@@ -10,12 +10,12 @@ Each job costs one JD-extraction LLM call; the resume is extracted once
 import json as _json
 from datetime import datetime, timezone
 
+from src.extractors.jd import extract_jd
 from src.fetchers import Job, fetch_adzuna_multi, fetch_arbeitnow_jobs
 from src.fetchers.enrich import fetch_full_description
-from src.extractors.jd import extract_jd
 from src.matcher import match
+from src.services import event_store, match_store, relevance, role_filter, vector_store
 from src.utils import session
-from src.services import match_store, event_store, relevance, role_filter, vector_store
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)

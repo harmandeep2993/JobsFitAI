@@ -13,16 +13,16 @@ Reuse note:
     PROJECT_STATE.md for the full reuse map.
 """
 
+import datetime as dt
+import html
 import os
 import re
-import html
 import time
-import datetime as dt
 from dataclasses import dataclass
 
 import requests
 from dotenv import load_dotenv
-from langdetect import detect, DetectorFactory
+from langdetect import DetectorFactory, detect
 from langdetect.lang_detect_exception import LangDetectException
 
 from src.utils.logger import get_logger

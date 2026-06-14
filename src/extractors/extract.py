@@ -6,10 +6,10 @@ Orchestrates resume and JD extraction in sequence.
 Returns structured dicts for both inputs, or empty dicts on failure.
 """
 
-from src.utils.router import check_llm
-from src.extractors.resume import extract_resume
 from src.extractors.jd import extract_jd
+from src.extractors.resume import extract_resume
 from src.utils.logger import get_logger
+from src.utils.router import check_llm
 
 logger = get_logger(__name__)
 

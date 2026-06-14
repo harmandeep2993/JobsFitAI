@@ -10,8 +10,8 @@ runs endpoint work in a threadpool.
 """
 
 import sqlite3
-from pathlib import Path
 from contextlib import contextmanager
+from pathlib import Path
 
 from src.utils.logger import get_logger
 

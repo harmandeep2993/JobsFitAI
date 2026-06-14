@@ -9,11 +9,12 @@ Do not call this module directly from routes or services.
 
 import os
 import time
+
 import requests
 
 from src.utils.config import (
-    LLM_TEMPERATURE,
     LLM_MAX_OUTPUT_TOKENS,
+    LLM_TEMPERATURE,
     LLM_TIMEOUT,
     OPENAI_CONFIG,
 )

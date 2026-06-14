@@ -6,13 +6,14 @@ Get API key: https://console.groq.com
 """
 
 import os
+
 import requests
 
 from src.utils.config import (
-    LLM_TIMEOUT,
-    LLM_TEMPERATURE,
-    LLM_MAX_OUTPUT_TOKENS,
     GROQ_CONFIG,
+    LLM_MAX_OUTPUT_TOKENS,
+    LLM_TEMPERATURE,
+    LLM_TIMEOUT,
 )
 from src.utils.logger import get_logger
 

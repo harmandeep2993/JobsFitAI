@@ -12,7 +12,7 @@ import re
 import time
 
 from src.fetchers import Job
-from src.utils.config import TARGET_TITLES, MAX_AGE_DAYS
+from src.utils.config import MAX_AGE_DAYS, TARGET_TITLES
 
 
 def _norm(text: str) -> str:

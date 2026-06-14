@@ -149,6 +149,7 @@ def get_jd_sections(jd: dict) -> dict:
 # add to src/matcher/utils.py
 
 from sentence_transformers import util
+
 from src.matcher.embedding_model import load_model
 
 

@@ -31,13 +31,13 @@ Output format:
 """
 
 from src.matcher.scores import (
-    score_required_skills,
-    score_preferred_skills,
-    score_responsibilities,
-    score_experience,
-    score_education,
-    score_languages,
     score_certifications,
+    score_education,
+    score_experience,
+    score_languages,
+    score_preferred_skills,
+    score_required_skills,
+    score_responsibilities,
 )
 from src.matcher.utils import get_score_label
 from src.utils.config import WEIGHTS

@@ -6,8 +6,8 @@ Called after match() returns results dict.
 
 import math
 
+from src.frontend.components import make_tags, prog_grad, safe_html, score_col
 from src.utils import session
-from src.frontend.components import score_col, prog_grad, make_tags, safe_html
 
 _GAUGE_R = 17
 _GAUGE_CIRC = round(2 * math.pi * _GAUGE_R, 2)  # 106.81

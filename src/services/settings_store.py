@@ -12,7 +12,7 @@ User-editable search settings, persisted in SQLite so they survive restarts.
 import json
 
 from src.services import db
-from src.utils.config import TARGET_TITLES, SEARCH_COUNTRY, AUTO_FETCH_MINUTES
+from src.utils.config import AUTO_FETCH_MINUTES, SEARCH_COUNTRY, TARGET_TITLES
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)

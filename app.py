@@ -10,69 +10,68 @@ Responsibilities:
 - Start the FastAPI/uvicorn server
 """
 
+import asyncio
 import csv
 import hashlib
 import io
+import json as _json
 import os
+import tempfile
 import time
 import uuid
-import asyncio
-import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Set
 
 from fastapi import FastAPI
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import (
+    FileResponse,
     HTMLResponse,
     JSONResponse,
     StreamingResponse,
-    FileResponse,
 )
-from starlette.requests import Request
+from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
+from starlette.requests import Request
 
 from src.utils.logger import get_logger
 
 logger = get_logger("app")
 
-from src.utils import session
-from src.utils.router import check_llm
-from src.parsers import extract_all_text
 from src.extractors import extract_all
-from src.extractors.resume import extract_resume
 from src.extractors.jd import extract_jd
-from src.matcher.matcher import match
+from src.extractors.resume import extract_resume
 from src.frontend.results import build_results_html, render_error_panel
-from src.services.job_matcher import (
-    discover_and_score,
-    begin_run,
-    end_run,
-    get_run_status,
-    rescore_all,
-    fetch_combined,
-)
+from src.matcher.matcher import match
+from src.parsers import extract_all_text
 from src.services import (
-    match_store,
-    event_store,
-    vector_store,
-    settings_store,
-    resume_store,
     analysis_store,
     cache_store,
     db,
+    event_store,
+    match_store,
+    resume_store,
+    settings_store,
+    vector_store,
 )
-import json as _json
+from src.services.job_matcher import (
+    begin_run,
+    discover_and_score,
+    end_run,
+    fetch_combined,
+    get_run_status,
+    rescore_all,
+)
 from src.services.summary import generate_summary
+from src.utils import session
 from src.utils.config import (
-    SEARCH_PER_TITLE,
-    MAX_AGE_DAYS,
     JD_MAX_CHARS,
+    MAX_AGE_DAYS,
     MAX_FILE_SIZE_MB,
+    SEARCH_PER_TITLE,
     SUPPORTED_EXTENSIONS,
 )
-
+from src.utils.router import check_llm
 
 app = FastAPI(title="JobsFitAI")
 
