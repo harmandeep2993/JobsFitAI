@@ -11,7 +11,12 @@ import json as _json
 from datetime import datetime, timezone
 
 from src.extractors.jd import extract_jd
-from src.fetchers import Job, fetch_adzuna_multi, fetch_arbeitnow_jobs
+from src.fetchers import (
+    Job,
+    fetch_adzuna_multi,
+    fetch_arbeitnow_jobs,
+    fetch_bundesagentur_jobs,
+)
 from src.fetchers.enrich import fetch_full_description
 from src.matcher import match
 from src.services import event_store, match_store, relevance, role_filter, vector_store
@@ -25,8 +30,15 @@ _SNIPPET_LIMIT = 1200
 
 
 def _enrich(job: Job) -> None:
-    """Replace a thin Adzuna snippet with the full JD from its detail page."""
-    if job.source != "adzuna" or len(job.description) >= _SNIPPET_LIMIT:
+    """
+    Replace a thin or empty description with the full JD scraped from the
+    posting URL. Applies to Adzuna snippets and Bundesagentur jobs where the
+    real JD lives on an external site (StepStone, LinkedIn, etc.).
+    """
+    needs_enrich = (
+        job.source == "adzuna" and len(job.description) < _SNIPPET_LIMIT
+    ) or (job.source == "bundesagentur" and len(job.description) < _SNIPPET_LIMIT)
+    if not needs_enrich:
         return
     full = fetch_full_description(job.url)
     if full and len(full) > len(job.description):
@@ -101,13 +113,14 @@ def fetch_combined(
     countries: list[str] | None = None,
     per_title: int = 5,
     arbeitnow_limit: int = 100,
+    bundesagentur_limit: int = 10,
 ) -> list[Job]:
     """
-    Pull jobs from both sources across one or more countries, and merge.
+    Pull jobs from all sources across one or more countries, and merge.
 
     - Adzuna: server-side search per target title, per country code.
-    - Arbeitnow: Germany feed filtered to target-title roles (only when
-      Germany is among the countries; it has no other-country data).
+    - Arbeitnow: Germany feed filtered to target-title roles (DE only).
+    - Bundesagentur: Germany official job board via public API (DE only).
 
     Deduped by id; the LLM funnel and vector dedup refine further.
     """
@@ -120,15 +133,25 @@ def fetch_combined(
         )
 
     arbeitnow: list[Job] = []
+    bundesagentur: list[Job] = []
     if "de" in countries:
         terms = sorted({w for t in titles for w in t.split()})
+        query = " ".join(terms)
+
         arb_raw = fetch_arbeitnow_jobs(
-            query=" ".join(terms), location=location, limit=arbeitnow_limit
+            query=query, location=location, limit=arbeitnow_limit
         )
         arbeitnow = [j for j in arb_raw if role_filter.is_target_role(j.title, titles)]
 
+        ba_raw = fetch_bundesagentur_jobs(
+            query=query, location=location, limit=bundesagentur_limit
+        )
+        bundesagentur = [
+            j for j in ba_raw if role_filter.is_target_role(j.title, titles)
+        ]
+
     merged, seen_ids, seen_content = [], set(), set()
-    for job in adzuna + arbeitnow:
+    for job in adzuna + arbeitnow + bundesagentur:
         ckey = (
             (job.title or "").strip().lower()
             + "|"
@@ -140,10 +163,11 @@ def fetch_combined(
             merged.append(job)
 
     logger.info(
-        "Combined sources (%s): %d adzuna + %d arbeitnow -> %d unique",
+        "Combined sources (%s): %d adzuna + %d arbeitnow + %d bundesagentur -> %d unique",
         ",".join(countries),
         len(adzuna),
         len(arbeitnow),
+        len(bundesagentur),
         len(merged),
     )
     return merged
@@ -288,6 +312,7 @@ def discover_and_score(jobs: list[Job], entry_only: bool = True) -> dict:
                 "scored": scored,
                 "adzuna": by_source.get("adzuna", 0),
                 "arbeitnow": by_source.get("arbeitnow", 0),
+                "bundesagentur": by_source.get("bundesagentur", 0),
                 "total_seen": len(seen) + len(new_jobs),
             }
         )
