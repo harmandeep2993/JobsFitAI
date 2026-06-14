@@ -568,7 +568,7 @@ async def api_analyze(request: Request) -> JSONResponse:
         try:
             analysis_store.save(
                 resume_id,
-                jd_text[:120],
+                jd_text,
                 results.get("overall_score", 0),
                 results.get("label", ""),
             )
