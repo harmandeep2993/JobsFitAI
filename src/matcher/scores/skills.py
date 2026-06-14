@@ -89,8 +89,8 @@ def score_required_skills(resume: dict, jd: dict) -> tuple[float, list, list]:
     score = round(len(matched) / len(required) * 100, 1)
 
     logger.info("Required skills score : %s", score)
-    logger.info("Matched skills        : %s", matched)
-    logger.info("Missing skills        : %s", missing)
+    logger.info("Matched skills : %s", matched)
+    logger.info("Missing skills : %s", missing)
 
     return score, matched, missing
 
@@ -154,7 +154,7 @@ def score_preferred_skills(resume: dict, jd: dict) -> tuple[float, list, list]:
     score = round(len(matched) / len(preferred) * 100, 1)
 
     logger.info("Preferred skills score : %s", score)
-    logger.info("Matched preferred      : %s", matched)
-    logger.info("Missing preferred      : %s", missing)
+    logger.info("Matched preferred : %s", matched)
+    logger.info("Missing preferred : %s", missing)
 
     return score, matched, missing

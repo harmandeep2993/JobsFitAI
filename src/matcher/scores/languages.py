@@ -197,7 +197,7 @@ def score_languages(resume: dict, jd: dict) -> float:
     # Candidate lookup - language name -> proficiency level
     candidate_map = {lang: level for lang, level in candidate_parsed}
 
-    logger.info("Required languages  : %s", required_parsed)
+    logger.info("Required languages : %s", required_parsed)
     logger.info("Candidate languages : %s", candidate_map)
 
     # --- Score each required language ---

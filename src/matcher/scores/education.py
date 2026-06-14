@@ -78,7 +78,7 @@ def score_education(resume: dict, jd: dict) -> float:
     education_entries = resume.get("education", [])
 
     logger.info("JD education requirements : %s", education_requirements)
-    logger.info("Resume education entries  : %d", len(education_entries))
+    logger.info("Resume education entries : %d", len(education_entries))
 
     # --- Edge case: no requirements ---
     if not education_requirements:
@@ -97,8 +97,8 @@ def score_education(resume: dict, jd: dict) -> float:
     candidate_text = _build_education_text(education_entries)
     requirements_text = " ".join(r for r in education_requirements if r).strip()
 
-    logger.info("Candidate education text  : %s", candidate_text)
-    logger.info("Requirements text         : %s", requirements_text)
+    logger.info("Candidate education text : %s", candidate_text)
+    logger.info("Requirements text : %s", requirements_text)
 
     if not candidate_text:
         logger.warning("Education entries produced no text")

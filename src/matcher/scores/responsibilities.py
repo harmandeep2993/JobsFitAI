@@ -70,7 +70,7 @@ def score_responsibilities(resume: dict, jd: dict) -> float:
     jd_bullets = [b.strip() for b in jd_bullets if b.strip()]
 
     logger.info("Resume bullets collected : %d", len(resume_bullets))
-    logger.info("JD bullets collected     : %d", len(jd_bullets))
+    logger.info("JD bullets collected : %d", len(jd_bullets))
 
     # --- Edge cases ---
     if not resume_bullets:

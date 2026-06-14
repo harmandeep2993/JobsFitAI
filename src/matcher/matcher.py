@@ -68,27 +68,27 @@ def match(resume: dict, jd: dict) -> dict:
 
     # --- Run all scorers (per-section detail at DEBUG) ---
     req_score, matched_required, missing_required = score_required_skills(resume, jd)
-    logger.debug("Required skills   : %.1f", req_score)
+    logger.debug("Required skills : %.1f", req_score)
 
     pref_score, matched_preferred, missing_preferred = score_preferred_skills(
         resume, jd
     )
-    logger.debug("Preferred skills  : %.1f", pref_score)
+    logger.debug("Preferred skills : %.1f", pref_score)
 
     resp_score = score_responsibilities(resume, jd)
-    logger.debug("Responsibilities  : %.1f", resp_score)
+    logger.debug("Responsibilities : %.1f", resp_score)
 
     exp_score = score_experience(resume, jd)
-    logger.debug("Experience        : %.1f", exp_score)
+    logger.debug("Experience : %.1f", exp_score)
 
     edu_score = score_education(resume, jd)
-    logger.debug("Education         : %.1f", edu_score)
+    logger.debug("Education : %.1f", edu_score)
 
     lang_score = score_languages(resume, jd)
-    logger.debug("Languages         : %.1f", lang_score)
+    logger.debug("Languages : %.1f", lang_score)
 
     cert_score = score_certifications(resume, jd)
-    logger.debug("Certifications    : %.1f", cert_score)
+    logger.debug("Certifications : %.1f", cert_score)
 
     # --- Build section scores dict (clamp each to 0-100) ---
     def _clamp(v: float) -> float:
