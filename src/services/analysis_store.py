@@ -13,8 +13,8 @@ from src.services import db
 
 # Maximum characters stored in the jd_snippet column.
 # Long enough to be a useful identifier in the history view, short enough
-# to stay well within SQLite's default page size. Must stay in sync with
-# the truncation applied in app.py before calling save().
+# to stay well within SQLite's default page size. Truncation is applied
+# inside save() so callers pass the raw JD text.
 _SNIPPET_MAX = 120
 
 
