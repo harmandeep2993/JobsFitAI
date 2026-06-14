@@ -72,7 +72,7 @@ def _fix_broken_words(text: str) -> str:
     Returns:
         str: Text with broken words rejoined
     """
-    # Pattern: word-\nnextword → wordnextword
+    # Pattern: word-\nnextword -> wordnextword
     text = re.sub(r"(\w)-\n(\w)", r"\1\2", text)
     return text
 

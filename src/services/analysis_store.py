@@ -1,12 +1,27 @@
+"""
+Per-resume analysis history store.
+
+Records every successful analyze() run, keyed on (resume_id, jd_snippet).
+Repeated runs for the same resume+JD pair update the existing row rather
+than inserting a duplicate, so the history shows the most recent score.
+"""
+
 import uuid
 from datetime import datetime, timezone
 
 from src.services import db
 
+# Maximum characters stored in the jd_snippet column.
+# Long enough to be a useful identifier in the history view, short enough
+# to stay well within SQLite's default page size. Truncation is applied
+# inside save() so callers pass the raw JD text.
+_SNIPPET_MAX = 120
+
 
 def save(resume_id: str, jd_snippet: str, score: float, label: str) -> None:
+    """Upsert an analysis result; update score/label if the same resume+JD pair already exists."""
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
-    snippet = (jd_snippet or "")[:120]
+    snippet = (jd_snippet or "")[:_SNIPPET_MAX]
     with db.connect() as conn:
         existing = conn.execute(
             "SELECT id FROM analyses WHERE resume_id=? AND jd_snippet=?",

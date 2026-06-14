@@ -10,8 +10,8 @@ Uploading to a slot replaces any existing resume in that slot.
 """
 
 import uuid
-from pathlib import Path
 from datetime import datetime, timezone
+from pathlib import Path
 
 from src.services import db
 from src.utils.logger import get_logger

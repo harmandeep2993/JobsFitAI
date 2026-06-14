@@ -5,8 +5,8 @@ Sentence-transformers embedding model loader.
 Loads the model once and reuses it across the application.
 """
 
-import os
 import contextlib
+import os
 
 # Quiet HuggingFace/transformers noise before they're imported below
 # (progress bars, advisory warnings, the model "LOAD REPORT").

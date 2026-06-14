@@ -1,16 +1,23 @@
 # src/utils/ollama.py
+"""
+Thin HTTP wrapper around a locally-running Ollama instance.
 
-import re
+These functions are called only from src/utils/router.py via the ollama
+provider path. Do not import this module directly from routes or services.
+"""
+
 import json
+import re
+
 import requests
 
 from src.utils.config import (
-    OLLAMA_URL,
     OLLAMA_HEALTH_URL,
-    OLLAMA_MODEL,
-    OLLAMA_TIMEOUT,
-    OLLAMA_TEMPERATURE,
     OLLAMA_MAX_TOKENS,
+    OLLAMA_MODEL,
+    OLLAMA_TEMPERATURE,
+    OLLAMA_TIMEOUT,
+    OLLAMA_URL,
 )
 
 

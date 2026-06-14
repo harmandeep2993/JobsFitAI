@@ -6,14 +6,14 @@ Called after match() returns results dict.
 
 import math
 
+from src.frontend.components import make_tags, prog_grad, safe_html, score_col
 from src.utils import session
-from src.frontend.components import score_col, prog_grad, make_tags, safe_html
 
 _GAUGE_R = 17
 _GAUGE_CIRC = round(2 * math.pi * _GAUGE_R, 2)  # 106.81
 
 
-# ── Error panel ──────────────────────────────────────────────
+# --- Error panel ---
 
 
 def render_error_panel(title: str, message: str) -> str:
@@ -43,7 +43,7 @@ def render_error_panel(title: str, message: str) -> str:
 </div>"""
 
 
-# ── SVG icon helpers ─────────────────────────────────────────
+# --- SVG icon helpers ---
 def _ico(d, s=16):
     return (
         f'<svg width="{s}" height="{s}" viewBox="0 0 16 16" fill="none" '
@@ -149,6 +149,19 @@ _SUM_SECTIONS = [
 
 
 def render_summary(summary_text, score=0, label="", matched_req=None, missing_req=None):
+    """
+    Render the Summary tab panel: gauge ring, score pill, profile/strengths columns.
+
+    Args:
+        summary_text: JSON string from generate_summary() or plain fallback text.
+        score: overall match score 0-100.
+        label: tier label e.g. "Good Match".
+        matched_req: list of matched required skill strings.
+        missing_req: list of missing required skill strings.
+
+    Returns:
+        str: HTML string for the #jf-summary panel.
+    """
     import json as _json
 
     tier = score_tier(score)
@@ -297,6 +310,15 @@ def render_breakdown(
     r_langs,
     c_yrs=0,
 ):
+    """
+    Render the Breakdown tab: one collapsible accordion row per scoring section.
+
+    Each row shows a mini gauge ring, score, matched/missing skill tags, and
+    a progress bar. Rows are collapsed by default; JS toggles them on click.
+
+    Returns:
+        str: HTML string for the #jf-breakdown panel.
+    """
     items = []
 
     for k in SCORE_ORDER:
@@ -377,6 +399,15 @@ def render_breakdown(
 
 
 def render_keywords(matched_req, missing_req, matched_pref, missing_pref):
+    """
+    Render the Keywords tab: coverage bar + colour-coded skill tag sections.
+
+    Green tags = matched skills present in the resume.
+    Red tags = skills the JD requires but not found in the resume.
+
+    Returns:
+        str: HTML string for the #jf-keywords panel.
+    """
     total = len(matched_req) + len(missing_req) + len(matched_pref) + len(missing_pref)
     covered = len(matched_req) + len(matched_pref)
 
@@ -951,6 +982,21 @@ def _render_keywords_panel(matched_req, missing_req, matched_pref, missing_pref)
 def build_results_html(
     results: dict, resume_json: dict, jd_json: dict, summary: str = ""
 ) -> str:
+    """
+    Assemble the full analysis results HTML injected into #jf-results.
+
+    Combines all tab panels (Summary, Breakdown, Keywords, Recommendations)
+    into a single .nb-card with the shared tab-row header and export footer.
+
+    Args:
+        results: output of match() - scores, labels, matched/missing skills.
+        resume_json: extracted resume data dict.
+        jd_json: extracted job description data dict.
+        summary: JSON string from generate_summary(); empty string on failure.
+
+    Returns:
+        str: Full HTML string ready for innerHTML injection.
+    """
     import json as _json
 
     score = results.get("overall_score", 0)

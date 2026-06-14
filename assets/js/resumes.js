@@ -9,8 +9,7 @@ var RV_SLOT_META = [
   { label: 'Tailored Resume 2', hint: 'A second tailored variant' },
 ];
 
-// ── Load + render ─────────────────────────────────────────
-
+// === Load + render ===
 function rvLoad() {
   fetch('/api/resumes')
     .then(function(r) { return r.json(); })
@@ -90,8 +89,7 @@ function _rvFilledSlot(r, meta) {
   );
 }
 
-// ── Analyzer picker ───────────────────────────────────────
-
+// === Analyzer picker ===
 function _rvRenderPicker(resumes) {
   var picker  = document.getElementById('az-resume-picker');
   var zone    = document.getElementById('up-zone');
@@ -173,8 +171,7 @@ window.rvSelect = function(id, name) {
   fetch('/api/resumes/' + id + '/use-for-matching', { method: 'POST' }).catch(function() {});
 };
 
-// ── Upload ────────────────────────────────────────────────
-
+// === Upload ===
 window.rvPickFile = function(slot) {
   _rvSlotTarget = (slot === -1) ? _rvNextFreeSlot() : slot;
   var inp = document.getElementById('rv-file-input');
@@ -222,8 +219,7 @@ window.rvUpload = function(file, slot) {
     .catch(function() { toast('Upload failed.', 'err'); });
 };
 
-// ── Rename label ─────────────────────────────────────────
-
+// === Rename label ===
 window.rvEditLabel = function(id) {
   var span = document.getElementById('rv-lbl-' + id);
   if (!span || span.querySelector('input')) return; // already editing
@@ -260,8 +256,7 @@ window.rvEditLabel = function(id) {
   inp.addEventListener('blur', save);
 };
 
-// ── Delete ────────────────────────────────────────────────
-
+// === Delete ===
 window.rvDelete = function(id) {
   fetch('/api/resumes/' + id, { method: 'DELETE' })
     .then(function(r) { return r.json(); })
@@ -277,8 +272,7 @@ window.rvDelete = function(id) {
     .catch(function() { toast('Delete failed.', 'err'); });
 };
 
-// ── Preview ───────────────────────────────────────────────
-
+// === Preview ===
 window.rvPreview = function(id, filename) {
   var modal   = document.getElementById('resume-preview-modal');
   var content = document.getElementById('rp-content');
@@ -322,8 +316,7 @@ window.rvPreview = function(id, filename) {
   }
 };
 
-// ── Recommendation ───────────────────────────────────────
-
+// === Recommendation ===
 var _rvRecoTimer  = null;
 var _rvRecoActive = false; // true while a request is in flight
 var _rvLastJD     = '';
@@ -397,8 +390,7 @@ window.rvCheckReco = function(jd) {
   _rvRecoTimer = setTimeout(function() { _rvRequestReco(jd); }, 1500);
 };
 
-// ── Badge ─────────────────────────────────────────────────
-
+// === Badge ===
 function _rvUpdateBadge(count) {
   var badge = document.getElementById('sb-badge-resumes');
   if (!badge) return;
@@ -406,8 +398,7 @@ function _rvUpdateBadge(count) {
   badge.style.display = count > 0 ? '' : 'none';
 }
 
-// ── Util ──────────────────────────────────────────────────
-
+// === Util ===
 function _esc(str) {
   return String(str)
     .replace(/&/g, '&amp;')
@@ -416,7 +407,6 @@ function _esc(str) {
     .replace(/"/g, '&quot;');
 }
 
-// ── Init ──────────────────────────────────────────────────
-
+// === Init ===
 // Load on page start so picker is ready when user opens analyser.
 (function() { rvLoad(); })();

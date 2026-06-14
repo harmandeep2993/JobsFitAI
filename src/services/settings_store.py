@@ -12,7 +12,7 @@ User-editable search settings, persisted in SQLite so they survive restarts.
 import json
 
 from src.services import db
-from src.utils.config import TARGET_TITLES, SEARCH_COUNTRY, AUTO_FETCH_MINUTES
+from src.utils.config import AUTO_FETCH_MINUTES, SEARCH_COUNTRY, TARGET_TITLES
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -84,7 +84,7 @@ def _set(key, value) -> None:
         )
 
 
-# ── Target titles ─────────────────────────────────────────
+# --- Target titles ---
 def get_titles() -> list[str]:
     return _get("target_titles", list(TARGET_TITLES))
 
@@ -100,7 +100,7 @@ def set_titles(titles: list[str]) -> None:
     logger.info("Target titles updated: %d", len(cleaned))
 
 
-# ── Countries (codes) / location ──────────────────────────
+# --- Countries (codes) / location ---
 def get_countries() -> list[str]:
     return _get("countries", [SEARCH_COUNTRY])
 
@@ -128,7 +128,7 @@ def set_location(loc: str) -> None:
     _set("location", (loc or "").strip())
 
 
-# ── Background scheduler ──────────────────────────────────
+# --- Background scheduler ---
 def get_scheduler_enabled() -> bool:
     # Defaults to on only if config seeded a positive interval.
     return bool(_get("scheduler_enabled", AUTO_FETCH_MINUTES > 0))

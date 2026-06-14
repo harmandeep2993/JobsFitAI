@@ -135,7 +135,7 @@ def _normalize_language(text: str) -> tuple[str, int]:
     lang_part = text.split("(")[0].split(",")[0].strip()
 
     # Remove proficiency keywords from lang_part
-    # e.g. "conversational german" → "german"
+    # e.g. "conversational german" -> "german"
     for keyword in PROFICIENCY_LEVELS:
         lang_part = lang_part.replace(keyword, "").strip()
 
@@ -194,7 +194,7 @@ def score_languages(resume: dict, jd: dict) -> float:
         _normalize_language(lang) for lang in resume.get("languages", []) if lang
     ]
 
-    # Candidate lookup - language name → proficiency level
+    # Candidate lookup - language name -> proficiency level
     candidate_map = {lang: level for lang, level in candidate_parsed}
 
     logger.info("Required languages  : %s", required_parsed)

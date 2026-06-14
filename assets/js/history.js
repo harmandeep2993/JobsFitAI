@@ -28,8 +28,7 @@ function _hTierCls(score) {
   return 'sc-poor';
 }
 
-// ── Tab switching ─────────────────────────────────────────
-
+// === Tab switching ===
 window.hTab = function(el, tabId) {
   document.querySelectorAll('#hv-tab-row .hv-tab').forEach(function(t) {
     t.classList.remove('active');
@@ -42,8 +41,7 @@ window.hTab = function(el, tabId) {
   if (panel) panel.style.display = '';
 };
 
-// ── Load ──────────────────────────────────────────────────
-
+// === Load ===
 window.loadHistory = window.hvLoad = function() {
   ['hv-analyser', 'hv-fetcher', 'hv-applications'].forEach(function(id) {
     var el = document.getElementById(id);
@@ -67,8 +65,7 @@ window.loadHistory = window.hvLoad = function() {
     });
 };
 
-// ── Analyser tab ──────────────────────────────────────────
-
+// === Analyser tab ===
 function _hvRenderAnalyser(entries) {
   var el = document.getElementById('hv-analyser');
   if (!el) return;
@@ -103,8 +100,7 @@ function _hvRenderAnalyser(entries) {
   }).join('');
 }
 
-// ── Fetcher tab ───────────────────────────────────────────
-
+// === Fetcher tab ===
 function _hvParseFetchDetail(raw) {
   try {
     var d = JSON.parse(raw || '{}');
@@ -226,8 +222,7 @@ function _hvRenderFetcher(entries) {
   el.innerHTML = statsHtml + resultsHtml + zeroHtml;
 }
 
-// ── Applications tab ──────────────────────────────────────
-
+// === Applications tab ===
 function _hvRenderApplications(entries) {
   var el = document.getElementById('hv-applications');
   if (!el) return;
@@ -266,8 +261,7 @@ function _hvRenderApplications(entries) {
   }).join('');
 }
 
-// ── Badge ─────────────────────────────────────────────────
-
+// === Badge ===
 function _hvUpdateBadge(count) {
   var badge = document.getElementById('sb-badge-history');
   if (!badge) return;
@@ -275,5 +269,5 @@ function _hvUpdateBadge(count) {
   badge.style.display = count > 0 ? '' : 'none';
 }
 
-// ── Init ──────────────────────────────────────────────────
+// === Init ===
 (function() { hvLoad(); })();

@@ -13,11 +13,11 @@ The configuration is loaded once when the module is imported
 and exposed as constants across the application.
 """
 
-import yaml
-from pathlib import Path
-from dotenv import load_dotenv
-
 import logging
+from pathlib import Path
+
+import yaml
+from dotenv import load_dotenv
 
 _logger = logging.getLogger(__name__)
 

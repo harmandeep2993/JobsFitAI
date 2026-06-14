@@ -6,13 +6,13 @@ Uses an LLM to extract structured information from resume text.
 Includes light post-processing to normalize all string values to lowercase.
 """
 
-import re
 import datetime as dt
+import re
 
-from src.utils.router import call_llm, parse_json_response
-from src.utils.config import RESUME_MAX_CHARS
 from src.prompts import get_resume_prompt
+from src.utils.config import RESUME_MAX_CHARS
 from src.utils.logger import get_logger
+from src.utils.router import call_llm, parse_json_response
 
 logger = get_logger(__name__)
 

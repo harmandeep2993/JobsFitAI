@@ -11,15 +11,15 @@ at runtime (weights sum, positive limits). Extra keys in config.yaml
 are ignored so the file can hold user notes without breaking the app.
 """
 
-import sys
 import logging
+import sys
 
 from pydantic import BaseModel, Field, model_validator
 
 logger = logging.getLogger(__name__)
 
 
-# ── Sub-models ────────────────────────────────────────────────────────────
+# --- Sub-models ---
 
 
 class LLMConfig(BaseModel):
@@ -45,6 +45,7 @@ class MatcherWeights(BaseModel):
 
     @model_validator(mode="after")
     def weights_sum_to_one(self) -> "MatcherWeights":
+        """Reject configs where weights don't sum to 1.0 (within 0.001 tolerance)."""
         total = round(
             sum(
                 [
@@ -114,7 +115,7 @@ class Settings(BaseModel):
     validator: ValidatorConfig
 
 
-# ── Public API ────────────────────────────────────────────────────────────
+# --- Public API ---
 
 
 def validate_config(raw: dict) -> Settings:

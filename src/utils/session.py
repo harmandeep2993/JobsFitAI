@@ -14,9 +14,9 @@ change here takes effect on the next analysis without a restart.
 import json
 from datetime import datetime, timezone
 
+from src.services import db
 from src.utils.config import PROVIDER_CONFIGS
 from src.utils.logger import get_logger
-from src.services import db
 
 logger = get_logger(__name__)
 

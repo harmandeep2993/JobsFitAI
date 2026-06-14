@@ -35,7 +35,7 @@ DATE_FORMAT = "%H:%M:%S"
 
 # Low-level helpers pinned to WARNING so their per-call detail stays out of
 # normal runs. The major-event modules (resume_parser, resume, jd, matcher,
-# job_matcher, app, …) log clean one-line INFO summaries and are NOT muted.
+# job_matcher, app, ...) log clean one-line INFO summaries and are NOT muted.
 # Set config logging.level to DEBUG to see all detail again.
 _QUIET_INTERNAL = [
     "skills",
@@ -79,6 +79,7 @@ class _ColourFormatter(logging.Formatter):
     RESET = "\033[0m"
 
     def format(self, record):
+        """Apply ANSI colour to the level name before delegating to stdlib Formatter."""
         colour = self.COLOURS.get(record.levelno, "")
         reset = self.RESET
         fmt = (
@@ -198,6 +199,6 @@ def get_logger(name: str) -> logging.Logger:
             pass
         _setup_logging(level)
 
-    # Shorten name: src.parsers.pdf_parser → pdf_parser
+    # Shorten name: src.parsers.pdf_parser -> pdf_parser
     short_name = name.split(".")[-1] if "." in name else name
     return logging.getLogger(short_name)

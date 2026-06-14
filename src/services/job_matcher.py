@@ -10,12 +10,12 @@ Each job costs one JD-extraction LLM call; the resume is extracted once
 import json as _json
 from datetime import datetime, timezone
 
+from src.extractors.jd import extract_jd
 from src.fetchers import Job, fetch_adzuna_multi, fetch_arbeitnow_jobs
 from src.fetchers.enrich import fetch_full_description
-from src.extractors.jd import extract_jd
 from src.matcher import match
+from src.services import event_store, match_store, relevance, role_filter, vector_store
 from src.utils import session
-from src.services import match_store, event_store, relevance, role_filter, vector_store
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -224,10 +224,10 @@ def discover_and_score(jobs: list[Job], entry_only: bool = True) -> dict:
 
     survivors = []
     for job in candidates:
-        v = verdicts.get(job.id, {"relevant": True, "entry_level": True})
-        if not v["relevant"]:
+        verdict = verdicts.get(job.id, {"relevant": True, "entry_level": True})
+        if not verdict["relevant"]:
             event_store.mark_seen(job, "irrelevant")
-        elif entry_only and not v["entry_level"]:
+        elif entry_only and not verdict["entry_level"]:
             event_store.mark_seen(job, "not_entry")
         else:
             survivors.append(job)

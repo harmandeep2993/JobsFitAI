@@ -1,6 +1,6 @@
 // assets/js/analysis.js
 
-// ── Step indicator (top progress bar) ────────────────────
+// === Step indicator (top progress bar) ===
 function setStep(n) {
   var labels = ['Upload', 'Job Description', 'Analysing', 'Results'];
   var parts = labels.map(function(lbl, i) {
@@ -17,7 +17,7 @@ function setStep(n) {
   if (el) el.outerHTML = '<div class="steps">' + parts + '</div>';
 }
 
-// ── Analysis progress stepper ─────────────────────────────
+// === Analysis progress stepper ===
 var _azTimers = [];
 
 var AZ_STEPS = [
@@ -113,7 +113,7 @@ function hideProgress() {
   if (box) { box.style.opacity = ''; box.style.transition = ''; box.style.display = 'none'; }
 }
 
-// ── JD validation ─────────────────────────────────────────
+// === JD validation ===
 function checkJD() {
   var jd = document.getElementById('jd-input');
   if (!jd) return;
@@ -126,7 +126,7 @@ function checkJD() {
   if (typeof rvCheckReco === 'function') rvCheckReco(val);
 }
 
-// ── Persistent result cache (localStorage, survives refresh) ─
+// === Persistent result cache (localStorage, survives refresh) ===
 var _CACHE_LS_KEY = 'jfai_cache';
 var _CACHE_MAX    = 5;
 
@@ -147,7 +147,7 @@ function _cacheSet(key, html) {
   } catch(e) {}
 }
 
-// ── Results placeholder HTML (restored by runAgain) ──────
+// === Results placeholder HTML (restored by runAgain) ===
 var RES_PLACEHOLDER =
   '<div class="res-placeholder">' +
   '<div class="res-empty-body">' +
@@ -160,7 +160,7 @@ var RES_PLACEHOLDER =
   '</div>' +
   '</div>';
 
-// ── Analysis trigger ──────────────────────────────────────
+// === Analysis trigger ===
 window.startAnalysis = function() {
   var jdEl = document.getElementById('jd-input');
   var jd   = jdEl ? jdEl.value.trim() : '';
@@ -246,7 +246,7 @@ window.startAnalysis = function() {
     });
 };
 
-// ── Results tab switching ─────────────────────────────────
+// === Results tab switching ===
 window.jfTab = function(el, panelId) {
   document.querySelectorAll('#jf-tab-row .tab-item').forEach(function(t) {
     t.classList.remove('active');
@@ -259,7 +259,7 @@ window.jfTab = function(el, panelId) {
   if (panel) panel.style.display = 'block';
 };
 
-// ── Ring animations (sidebar score + breakdown rings) ─────
+// === Ring animations (sidebar score + breakdown rings) ===
 function animateResRing() { animateBdRings(); }
 
 function animateBdRings() {
@@ -277,7 +277,7 @@ function animateBdRings() {
   });
 }
 
-// ── Breakdown accordion toggles ───────────────────────────
+// === Breakdown accordion toggles ===
 window.bdToggle = function(item) {
   if (!item) return;
   var open = item.getAttribute('data-open') === 'true';
@@ -307,7 +307,7 @@ window.bdToggleAll = function(btn) {
   btn.textContent = anyOpen ? 'Expand all' : 'Collapse all';
 };
 
-// ── Export / copy results ─────────────────────────────────
+// === Export / copy results ===
 window.copyResults = function() {
   var score  = document.querySelector('.sum-hero-sub');
   var label  = document.querySelector('.sum-hero-label');
@@ -357,7 +357,7 @@ window.copyResults = function() {
   }
 };
 
-// ── Run Again (keep resume, clear JD + results) ──────────
+// === Run Again (keep resume, clear JD + results) ===
 window.runAgain = function() {
   _azTimers.forEach(clearTimeout);
   _azTimers = [];
@@ -377,7 +377,7 @@ window.runAgain = function() {
   if (jdEl) setTimeout(function() { jdEl.focus(); }, 350);
 };
 
-// ── Bindings ──────────────────────────────────────────────
+// === Bindings ===
 (function bindJD() {
   var jd = document.getElementById('jd-input');
   if (jd) {

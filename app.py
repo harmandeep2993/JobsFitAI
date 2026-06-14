@@ -10,69 +10,68 @@ Responsibilities:
 - Start the FastAPI/uvicorn server
 """
 
+import asyncio
 import csv
 import hashlib
 import io
+import json as _json
 import os
+import tempfile
 import time
 import uuid
-import asyncio
-import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Set
 
 from fastapi import FastAPI
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import (
+    FileResponse,
     HTMLResponse,
     JSONResponse,
     StreamingResponse,
-    FileResponse,
 )
-from starlette.requests import Request
+from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
+from starlette.requests import Request
 
 from src.utils.logger import get_logger
 
 logger = get_logger("app")
 
-from src.utils import session
-from src.utils.router import check_llm
-from src.parsers import extract_all_text
 from src.extractors import extract_all
-from src.extractors.resume import extract_resume
 from src.extractors.jd import extract_jd
-from src.matcher.matcher import match
+from src.extractors.resume import extract_resume
 from src.frontend.results import build_results_html, render_error_panel
-from src.services.job_matcher import (
-    discover_and_score,
-    begin_run,
-    end_run,
-    get_run_status,
-    rescore_all,
-    fetch_combined,
-)
+from src.matcher.matcher import match
+from src.parsers import extract_all_text
 from src.services import (
-    match_store,
-    event_store,
-    vector_store,
-    settings_store,
-    resume_store,
     analysis_store,
     cache_store,
     db,
+    event_store,
+    match_store,
+    resume_store,
+    settings_store,
+    vector_store,
 )
-import json as _json
+from src.services.job_matcher import (
+    begin_run,
+    discover_and_score,
+    end_run,
+    fetch_combined,
+    get_run_status,
+    rescore_all,
+)
 from src.services.summary import generate_summary
+from src.utils import session
 from src.utils.config import (
-    SEARCH_PER_TITLE,
-    MAX_AGE_DAYS,
     JD_MAX_CHARS,
+    MAX_AGE_DAYS,
     MAX_FILE_SIZE_MB,
+    SEARCH_PER_TITLE,
     SUPPORTED_EXTENSIONS,
 )
-
+from src.utils.router import check_llm
 
 app = FastAPI(title="JobsFitAI")
 
@@ -80,7 +79,7 @@ app = FastAPI(title="JobsFitAI")
 app.mount("/assets", StaticFiles(directory="assets"), name="assets")
 
 
-# ── Request logging middleware ─────────────────────────────
+# --- Request logging middleware ---
 
 
 @app.middleware("http")
@@ -113,7 +112,7 @@ ALLOWED_EXTENSIONS: Set[str] = SUPPORTED_EXTENSIONS
 MAX_FILE_MB: int = MAX_FILE_SIZE_MB
 
 
-# ── Frontend ──────────────────────────────────────────────
+# --- Frontend ---
 
 
 @app.get("/")
@@ -159,7 +158,7 @@ async def health() -> JSONResponse:
     )
 
 
-# ── Resume upload ─────────────────────────────────────────
+# --- Resume upload ---
 
 
 @app.post("/api/upload")
@@ -210,7 +209,7 @@ async def api_upload(request: Request) -> JSONResponse:
     )
 
 
-# ── Stored resume endpoints ───────────────────────────────
+# --- Stored resume endpoints ---
 
 _USER = "local"  # single-user mode; swap for session user_id at launch
 
@@ -380,7 +379,7 @@ async def api_resumes_recommend(request: Request) -> JSONResponse:
     )
 
 
-# ── Serve original resume file ────────────────────────────
+# --- Serve original resume file ---
 
 _PREVIEW_TYPES = {
     ".pdf": "application/pdf",
@@ -399,11 +398,12 @@ async def api_resume_file(tmp: str) -> FileResponse:
     return FileResponse(tmp, media_type=_PREVIEW_TYPES[suffix])
 
 
-# ── Resume text preview (no LLM) ─────────────────────────
+# --- Resume text preview (no LLM) ---
 
 
 @app.post("/api/resume-preview")
 async def api_resume_preview(request: Request) -> JSONResponse:
+    """Extract raw text from a stored or temp resume file - no LLM, no scoring."""
     body = await request.json()
     tmp = (body.get("tmp") or "").strip()
     resume_id = (body.get("resume_id") or "").strip()
@@ -426,7 +426,7 @@ async def api_resume_preview(request: Request) -> JSONResponse:
     return JSONResponse({"ok": True, "text": text[:3000], "total_chars": len(text)})
 
 
-# ── Analyzer ──────────────────────────────────────────────
+# --- Analyzer ---
 
 
 @app.post("/api/analyze")
@@ -568,7 +568,7 @@ async def api_analyze(request: Request) -> JSONResponse:
         try:
             analysis_store.save(
                 resume_id,
-                jd_text[:120],
+                jd_text,
                 results.get("overall_score", 0),
                 results.get("label", ""),
             )
@@ -578,7 +578,7 @@ async def api_analyze(request: Request) -> JSONResponse:
     return JSONResponse({"ok": True, "cached": False, **payload})
 
 
-# ── Resume rewrite ─────────────────────────────────────────
+# --- Resume rewrite ---
 
 
 @app.post("/api/improve-resume")
@@ -605,7 +605,7 @@ async def api_improve_resume(request: Request) -> JSONResponse:
     return JSONResponse(result)
 
 
-# ── ATS Maker ─────────────────────────────────────────────
+# --- ATS Maker ---
 
 
 @app.post("/api/ats/optimise")
@@ -695,7 +695,7 @@ async def api_ats_check(request: Request) -> JSONResponse:
     return JSONResponse({"ok": True, **result})
 
 
-# ── History ───────────────────────────────────────────────
+# --- History ---
 
 
 @app.get("/api/history")
@@ -733,7 +733,7 @@ async def api_history() -> JSONResponse:
     )
 
 
-# ── LLM ping ──────────────────────────────────────────────
+# --- LLM ping ---
 
 
 @app.get("/api/llm-ping")
@@ -749,7 +749,7 @@ async def api_llm_ping() -> JSONResponse:
     )
 
 
-# ── LLM settings ──────────────────────────────────────────
+# --- LLM settings ---
 
 
 @app.get("/api/llm-settings")
@@ -765,6 +765,7 @@ async def api_get_llm_settings() -> JSONResponse:
 
 @app.post("/api/llm-settings")
 async def api_set_llm_settings(request: Request) -> JSONResponse:
+    """Switch the active LLM provider and/or model; verifies connectivity after switching."""
     body = await request.json()
     provider = (body.get("provider") or "").strip()
     model = (body.get("model") or "").strip()
@@ -785,7 +786,7 @@ async def api_set_llm_settings(request: Request) -> JSONResponse:
     )
 
 
-# ── Resume diff ───────────────────────────────────────────
+# --- Resume diff ---
 
 
 def _resume_diff(old: dict, new: dict) -> dict:
@@ -830,7 +831,7 @@ def _resume_diff(old: dict, new: dict) -> dict:
     }
 
 
-# ── Job matches ───────────────────────────────────────────
+# --- Job matches ---
 
 
 @app.post("/api/match/resume")
@@ -881,6 +882,13 @@ async def api_match_resume(request: Request) -> JSONResponse:
 
 @app.get("/api/match/run")
 async def api_match_run(request: Request) -> JSONResponse:
+    """
+    Kick off a background job-fetch-and-score run.
+
+    Returns immediately with {started: true} and runs the pipeline in a
+    background task. Only one run can be active at a time; subsequent calls
+    return {started: false, already_running: true} until the run completes.
+    """
     if not session.has_resume():
         return JSONResponse(
             {"ok": False, "error": "no_resume", "results": match_store.get_all()},
@@ -919,6 +927,7 @@ async def api_match_run(request: Request) -> JSONResponse:
 
 @app.get("/api/match/state")
 async def api_match_state() -> JSONResponse:
+    """Full state snapshot polled by the frontend while a run is active."""
     return JSONResponse(
         {
             "ok": True,
@@ -944,6 +953,7 @@ async def api_match_state() -> JSONResponse:
 
 @app.post("/api/match/applied")
 async def api_match_applied(request: Request) -> JSONResponse:
+    """Toggle the applied flag on a scored job and log an 'applied' event."""
     body = await request.json()
     job_id = (body.get("id") or "").strip()
     applied = bool(body.get("applied"))
@@ -957,6 +967,12 @@ async def api_match_applied(request: Request) -> JSONResponse:
 
 @app.get("/api/match/detail")
 async def api_match_detail(request: Request) -> JSONResponse:
+    """
+    Return full detail for a scored job, lazily generating an LLM summary if absent.
+
+    The summary is generated on first request for a job and then cached in
+    the matches table so subsequent calls return immediately.
+    """
     job_id = (request.query_params.get("id") or "").strip()
     row = match_store.get_one(job_id)
     if not row:
@@ -1010,6 +1026,7 @@ async def api_match_detail(request: Request) -> JSONResponse:
 
 @app.post("/api/match/filters")
 async def api_match_filters(request: Request) -> JSONResponse:
+    """Update target titles, countries, and/or location filter; returns the new values."""
     body = await request.json()
 
     if isinstance(body.get("target_titles"), list):
@@ -1107,6 +1124,7 @@ async def api_score_jd(request: Request) -> JSONResponse:
 
 @app.post("/api/match/scheduler")
 async def api_match_scheduler(request: Request) -> JSONResponse:
+    """Enable/disable the auto-fetch scheduler or change its interval (minutes)."""
     global _sched_last
     body = await request.json()
     if "enabled" in body:
@@ -1195,7 +1213,7 @@ async def api_match_export() -> StreamingResponse:
     )
 
 
-# ── Background scheduler ──────────────────────────────────
+# --- Background scheduler ---
 
 _sched_last = 0.0
 
@@ -1284,7 +1302,7 @@ async def _start_scheduler() -> None:
     )
 
 
-# ── Entry point ───────────────────────────────────────────
+# --- Entry point ---
 
 PORT = 8080
 

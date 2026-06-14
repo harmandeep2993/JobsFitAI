@@ -8,9 +8,9 @@ full description. This module fetches that page and extracts the full text
 so the matcher scores against the complete JD.
 """
 
-import re
 import html
 import json
+import re
 import time
 
 import requests

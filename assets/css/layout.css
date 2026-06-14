@@ -20,7 +20,7 @@ html, body {
   overflow: hidden;
 }
 
-/* --- Sidebar --- */
+/* === Sidebar === */
 .jfai-sidebar {
   background: var(--bg-r);
   border-right: 1px solid var(--bd);
@@ -140,7 +140,7 @@ html, body {
   flex-shrink: 0;
 }
 
-/* --- Workspace --- */
+/* === Workspace === */
 #workspace {
   display: flex;
   flex-direction: column;
@@ -149,7 +149,7 @@ html, body {
   overflow: hidden;
 }
 
-/* --- Topbar --- */
+/* === Topbar === */
 .jfai-topbar {
   height: var(--topbar-h);
   background: var(--bg-r);
@@ -247,7 +247,7 @@ html, body {
 }
 .theme-btn:hover { background: var(--bg-hov); color: var(--t1); }
 
-/* --- Main scroll --- */
+/* === Main scroll === */
 #main-scroll {
   flex: 1;
   min-height: 0;
@@ -268,7 +268,7 @@ html, body {
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* --- Page headings --- */
+/* === Page headings === */
 .pg-title {
   font-size: 21px;
   font-weight: 700;
@@ -286,13 +286,13 @@ html, body {
 
 .divider { height: 1px; background: var(--bd); margin: 20px 0; }
 
-/* --- Scrollbars --- */
+/* === Scrollbars === */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 99px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--t3); }
 
-/* --- Responsive --- */
+/* === Responsive === */
 @media (max-width: 820px) {
   :root { --sidebar-w: 50px; }
   .sb-item > span:not(.sb-icon):not(.sb-badge),

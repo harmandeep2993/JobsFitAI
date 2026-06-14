@@ -9,8 +9,8 @@ we never spend the expensive extraction/scoring tokens on irrelevant or
 senior jobs.
 """
 
-from src.utils.router import call_llm, parse_json_response
 from src.utils.logger import get_logger
+from src.utils.router import call_llm, parse_json_response
 
 logger = get_logger(__name__)
 

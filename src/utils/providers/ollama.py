@@ -7,9 +7,9 @@ Runs fully local - no API key required. Get Ollama: https://ollama.com
 import requests
 
 from src.utils.config import (
-    LLM_TIMEOUT,
-    LLM_TEMPERATURE,
     LLM_MAX_OUTPUT_TOKENS,
+    LLM_TEMPERATURE,
+    LLM_TIMEOUT,
     OLLAMA_CONFIG,
 )
 from src.utils.logger import get_logger

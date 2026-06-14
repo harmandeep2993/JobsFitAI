@@ -130,23 +130,23 @@ def get_all() -> list[dict]:
         ).fetchall()
 
     out = []
-    for r in rows:
-        d = dict(r)
+    for row in rows:
+        job = dict(row)
         try:
-            d["matched_required"] = json.loads(d.get("matched_required") or "[]")
+            job["matched_required"] = json.loads(job.get("matched_required") or "[]")
         except (ValueError, TypeError):
             logger.warning(
-                "Corrupt matched_required for job %s - using []", d.get("id")
+                "Corrupt matched_required for job %s - using []", job.get("id")
             )
-            d["matched_required"] = []
+            job["matched_required"] = []
         try:
-            d["missing_required"] = json.loads(d.get("missing_required") or "[]")
+            job["missing_required"] = json.loads(job.get("missing_required") or "[]")
         except (ValueError, TypeError):
             logger.warning(
-                "Corrupt missing_required for job %s - using []", d.get("id")
+                "Corrupt missing_required for job %s - using []", job.get("id")
             )
-            d["missing_required"] = []
-        out.append(d)
+            job["missing_required"] = []
+        out.append(job)
     return out
 
 
@@ -191,26 +191,28 @@ def update_score(job_id: str, result: dict) -> None:
 def get_one(job_id: str) -> dict | None:
     """Return a single match row with jd/section_scores parsed, or None."""
     with db.connect() as conn:
-        r = conn.execute("SELECT * FROM matches WHERE id=?", (job_id,)).fetchone()
-    if not r:
+        row = conn.execute("SELECT * FROM matches WHERE id=?", (job_id,)).fetchone()
+    if not row:
         return None
-    d = dict(r)
+    job = dict(row)
     for field, default, raw in (
-        ("matched_required", [], d.get("matched_required") or "[]"),
-        ("missing_required", [], d.get("missing_required") or "[]"),
-        ("section_scores", {}, d.get("section_scores") or "{}"),
+        ("matched_required", [], job.get("matched_required") or "[]"),
+        ("missing_required", [], job.get("missing_required") or "[]"),
+        ("section_scores", {}, job.get("section_scores") or "{}"),
     ):
         try:
-            d[field] = json.loads(raw)
+            job[field] = json.loads(raw)
         except (ValueError, TypeError):
-            logger.warning("Corrupt %s for job %s - using default", field, d.get("id"))
-            d[field] = default
+            logger.warning(
+                "Corrupt %s for job %s - using default", field, job.get("id")
+            )
+            job[field] = default
     try:
-        d["jd_json"] = json.loads(d["jd_json"]) if d.get("jd_json") else {}
+        job["jd_json"] = json.loads(job["jd_json"]) if job.get("jd_json") else {}
     except (ValueError, TypeError):
-        logger.warning("Corrupt jd_json for job %s - using {}", d.get("id"))
-        d["jd_json"] = {}
-    return d
+        logger.warning("Corrupt jd_json for job %s - using {}", job.get("id"))
+        job["jd_json"] = {}
+    return job
 
 
 def set_summary(job_id: str, summary: str) -> None:
