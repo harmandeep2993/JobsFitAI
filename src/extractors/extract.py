@@ -23,7 +23,7 @@ def extract_all(resume_text: str, jd_text: str) -> tuple[dict, dict]:
 
     Args:
         resume_text (str): Raw resume text
-        jd_text     (str): Raw job description text
+        jd_text (str): Raw job description text
 
     Returns:
         tuple[dict, dict]: (resume_json, jd_json)

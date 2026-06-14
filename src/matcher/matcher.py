@@ -52,7 +52,7 @@ def match(resume: dict, jd: dict) -> dict:
 
     Args:
         resume (dict): Extracted resume data
-        jd     (dict): Extracted JD data
+        jd (dict): Extracted JD data
 
     Returns:
         dict: Full match results including overall score,

@@ -122,7 +122,7 @@ def make_prog(label, val):
 
     Args:
         label (str):  Display label
-        val   (float): Score 0-100
+        val (float): Score 0-100
 
     Returns:
         str: Progress bar HTML
@@ -149,7 +149,7 @@ def make_tags(items, css):
 
     Args:
         items (list): Skill strings
-        css   (str):  Tag colour class e.g. tg, tr, ta, tb
+        css (str):  Tag colour class e.g. tg, tr, ta, tb
 
     Returns:
         str: Tags HTML or em-dash if empty

@@ -36,7 +36,7 @@ def score_required_skills(resume: dict, jd: dict) -> tuple[float, list, list]:
 
     Args:
         resume (dict): Extracted resume data
-        jd     (dict): Extracted JD data
+        jd (dict): Extracted JD data
 
     Returns:
         tuple: (score 0-100, matched_skills, missing_skills)
@@ -104,7 +104,7 @@ def score_preferred_skills(resume: dict, jd: dict) -> tuple[float, list, list]:
 
     Args:
         resume (dict): Extracted resume data
-        jd     (dict): Extracted JD data
+        jd (dict): Extracted JD data
 
     Returns:
         tuple: (score 0-100, matched_skills, missing_skills)

@@ -56,7 +56,7 @@ def _filter_relevant_entries(experience_entries: list, jd_context: str) -> list:
 
     Args:
         experience_entries (list): All resume experience entries
-        jd_context         (str):  Combined JD responsibilities +
+        jd_context (str):  Combined JD responsibilities +
                                    experience requirements text
 
     Returns:
@@ -105,7 +105,7 @@ def score_experience(resume: dict, jd: dict) -> float:
 
     Args:
         resume (dict): Extracted resume data
-        jd     (dict): Extracted JD data
+        jd (dict): Extracted JD data
 
     Returns:
         float: Experience score 0-100

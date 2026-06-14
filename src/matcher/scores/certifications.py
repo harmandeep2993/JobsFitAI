@@ -45,7 +45,7 @@ def score_certifications(resume: dict, jd: dict) -> float:
 
     Args:
         resume (dict): Extracted resume data
-        jd     (dict): Extracted JD data
+        jd (dict): Extracted JD data
 
     Returns:
         float: Certification score 0-100

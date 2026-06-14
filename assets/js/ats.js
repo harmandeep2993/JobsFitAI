@@ -2,8 +2,8 @@
 // ATS Maker view - generate a complete ATS-optimised resume from a stored
 // resume and a pasted job description.
 
-var _atsInitDone  = false;
-var _atsResumeId  = null;  // currently selected resume id
+var _atsInitDone = false;
+var _atsResumeId = null;  // currently selected resume id
 
 var ATS_SLOT_LABELS = ['Base', 'Tailored 1', 'Tailored 2'];
 
@@ -129,10 +129,10 @@ function _atsRenderPicker(resumes) {
 
   var html = '<div class="az-rv-picker">';
   resumes.forEach(function(r) {
-    var ext     = r.original_name.split('.').pop().toUpperCase();
+    var ext = r.original_name.split('.').pop().toUpperCase();
     var slotLbl = ATS_SLOT_LABELS[r.slot] || ('Slot ' + (r.slot + 1));
-    var sel     = (_atsResumeId === r.id) ? ' selected' : '';
-    var hist    = '';
+    var sel = (_atsResumeId === r.id) ? ' selected' : '';
+    var hist = '';
     if (r.last_score != null) {
       var tierCls = r.last_score >= 80 ? 'sc-exc' : r.last_score >= 60 ? 'sc-good' : r.last_score >= 40 ? 'sc-partial' : 'sc-poor';
       hist =
@@ -202,8 +202,8 @@ function _atsBindJD() {
 }
 
 function _atsOnJDInput(ta) {
-  var val   = ta ? ta.value : '';
-  var len   = val.length;
+  var val = ta ? ta.value : '';
+  var len = val.length;
   var counter = document.getElementById('ats-jd-counter');
   if (counter) {
     counter.textContent = len + ' / 5000';
@@ -213,11 +213,11 @@ function _atsOnJDInput(ta) {
 }
 
 function _atsUpdateButtons() {
-  var jdEl   = document.getElementById('ats-jd-input');
-  var jdLen  = jdEl ? jdEl.value.trim().length : 0;
+  var jdEl = document.getElementById('ats-jd-input');
+  var jdLen = jdEl ? jdEl.value.trim().length : 0;
   var hasRes = !!_atsResumeId;
 
-  var runBtn  = document.getElementById('ats-run-btn');
+  var runBtn = document.getElementById('ats-run-btn');
   var scanBtn = document.getElementById('ats-scan-btn');
 
   if (runBtn)  runBtn.disabled  = !(hasRes && jdLen >= 50);

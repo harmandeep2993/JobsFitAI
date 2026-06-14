@@ -39,8 +39,8 @@ def extract_all_text(file_path: str) -> str:
 
     Raises:
         FileNotFoundError : File does not exist
-        ValueError        : Validation failed or unsupported format
-        RuntimeError      : Extraction failed
+        ValueError : Validation failed or unsupported format
+        RuntimeError : Extraction failed
     """
     path = Path(file_path)
     logger.debug("Starting parsing pipeline for: %s", path.name)

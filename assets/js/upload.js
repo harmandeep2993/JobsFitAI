@@ -108,9 +108,9 @@ window.handleFileSelect = function(file) {
 window.previewResume = function() {
   if (!window._resumeTmp) return;
 
-  var modal   = document.getElementById('resume-preview-modal');
+  var modal = document.getElementById('resume-preview-modal');
   var content = document.getElementById('rp-content');
-  var sub     = document.querySelector('#resume-preview-modal .dt-sub');
+  var sub = document.querySelector('#resume-preview-modal .dt-sub');
   if (!modal || !content) return;
 
   var ext = (window._resumeName || '').split('.').pop().toLowerCase();
@@ -133,7 +133,7 @@ window.previewResume = function() {
       .then(function(r) { return r.json(); })
       .then(function(d) {
         if (!d.ok) { content.innerHTML = '<p class="rp-err">Could not extract: ' + (d.error || 'unknown') + '</p>'; return; }
-        var total   = d.total_chars;
+        var total = d.total_chars;
         var truncated = total > d.text.length ? '<div class="rp-trunc">Showing first ' + d.text.length.toLocaleString() + ' of ' + total.toLocaleString() + ' characters</div>' : '';
         content.innerHTML =
           '<div class="rp-meta">' + window._resumeName + ' &nbsp;&middot;&nbsp; ' + total.toLocaleString() + ' chars</div>' +
@@ -145,7 +145,7 @@ window.previewResume = function() {
 };
 
 window.closeResumePreview = function() {
-  var modal   = document.getElementById('resume-preview-modal');
+  var modal = document.getElementById('resume-preview-modal');
   var content = document.getElementById('rp-content');
   if (modal)   modal.style.display = 'none';
   if (content) { content.classList.remove('rp-content--frame'); content.innerHTML = ''; }

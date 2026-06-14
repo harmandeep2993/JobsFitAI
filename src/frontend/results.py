@@ -105,10 +105,10 @@ def render_metrics(score, matched_req, missing_req, c_yrs):
     Build metrics cards HTML.
 
     Args:
-        score       (float): Overall match score
+        score (float): Overall match score
         matched_req (list):  Matched required skills
         missing_req (list):  Missing required skills
-        c_yrs       (float): Candidate total experience years
+        c_yrs (float): Candidate total experience years
     """
     sc = score_col(score)
     d_cls, d_txt = get_direction(score)
@@ -462,8 +462,8 @@ def render_skills_gap(matched_req, missing_req, matched_pref, missing_pref):
     Build skills gap tab panel HTML.
 
     Args:
-        matched_req  (list): Matched required skills
-        missing_req  (list): Missing required skills
+        matched_req (list): Matched required skills
+        missing_req (list): Missing required skills
         matched_pref (list): Matched preferred skills
         missing_pref (list): Missing preferred skills
     """
@@ -518,13 +518,13 @@ def render_recommendations(
     Rule-based - no LLM needed.
 
     Args:
-        score        (float): Final match score
-        missing_req  (list):  Missing required skills
+        score (float): Final match score
+        missing_req (list):  Missing required skills
         missing_pref (list):  Missing preferred skills
-        c_yrs        (float): Candidate years experience
-        c_edu        (list):  Candidate education list
-        r_edu_list   (list):  JD education requirements list
-        scores       (dict):  Section scores
+        c_yrs (float): Candidate years experience
+        c_edu (list):  Candidate education list
+        r_edu_list (list):  JD education requirements list
+        scores (dict):  Section scores
     """
     items = []
 

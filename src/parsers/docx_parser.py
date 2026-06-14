@@ -116,8 +116,8 @@ def parse_docx(file_path: str) -> str:
 
     Raises:
         FileNotFoundError : File does not exist
-        ValueError        : Unsupported file format
-        RuntimeError      : Extraction failed
+        ValueError : Unsupported file format
+        RuntimeError : Extraction failed
     """
     path = Path(file_path)
 

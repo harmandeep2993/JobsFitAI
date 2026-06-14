@@ -43,7 +43,7 @@ def score_responsibilities(resume: dict, jd: dict) -> float:
 
     Args:
         resume (dict): Extracted resume data
-        jd     (dict): Extracted JD data
+        jd (dict): Extracted JD data
 
     Returns:
         float: Responsibilities score 0-100

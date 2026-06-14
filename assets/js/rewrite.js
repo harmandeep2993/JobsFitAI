@@ -17,9 +17,9 @@ function _rwBadgeCls(badge) {
 
 function _rwItemHTML(item) {
   var badgeCls = _rwBadgeCls(item.badge);
-  var after    = item.after  || '';
-  var before   = item.before || '';
-  var source   = item.source || '';
+  var after = item.after  || '';
+  var before = item.before || '';
+  var source = item.source || '';
 
   var beforeRow = before
     ? '<div class="rw-before"><span class="rw-label">Before</span><span class="rw-text">' + _rwEsc(before) + '</span></div>'
@@ -59,8 +59,8 @@ function _rwSectionHTML(section) {
 }
 
 window.rwGenerate = function() {
-  var jd        = window._rwJd        || (document.getElementById('jd-input') || {}).value || '';
-  var gaps      = window._rwGaps      || [];
+  var jd = window._rwJd        || (document.getElementById('jd-input') || {}).value || '';
+  var gaps = window._rwGaps      || [];
   var strengths = window._rwStrengths || [];
 
   if (!jd || jd.trim().length < 30) {
@@ -68,7 +68,7 @@ window.rwGenerate = function() {
     return;
   }
 
-  var btn    = document.getElementById('rw-run-btn');
+  var btn = document.getElementById('rw-run-btn');
   var output = document.getElementById('rw-output');
   if (btn)    { btn.disabled = true; btn.textContent = 'Generating…'; }
   if (output) output.innerHTML = '<div class="rw-loading">Analysing your resumes and rewriting bullets…</div>';
