@@ -19,7 +19,7 @@ from pydantic import BaseModel, Field, model_validator
 logger = logging.getLogger(__name__)
 
 
-# ── Sub-models ────────────────────────────────────────────────────────────
+# --- Sub-models ---
 
 
 class LLMConfig(BaseModel):
@@ -114,7 +114,7 @@ class Settings(BaseModel):
     validator: ValidatorConfig
 
 
-# ── Public API ────────────────────────────────────────────────────────────
+# --- Public API ---
 
 
 def validate_config(raw: dict) -> Settings:

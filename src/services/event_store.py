@@ -19,7 +19,7 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
-# ── Seen jobs ─────────────────────────────────────────────
+# --- Seen jobs ---
 def seen_ids() -> set:
     """All job ids we've already encountered."""
     with db.connect() as conn:
@@ -53,7 +53,7 @@ def block(job_id: str) -> None:
         )
 
 
-# ── Events ────────────────────────────────────────────────
+# --- Events ---
 def log_event(event_type: str, job_id: str = "", detail: str = "") -> None:
     """Append an event to the timeline."""
     with db.connect() as conn:
@@ -73,7 +73,7 @@ def recent_events(limit: int = 50) -> list[dict]:
     return [dict(r) for r in rows]
 
 
-# ── Stats (for the live dashboard) ────────────────────────
+# --- Stats (for the live dashboard) ---
 def stats() -> dict:
     """Aggregate counts for the metrics header."""
     with db.connect() as conn:

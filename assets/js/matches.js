@@ -51,7 +51,7 @@ function fetchedAgo(scored_at) {
   return Math.floor(days / 7) + 'w ago';
 }
 
-// ── Load current state (resume + stored results) ──────────
+// === Load current state (resume + stored results) ===
 window.loadMatchState = function() {
   fetch('/api/match/state')
     .then(r => r.json())
@@ -262,7 +262,7 @@ function setResumeStatus(has, name) {
   }
 }
 
-// ── Resume upload ─────────────────────────────────────────
+// === Resume upload ===
 function uploadMatchResume(file) {
   if (!file) return;
   const status = document.getElementById('mt-resume-status');
@@ -301,7 +301,7 @@ function uploadMatchResume(file) {
     });
 }
 
-// ── Fetch & score (streams results as the funnel runs) ────
+// === Fetch & score (streams results as the funnel runs) ===
 window.runMatch = function() {
   const status = document.getElementById('mt-poll-status');
   const btn    = document.getElementById('mt-run-btn');
@@ -418,7 +418,7 @@ function pollRun() {
     });
 }
 
-// ── SVG gauge ring builder ────────────────────────────────
+// === SVG gauge ring builder ===
 var GAUGE_R    = 17;
 var GAUGE_CIRC = +(2 * Math.PI * GAUGE_R).toFixed(2); // 106.81
 
@@ -436,7 +436,7 @@ function gaugeHTML(cls, pct, label) {
   '</div>';
 }
 
-// ── Render ranked matches ─────────────────────────────────
+// === Render ranked matches ===
 // Shared thumbnail card builder, reused by Matches and History views.
 window.matchCardHTML = function(r, isNew) {
   const posted  = relTime(r.posted_at);
@@ -475,7 +475,7 @@ window.matchCardHTML = function(r, isNew) {
     skillsHTML = '<span class="jt-na-hint">Scoring…</span>';
   }
 
-  // Single meta line: date · lang · source
+  // Single meta line: date . lang . source
   const metaParts = [
     posted     ? posted        : null,
     r.language || null,
@@ -570,7 +570,7 @@ window.clearAllMatches = function() {
     .catch(function() { toast('Clear failed - check server.', 'err'); });
 };
 
-// ── Detail / "more analysis" modal ────────────────────────
+// === Detail / "more analysis" modal ===
 window.openDetail = function(id) {
   const modal = document.getElementById('detail-modal');
   const box   = document.getElementById('detail-box');
@@ -678,7 +678,7 @@ window._mtHideApplied = false;   // hide applied jobs
 window._mtMaxAge      = 'all';   // published within N days ('all' = no limit)
 window._mtSource      = 'all';   // job source ('all', 'adzuna', 'arbeitnow')
 
-// ── Sort ──────────────────────────────────────────────────
+// === Sort ===
 window._mtSort = 'score';
 
 window.setSort = function(s) {
@@ -727,7 +727,7 @@ window.toggleMtApplied = function() {
   renderMatches(window._mtAllData, window._mtLastNewIds || new Set());
 };
 
-// ── Skeleton loading ──────────────────────────────────────
+// === Skeleton loading ===
 function renderSkeletons(n) {
   const box = document.getElementById('mt-results');
   if (!box) return;
@@ -746,7 +746,7 @@ function renderSkeletons(n) {
   box.innerHTML = html;
 }
 
-// ── Gauge arc fill animation ──────────────────────────────
+// === Gauge arc fill animation ===
 function animateScores() {
   document.querySelectorAll('.jt-gauge-arc[data-offset]').forEach(function(arc) {
     var circ   = parseFloat(arc.getAttribute('stroke-dasharray'));
@@ -847,7 +847,7 @@ function renderMatches(results, newIds) {
   requestAnimationFrame(animateScores);
 }
 
-// ── Resume diff banner ────────────────────────────────────
+// === Resume diff banner ===
 function renderResumeDiff(diff) {
   if (!diff) return;
 
@@ -891,7 +891,7 @@ function renderResumeDiff(diff) {
   if (results) results.before(banner);
 }
 
-// ── JD paste modal (for jd_unavailable cards) ────────────
+// === JD paste modal (for jd_unavailable cards) ===
 window.openJdModal = function(id) {
   var job    = (window._mtAllData || []).find(function(r) { return r.id === id; }) || {};
   var modal  = document.getElementById('jd-modal');
@@ -971,7 +971,7 @@ window.submitJd = function() {
     });
 };
 
-// ── Bind ──────────────────────────────────────────────────
+// === Bind ===
 (function bindMatches() {
   const file = document.getElementById('mt-file');
   if (file) {

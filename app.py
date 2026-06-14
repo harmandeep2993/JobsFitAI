@@ -80,7 +80,7 @@ app = FastAPI(title="JobsFitAI")
 app.mount("/assets", StaticFiles(directory="assets"), name="assets")
 
 
-# ── Request logging middleware ─────────────────────────────
+# --- Request logging middleware ---
 
 
 @app.middleware("http")
@@ -113,7 +113,7 @@ ALLOWED_EXTENSIONS: Set[str] = SUPPORTED_EXTENSIONS
 MAX_FILE_MB: int = MAX_FILE_SIZE_MB
 
 
-# ── Frontend ──────────────────────────────────────────────
+# --- Frontend ---
 
 
 @app.get("/")
@@ -159,7 +159,7 @@ async def health() -> JSONResponse:
     )
 
 
-# ── Resume upload ─────────────────────────────────────────
+# --- Resume upload ---
 
 
 @app.post("/api/upload")
@@ -210,7 +210,7 @@ async def api_upload(request: Request) -> JSONResponse:
     )
 
 
-# ── Stored resume endpoints ───────────────────────────────
+# --- Stored resume endpoints ---
 
 _USER = "local"  # single-user mode; swap for session user_id at launch
 
@@ -380,7 +380,7 @@ async def api_resumes_recommend(request: Request) -> JSONResponse:
     )
 
 
-# ── Serve original resume file ────────────────────────────
+# --- Serve original resume file ---
 
 _PREVIEW_TYPES = {
     ".pdf": "application/pdf",
@@ -399,7 +399,7 @@ async def api_resume_file(tmp: str) -> FileResponse:
     return FileResponse(tmp, media_type=_PREVIEW_TYPES[suffix])
 
 
-# ── Resume text preview (no LLM) ─────────────────────────
+# --- Resume text preview (no LLM) ---
 
 
 @app.post("/api/resume-preview")
@@ -426,7 +426,7 @@ async def api_resume_preview(request: Request) -> JSONResponse:
     return JSONResponse({"ok": True, "text": text[:3000], "total_chars": len(text)})
 
 
-# ── Analyzer ──────────────────────────────────────────────
+# --- Analyzer ---
 
 
 @app.post("/api/analyze")
@@ -578,7 +578,7 @@ async def api_analyze(request: Request) -> JSONResponse:
     return JSONResponse({"ok": True, "cached": False, **payload})
 
 
-# ── Resume rewrite ─────────────────────────────────────────
+# --- Resume rewrite ---
 
 
 @app.post("/api/improve-resume")
@@ -605,7 +605,7 @@ async def api_improve_resume(request: Request) -> JSONResponse:
     return JSONResponse(result)
 
 
-# ── ATS Maker ─────────────────────────────────────────────
+# --- ATS Maker ---
 
 
 @app.post("/api/ats/optimise")
@@ -695,7 +695,7 @@ async def api_ats_check(request: Request) -> JSONResponse:
     return JSONResponse({"ok": True, **result})
 
 
-# ── History ───────────────────────────────────────────────
+# --- History ---
 
 
 @app.get("/api/history")
@@ -733,7 +733,7 @@ async def api_history() -> JSONResponse:
     )
 
 
-# ── LLM ping ──────────────────────────────────────────────
+# --- LLM ping ---
 
 
 @app.get("/api/llm-ping")
@@ -749,7 +749,7 @@ async def api_llm_ping() -> JSONResponse:
     )
 
 
-# ── LLM settings ──────────────────────────────────────────
+# --- LLM settings ---
 
 
 @app.get("/api/llm-settings")
@@ -785,7 +785,7 @@ async def api_set_llm_settings(request: Request) -> JSONResponse:
     )
 
 
-# ── Resume diff ───────────────────────────────────────────
+# --- Resume diff ---
 
 
 def _resume_diff(old: dict, new: dict) -> dict:
@@ -830,7 +830,7 @@ def _resume_diff(old: dict, new: dict) -> dict:
     }
 
 
-# ── Job matches ───────────────────────────────────────────
+# --- Job matches ---
 
 
 @app.post("/api/match/resume")
@@ -1195,7 +1195,7 @@ async def api_match_export() -> StreamingResponse:
     )
 
 
-# ── Background scheduler ──────────────────────────────────
+# --- Background scheduler ---
 
 _sched_last = 0.0
 
@@ -1284,7 +1284,7 @@ async def _start_scheduler() -> None:
     )
 
 
-# ── Entry point ───────────────────────────────────────────
+# --- Entry point ---
 
 PORT = 8080
 

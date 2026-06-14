@@ -4,7 +4,7 @@
 
 const JD_MAX_CHARS = 5000;
 
-// ── Clear resume ──────────────────────────────────────────
+// === Clear resume ===
 window.clearResume = function() {
   window._resumeTmp         = null;
   window._resumeName        = null;
@@ -28,7 +28,7 @@ window.clearResume = function() {
   }
 };
 
-// ── Clear JD ─────────────────────────────────────────────
+// === Clear JD ===
 window.clearJD = function() {
   const jd = document.getElementById('jd-input');
   if (jd) {
@@ -38,7 +38,7 @@ window.clearJD = function() {
   }
 };
 
-// ── Char counter ─────────────────────────────────────────
+// === Char counter ===
 function updateCounter(len) {
   const el = document.getElementById('jd-counter');
   if (!el) return;
@@ -48,7 +48,7 @@ function updateCounter(len) {
   if (len >= JD_MAX_CHARS)      el.classList.add('limit');
 }
 
-// ── File upload ───────────────────────────────────────────
+// === File upload ===
 var FILE_MAX_MB = 5;
 
 window.handleFileSelect = function(file) {
@@ -104,7 +104,7 @@ window.handleFileSelect = function(file) {
     });
 };
 
-// ── Resume preview modal ──────────────────────────────────
+// === Resume preview modal ===
 window.previewResume = function() {
   if (!window._resumeTmp) return;
 
@@ -151,7 +151,7 @@ window.closeResumePreview = function() {
   if (content) { content.classList.remove('rp-content--frame'); content.innerHTML = ''; }
 };
 
-// ── Bind upload zone ──────────────────────────────────────
+// === Bind upload zone ===
 function bindUpload() {
   const zone  = document.getElementById('up-zone');
   const input = document.getElementById('file-input');
@@ -164,7 +164,7 @@ function bindUpload() {
   }
 }
 
-// ── Bind JD counter ───────────────────────────────────────
+// === Bind JD counter ===
 function bindCounter() {
   const jd = document.getElementById('jd-input');
   if (jd) {

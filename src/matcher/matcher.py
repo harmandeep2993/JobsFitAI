@@ -13,7 +13,7 @@ Flow:
 Output format:
     {
         "overall_score":    74.5,
-        "label":            "Good Match 🟡",
+        "label":            "Good Match",
         "section_scores": {
             "required_skills":  88.0,
             "preferred_skills": 60.0,

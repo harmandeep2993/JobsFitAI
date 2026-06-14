@@ -7,8 +7,7 @@ var _atsResumeId  = null;  // currently selected resume id
 
 var ATS_SLOT_LABELS = ['Base', 'Tailored 1', 'Tailored 2'];
 
-// ── Escape helpers ────────────────────────────────────────
-
+// === Escape helpers ===
 function _atsEsc(str) {
   return String(str)
     .replace(/&/g, '&amp;')
@@ -21,8 +20,7 @@ function _atsEscAttr(str) {
   return String(str).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
 }
 
-// ── Init ──────────────────────────────────────────────────
-
+// === Init ===
 window.atInit = function() {
   var view = document.getElementById('view-ats');
   if (!view) return;
@@ -103,8 +101,7 @@ function _atsBuildShell() {
   );
 }
 
-// ── Resume picker ─────────────────────────────────────────
-
+// === Resume picker ===
 function _atsLoadResumes() {
   fetch('/api/resumes')
     .then(function(r) { return r.json(); })
@@ -187,8 +184,7 @@ window.atsSelectResume = function(id, name) {
   if (typeof toast === 'function') toast('Resume selected: ' + name, 'ok', 2000);
 };
 
-// ── JD binding ────────────────────────────────────────────
-
+// === JD binding ===
 function _atsBindJD() {
   var view = document.getElementById('view-ats');
   if (!view) return;
@@ -233,8 +229,7 @@ window.atsClearJD = function() {
   if (ta) { ta.value = ''; _atsOnJDInput(ta); }
 };
 
-// ── API calls ─────────────────────────────────────────────
-
+// === API calls ===
 window.atGenerate = function() {
   var ta = document.getElementById('ats-jd-input');
   var jd = ta ? ta.value.trim() : '';
@@ -314,8 +309,7 @@ window.atCheck = function() {
     });
 };
 
-// ── Generate results rendering ────────────────────────────
-
+// === Generate results rendering ===
 window.atRenderResults = function(d) {
   var results = document.getElementById('ats-results');
   if (!results) return;
@@ -343,8 +337,7 @@ window.atRenderResults = function(d) {
   results.innerHTML = html;
 };
 
-// ── Quick Scan results rendering ──────────────────────────
-
+// === Quick Scan results rendering ===
 window.atRenderCheckResults = function(d) {
   var results = document.getElementById('ats-results');
   if (!results) return;
@@ -367,8 +360,7 @@ window.atRenderCheckResults = function(d) {
   results.innerHTML = html;
 };
 
-// ── Coverage stat (compact) ───────────────────────────────
-
+// === Coverage stat (compact) ===
 function _atsCoverageStatHTML(before, after) {
   var bPct = before.pct || 0;
   var aPct = after.pct  || 0;
@@ -392,8 +384,7 @@ function _atsCoverageStatHTML(before, after) {
   );
 }
 
-// ── Full resume card ──────────────────────────────────────
-
+// === Full resume card ===
 function _atsResumeHTML(resume, plainText) {
   var copyBtn =
     '<button class="ats-copy-resume-btn" onclick="atCopyResume(this)" data-text="' + _atsEscAttr(plainText) + '">' +
@@ -470,8 +461,7 @@ function _atsResumeHTML(resume, plainText) {
   );
 }
 
-// ── Collapsible warnings ──────────────────────────────────
-
+// === Collapsible warnings ===
 function _atsWarningsHTML(missingSections, formattingFlags) {
   var count = missingSections.length + formattingFlags.length;
   var warnIcon =
@@ -525,8 +515,7 @@ window.atsToggleWarnings = function(hd) {
   if (chevron) chevron.style.transform = open ? 'rotate(180deg)' : '';
 };
 
-// ── Section flags (used by Quick Scan) ───────────────────
-
+// === Section flags (used by Quick Scan) ===
 function _atsSectionFlagsHTML(flags) {
   var rows = flags.map(function(f) {
     if (f.found) {
@@ -572,8 +561,7 @@ function _atsSectionFlagsHTML(flags) {
   );
 }
 
-// ── Formatting flags (used by Quick Scan) ─────────────────
-
+// === Formatting flags (used by Quick Scan) ===
 function _atsFormattingFlagsHTML(flags) {
   var rows = flags.map(function(f) {
     return (
@@ -605,8 +593,7 @@ function _atsFormattingFlagsHTML(flags) {
   );
 }
 
-// ── Copy ──────────────────────────────────────────────────
-
+// === Copy ===
 window.atCopyResume = function(btn) {
   var text = btn.getAttribute('data-text') || '';
   if (!text) {

@@ -6,7 +6,7 @@
 window._llmCatalog = null;            // [{name, default_model, models[]}]
 window._sel        = { provider: '', model: '' };
 
-// ── Load catalog + current selection ──────────────────────
+// === Load catalog + current selection ===
 function loadLlmSettings() {
   fetch('/api/llm-settings')
     .then(r => r.json())
@@ -50,7 +50,7 @@ function renderModelMenu() {
   ).join('');
 }
 
-// ── Dropdown open/close ───────────────────────────────────
+// === Dropdown open/close ===
 window.ddToggle = function(ev, which) {
   ev.stopPropagation();
   const dd = document.getElementById('dd-' + which);
@@ -66,7 +66,7 @@ function closeAllDD() {
 // Close menus when clicking anywhere outside a dropdown.
 document.addEventListener('click', closeAllDD);
 
-// ── Selection ─────────────────────────────────────────────
+// === Selection ===
 window.selectProvider = function(name) {
   window._sel.provider = name;
   // Reset model to that provider's default.
@@ -90,7 +90,7 @@ window.selectModel = function(m) {
   closeAllDD();
 };
 
-// ── Apply selection ───────────────────────────────────────
+// === Apply selection ===
 window.applySettings = function() {
   const custom   = document.getElementById('set-model-custom').value.trim();
   const provider = window._sel.provider;
@@ -147,7 +147,7 @@ function updateTopbar(current, online) {
   if (bead)  bead.className     = 't-bead ' + (online ? 'bon' : 'boff');
 }
 
-// ── Test connection ───────────────────────────────────────
+// === Test connection ===
 window.testConnection = function() {
   var btn    = document.getElementById('set-test');
   var status = document.getElementById('set-status');

@@ -13,7 +13,7 @@ _GAUGE_R = 17
 _GAUGE_CIRC = round(2 * math.pi * _GAUGE_R, 2)  # 106.81
 
 
-# ── Error panel ──────────────────────────────────────────────
+# --- Error panel ---
 
 
 def render_error_panel(title: str, message: str) -> str:
@@ -43,7 +43,7 @@ def render_error_panel(title: str, message: str) -> str:
 </div>"""
 
 
-# ── SVG icon helpers ─────────────────────────────────────────
+# --- SVG icon helpers ---
 def _ico(d, s=16):
     return (
         f'<svg width="{s}" height="{s}" viewBox="0 0 16 16" fill="none" '

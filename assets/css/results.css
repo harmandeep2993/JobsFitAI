@@ -2,7 +2,7 @@
 
 #jf-results { margin-top: 20px; }
 
-/* --- Skeleton loading state --- */
+/* === Skeleton loading state === */
 .sk-sidebar-anim {
   animation: shimmer 1.5s ease-in-out infinite;
 }
@@ -73,7 +73,7 @@
   transition: opacity .15s;
 }
 
-/* --- Results placeholder (shown before first analysis) --- */
+/* === Results placeholder (shown before first analysis) === */
 .res-placeholder .tab-row {
   opacity: 0.4;
   pointer-events: none;
@@ -102,7 +102,7 @@
 }
 .res-empty-body p strong { color: var(--t2); font-weight: 600; }
 
-/* --- Analysis progress overlay --- */
+/* === Analysis progress overlay === */
 #spinner {
   position: fixed;
   top: var(--topbar-h);
@@ -230,7 +230,7 @@
 }
 .az-dot.done { background: rgba(255,255,255,0.7); transform: scale(1); }
 
-/* --- Metrics grid (top of results) --- */
+/* === Metrics grid (top of results) === */
 .metrics-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -287,7 +287,7 @@
 .ca { color: var(--amber); }
 .cr { color: var(--red);   }
 
-/* --- Notebook card wrapper --- */
+/* === Notebook card wrapper === */
 .nb-card {
   border: 1px solid var(--bd);
   border-radius: var(--radius);
@@ -296,7 +296,7 @@
   margin-bottom: 12px;
 }
 
-/* --- Tab bar --- */
+/* === Tab bar === */
 .tab-row {
   display: flex;
   gap: 3px;
@@ -334,7 +334,7 @@
   background: var(--bg-r);
 }
 
-/* --- Inside the notebook card: no line, unified white surface --- */
+/* === Inside the notebook card: no line, unified white surface === */
 .nb-card .tab-row {
   background: var(--bg-r);
   border-bottom: none;
@@ -347,10 +347,10 @@
 .nb-card .tab-item.active::after { display: none; }
 .nb-card .jf-panel { background: var(--bg); padding: 20px; }
 
-/* --- Panel container --- */
+/* === Panel container === */
 .jf-panel { animation: vfadeIn .18s ease; padding-bottom: 20px; }
 
-/* --- Summary panel --- */
+/* === Summary panel === */
 .nb-card #jf-summary { padding: 0; }
 #jf-summary {
   display: grid;
@@ -449,7 +449,7 @@
   font-weight: 700;
 }
 
-/* --- Progress bars (breakdown tab) --- */
+/* === Progress bars (breakdown tab) === */
 .prog-row {
   background: var(--bg-r);
   border: 1px solid var(--bd);
@@ -494,7 +494,7 @@
   transition: width .65s cubic-bezier(.22,.68,0,1.2);
 }
 
-/* --- Skills gap panel --- */
+/* === Skills gap panel === */
 .gap-block {
   margin-bottom: 16px;
 }
@@ -515,7 +515,7 @@
   gap: 5px;
 }
 
-/* --- Recommendation cards --- */
+/* === Recommendation cards === */
 .reco-card {
   display: flex;
   gap: 14px;
@@ -598,7 +598,7 @@
   color: var(--t2);
 }
 
-/* --- Callout & footer note --- */
+/* === Callout & footer note === */
 .callout {
   display: flex;
   align-items: flex-start;
@@ -646,14 +646,14 @@
 }
 .res-export-btn:hover { background: var(--bg-c); color: var(--t1); }
 
-/* --- Fade in animation --- */
+/* === Fade in animation === */
 @keyframes fade-in {
   from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 .fade-in { animation: fade-in .25s ease; }
 
-/* ── Score hero ───────────────────────────────────── */
+/* === Score hero === */
 .res-hero {
   display: flex;
   align-items: center;
@@ -691,7 +691,7 @@
 .res-label { font-size: 18px; font-weight: 700; color: var(--t1); letter-spacing: -0.4px; margin-bottom: 4px; }
 .res-sub   { font-size: 12.5px; color: var(--t2); line-height: 1.6; }
 
-/* ── Result tabs ──────────────────────────────────── */
+/* === Result tabs === */
 .res-tabs {
   display: flex;
   gap: 0;
@@ -733,7 +733,7 @@
 .res-pane { display: none; }
 .res-pane.active { display: block; }
 
-/* ── Section score grid ───────────────────────────── */
+/* === Section score grid === */
 .ds-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
@@ -786,7 +786,7 @@
 
 .sc-pct { font-size: 12px; color: var(--t3); margin-left: 1px; }
 
-/* ── Skills tabs ──────────────────────────────────── */
+/* === Skills tabs === */
 .skills-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -815,7 +815,7 @@
 
 .skills-tags { display: flex; flex-wrap: wrap; gap: 5px; }
 
-/* ── Responsibilities table ───────────────────────── */
+/* === Responsibilities table === */
 .resp-table {
   width: 100%;
   border-collapse: collapse;
@@ -857,7 +857,7 @@
 .match-mid { background: var(--amber-bg); color: var(--amber); }
 .match-lo  { background: var(--red-bg);   color: var(--red); }
 
-/* ── Summary block ────────────────────────────────── */
+/* === Summary block === */
 .summary-block {
   background: var(--bg-r);
   border: 1px solid var(--bd);
@@ -868,7 +868,7 @@
   line-height: 1.7;
 }
 
-/* ── Detail modal body (inside .modal-box) ────────── */
+/* === Detail modal body (inside .modal-box) === */
 .detail-body {
   padding: 16px 20px 20px;
   display: flex;
@@ -935,7 +935,7 @@
 
 .detail-tags { display: flex; flex-wrap: wrap; gap: 4px; }
 
-/* --- Breakdown accordion list --- */
+/* === Breakdown accordion list === */
 
 /* Panel header - "Score Breakdown" + expand all */
 .bd-panel-hd {
@@ -1089,7 +1089,7 @@
   color: var(--t3);
 }
 
-/* --- Keywords panel --- */
+/* === Keywords panel === */
 .kw-panel {
   display: flex;
   flex-direction: column;
@@ -1160,7 +1160,7 @@
   margin: 0;
 }
 
-/* --- SWOT Analysis panel --- */
+/* === SWOT Analysis panel === */
 .swot-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1213,9 +1213,7 @@
 .swot-t { background: rgba(245,158,11,0.06); border-color: rgba(245,158,11,0.18); }
 .swot-t .swot-quad-hd { color: var(--amber); }
 
-/* ═══════════════════════════════════════════════════
-   V2 LAYOUT - sidebar scorecard + scrollable main
-   ═══════════════════════════════════════════════════ */
+/* === V2 LAYOUT - sidebar scorecard + scrollable main === */
 
 .res-v2 {
   display: grid;
@@ -1228,7 +1226,7 @@
   align-items: start;
 }
 
-/* ── Sidebar ── */
+/* === Sidebar === */
 .rv2-sidebar {
   background: var(--bg-r);
   border-right: 1px solid var(--bd);
@@ -1354,7 +1352,7 @@
 .rv2-bar-val.sc-partial { color: var(--amber); }
 .rv2-bar-val.sc-poor    { color: var(--red); }
 
-/* ── Main content ── */
+/* === Main content === */
 .rv2-main {
   background: var(--bg);
   display: flex;
@@ -1427,7 +1425,7 @@
   margin-bottom: 10px;
 }
 
-/* ── Results placeholder ── */
+/* === Results placeholder === */
 .res-placeholder { padding: 0; }
 
 .res-empty-body {
@@ -1450,7 +1448,7 @@
 }
 .res-empty-body p strong { color: var(--t2); font-weight: 600; }
 
-/* ── Improve (rewrite) tab ───────────────────────────────── */
+/* === Improve (rewrite) tab === */
 
 .rw-intro {
   display: flex;
@@ -1595,7 +1593,7 @@
 }
 .rw-copy-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
 
-/* ── Print ──────────────────────────────────────────────── */
+/* === Print === */
 @media print {
   .sidebar, .topbar, .az-workspace, #spinner,
   .tab-row, .res-export-row, .callout { display: none !important; }
