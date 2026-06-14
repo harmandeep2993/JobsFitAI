@@ -59,7 +59,7 @@ function _fadeText(el, text) {
 function setAzStep(i, state) {
   if (state !== 'active') return;
   var labelEl = document.getElementById('az-status-label');
-  var subEl   = document.getElementById('az-status-sub');
+  var subEl = document.getElementById('az-status-sub');
   var countEl = document.getElementById('az-step-count');
   _fadeText(labelEl, AZ_STEPS[i].label + '…');
   _fadeText(subEl,   AZ_STEPS[i].sub);
@@ -87,8 +87,8 @@ function completeProgress(cb) {
   _azTimers.forEach(clearTimeout);
   _azTimers = [];
   var labelEl = document.getElementById('az-status-label');
-  var subEl   = document.getElementById('az-status-sub');
-  var ring    = document.getElementById('az-spin-ring');
+  var subEl = document.getElementById('az-status-sub');
+  var ring = document.getElementById('az-spin-ring');
   for (var i = 0; i < AZ_STEPS.length; i++) {
     var dot = document.getElementById('az-dot-' + i);
     if (dot) dot.className = 'az-dot done';
@@ -128,7 +128,7 @@ function checkJD() {
 
 // === Persistent result cache (localStorage, survives refresh) ===
 var _CACHE_LS_KEY = 'jfai_cache';
-var _CACHE_MAX    = 5;
+var _CACHE_MAX = 5;
 
 function _cacheGet(key) {
   try {
@@ -140,7 +140,7 @@ function _cacheGet(key) {
 function _cacheSet(key, html) {
   try {
     var store = JSON.parse(localStorage.getItem(_CACHE_LS_KEY) || 'null') || {};
-    var keys  = Object.keys(store);
+    var keys = Object.keys(store);
     while (keys.length >= _CACHE_MAX) { delete store[keys.shift()]; }
     store[key] = html;
     localStorage.setItem(_CACHE_LS_KEY, JSON.stringify(store));
@@ -163,15 +163,15 @@ var RES_PLACEHOLDER =
 // === Analysis trigger ===
 window.startAnalysis = function() {
   var jdEl = document.getElementById('jd-input');
-  var jd   = jdEl ? jdEl.value.trim() : '';
+  var jd = jdEl ? jdEl.value.trim() : '';
 
   if (jd.length < 50)                             { toast('Paste a job description (at least 50 characters).', 'warn'); return; }
   if (!window._resumeId && !window._resumeTmp)    { toast('Select or upload a resume first.', 'warn'); return; }
 
   // Cache hit - keyed on stable file fingerprint so it survives page refresh
   var fingerprint = window._resumeFingerprint || window._resumeId || window._resumeTmp || '';
-  var cacheKey    = fingerprint + '::' + jd;
-  var cached      = _cacheGet(cacheKey);
+  var cacheKey = fingerprint + '::' + jd;
+  var cached = _cacheGet(cacheKey);
   if (cached) {
     var resultsEl = document.getElementById('jf-results');
     if (resultsEl) {
@@ -267,7 +267,7 @@ function animateBdRings() {
   function ease(t) { return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2, 3)/2; }
   document.querySelectorAll('#jf-summary .jt-gauge-arc[data-offset], #jf-breakdown .jt-gauge-arc[data-offset]').forEach(function(arc) {
     var target = parseFloat(arc.getAttribute('data-offset'));
-    var start  = null, dur = 750;
+    var start = null, dur = 750;
     (function animate(ts) {
       if (!start) start = ts;
       var p = Math.min((ts - start) / dur, 1);
@@ -285,7 +285,7 @@ window.bdToggle = function(item) {
   // sync expand-all button label
   var panel = item.closest('#jf-breakdown');
   if (panel) {
-    var btn   = panel.querySelector('.bd-expand-all');
+    var btn = panel.querySelector('.bd-expand-all');
     var items = panel.querySelectorAll('.bd-item');
     var anyOpen = Array.from(items).some(function(i) {
       return i.getAttribute('data-open') === 'true';
@@ -295,9 +295,9 @@ window.bdToggle = function(item) {
 };
 
 window.bdToggleAll = function(btn) {
-  var list    = btn.closest('#jf-breakdown');
+  var list = btn.closest('#jf-breakdown');
   if (!list) return;
-  var items   = list.querySelectorAll('.bd-item');
+  var items = list.querySelectorAll('.bd-item');
   var anyOpen = Array.from(items).some(function(i) {
     return i.getAttribute('data-open') === 'true';
   });
@@ -309,9 +309,9 @@ window.bdToggleAll = function(btn) {
 
 // === Export / copy results ===
 window.copyResults = function() {
-  var score  = document.querySelector('.sum-hero-sub');
-  var label  = document.querySelector('.sum-hero-label');
-  var lines  = ['JobsFitAI Analysis Report', ''];
+  var score = document.querySelector('.sum-hero-sub');
+  var label = document.querySelector('.sum-hero-label');
+  var lines = ['JobsFitAI Analysis Report', ''];
   if (score) lines.push('Match: ' + score.textContent.trim());
   if (label) lines.push('Rating: ' + label.textContent.trim());
   lines.push('');
@@ -361,10 +361,10 @@ window.copyResults = function() {
 window.runAgain = function() {
   _azTimers.forEach(clearTimeout);
   _azTimers = [];
-  var jdEl    = document.getElementById('jd-input');
+  var jdEl = document.getElementById('jd-input');
   var results = document.getElementById('jf-results');
   var spinner = document.getElementById('spinner');
-  var btn     = document.getElementById('analyse-btn');
+  var btn = document.getElementById('analyse-btn');
 
   if (jdEl)    { jdEl.value = ''; jdEl.classList.remove('success'); }
   if (results) { results.innerHTML = RES_PLACEHOLDER; }

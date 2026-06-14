@@ -3,9 +3,9 @@
 """
 PDF text extraction with three-tier fallback strategy:
 
-    Tier 1 - pdfplumber  : best for structured/text-based PDFs
-    Tier 2 - PyMuPDF     : fallback for complex layouts pdfplumber struggles with
-    Tier 3 - OCR         : last resort for scanned/image-based PDFs
+    Tier 1 - pdfplumber : best for structured/text-based PDFs
+    Tier 2 - PyMuPDF : fallback for complex layouts pdfplumber struggles with
+    Tier 3 - OCR : last resort for scanned/image-based PDFs
 
 Each tier is tried in order. If a tier returns enough text it is used.
 OCR requires optional dependencies: pytesseract + pdf2image + poppler.
@@ -182,7 +182,7 @@ def parse_pdf(file_path: str) -> str:
 
     Raises:
         FileNotFoundError : File does not exist
-        ValueError        : PDF is unreadable - all tiers failed
+        ValueError : PDF is unreadable - all tiers failed
     """
     path = Path(file_path)
 

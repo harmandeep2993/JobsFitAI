@@ -18,8 +18,8 @@ def generate_summary(resume_json, jd_json, results):
 
     Args:
         resume_json (dict): Extracted resume data
-        jd_json     (dict): Extracted JD data
-        results     (dict): get_match_score() output
+        jd_json (dict): Extracted JD data
+        results (dict): get_match_score() output
 
     Returns:
         str: 3-4 sentence summary or fallback text

@@ -419,7 +419,7 @@ function pollRun() {
 }
 
 // === SVG gauge ring builder ===
-var GAUGE_R    = 17;
+var GAUGE_R = 17;
 var GAUGE_CIRC = +(2 * Math.PI * GAUGE_R).toFixed(2); // 106.81
 
 function gaugeHTML(cls, pct, label) {
@@ -749,14 +749,14 @@ function renderSkeletons(n) {
 // === Gauge arc fill animation ===
 function animateScores() {
   document.querySelectorAll('.jt-gauge-arc[data-offset]').forEach(function(arc) {
-    var circ   = parseFloat(arc.getAttribute('stroke-dasharray'));
+    var circ = parseFloat(arc.getAttribute('stroke-dasharray'));
     var target = parseFloat(arc.dataset.offset);
     var duration = 700;
     var startTime = null;
     function step(ts) {
       if (!startTime) startTime = ts;
       var progress = Math.min((ts - startTime) / duration, 1);
-      var eased    = 1 - Math.pow(1 - progress, 3);
+      var eased = 1 - Math.pow(1 - progress, 3);
       arc.setAttribute('stroke-dashoffset', circ - eased * (circ - target));
       if (progress < 1) requestAnimationFrame(step);
       else arc.removeAttribute('data-offset');
@@ -893,13 +893,13 @@ function renderResumeDiff(diff) {
 
 // === JD paste modal (for jd_unavailable cards) ===
 window.openJdModal = function(id) {
-  var job    = (window._mtAllData || []).find(function(r) { return r.id === id; }) || {};
-  var modal  = document.getElementById('jd-modal');
-  var title  = document.getElementById('jd-modal-title');
-  var sub    = document.getElementById('jd-modal-sub');
-  var input  = document.getElementById('jd-modal-input');
+  var job = (window._mtAllData || []).find(function(r) { return r.id === id; }) || {};
+  var modal = document.getElementById('jd-modal');
+  var title = document.getElementById('jd-modal-title');
+  var sub = document.getElementById('jd-modal-sub');
+  var input = document.getElementById('jd-modal-input');
   var status = document.getElementById('jd-modal-status');
-  var btn    = document.getElementById('jd-modal-btn');
+  var btn = document.getElementById('jd-modal-btn');
   if (!modal) return;
   window._jdModalId = id;
   if (title)  title.textContent  = job.title   || 'Paste Job Description';
@@ -921,11 +921,11 @@ window.confirmJdModal = function() {
 };
 
 window.submitJd = function() {
-  var id     = window._jdModalId;
-  var input  = document.getElementById('jd-modal-input');
-  var btn    = document.getElementById('jd-modal-btn');
+  var id = window._jdModalId;
+  var input = document.getElementById('jd-modal-input');
+  var btn = document.getElementById('jd-modal-btn');
   var status = document.getElementById('jd-modal-status');
-  var text   = (input ? input.value : '').trim();
+  var text = (input ? input.value : '').trim();
 
   if (text.length < 50) {
     if (status) { status.textContent = 'Too short - paste the full job description.'; status.className = 'mt-status err'; }
@@ -951,9 +951,9 @@ window.submitJd = function() {
       // Show result panel; OK button will close the modal
       var score = Math.round(d.score || 0);
       var badge = document.getElementById('jd-res-badge');
-      var lbl   = document.getElementById('jd-res-label');
-      var res   = document.getElementById('jd-modal-result');
-      var hint  = document.getElementById('jd-modal-hint');
+      var lbl = document.getElementById('jd-res-label');
+      var res = document.getElementById('jd-modal-result');
+      var hint = document.getElementById('jd-modal-hint');
       if (badge) badge.textContent = score + '%';
       if (lbl)   lbl.textContent   = d.label || '';
       // colour-code the badge using existing label classes

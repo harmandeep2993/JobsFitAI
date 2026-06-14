@@ -149,15 +149,15 @@ function updateTopbar(current, online) {
 
 // === Test connection ===
 window.testConnection = function() {
-  var btn    = document.getElementById('set-test');
+  var btn = document.getElementById('set-test');
   var status = document.getElementById('set-status');
-  var orig   = btn ? btn.textContent : 'Test connection';
+  var orig = btn ? btn.textContent : 'Test connection';
 
   if (btn) { btn.disabled = true; btn.textContent = 'Testing…'; }
   if (status) { status.textContent = 'Checking…'; status.className = 'set-status'; }
 
   var controller = new AbortController();
-  var timeoutId  = setTimeout(function() { controller.abort(); }, 8000);
+  var timeoutId = setTimeout(function() { controller.abort(); }, 8000);
 
   fetch('/api/llm-ping', { signal: controller.signal })
     .then(function(r) { return r.json(); })

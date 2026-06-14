@@ -1323,7 +1323,7 @@ if __name__ == "__main__":
         print(
             f"\n[JobsFitAI] Port {PORT} is already in use - an old server is still running.\n"
             f"           Stop it first, then re-run:\n"
-            f"           Windows    : taskkill /F /IM python.exe\n"
+            f"           Windows : taskkill /F /IM python.exe\n"
             f"           macOS/Linux: kill $(lsof -ti tcp:{PORT})\n"
         )
         sys.exit(1)

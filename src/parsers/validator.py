@@ -212,7 +212,7 @@ def validate(file_path: str) -> None:
 
     Raises:
         FileNotFoundError : File does not exist
-        ValueError        : Any validation check failed
+        ValueError : Any validation check failed
     """
     path = Path(file_path)
 

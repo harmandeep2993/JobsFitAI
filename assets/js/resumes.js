@@ -33,7 +33,7 @@ function _rvRenderSlots(resumes) {
   var html = '';
   for (var s = 0; s < 3; s++) {
     var meta = RV_SLOT_META[s];
-    var r    = bySlot[s];
+    var r = bySlot[s];
     html += r ? _rvFilledSlot(r, meta) : _rvEmptySlot(s, meta);
   }
   el.innerHTML = html;
@@ -59,7 +59,7 @@ function _rvEmptySlot(slot, meta) {
 
 function _rvFilledSlot(r, meta) {
   var date = r.uploaded_at ? r.uploaded_at.slice(0, 10) : '';
-  var ext  = r.original_name.split('.').pop().toUpperCase();
+  var ext = r.original_name.split('.').pop().toUpperCase();
   return (
     '<div class="rv-slot rv-slot-filled">' +
       '<div class="rv-slot-num">' + (r.slot + 1) + '</div>' +
@@ -91,9 +91,9 @@ function _rvFilledSlot(r, meta) {
 
 // === Analyzer picker ===
 function _rvRenderPicker(resumes) {
-  var picker  = document.getElementById('az-resume-picker');
-  var zone    = document.getElementById('up-zone');
-  var manBtn  = document.getElementById('az-resume-manage');
+  var picker = document.getElementById('az-resume-picker');
+  var zone = document.getElementById('up-zone');
+  var manBtn = document.getElementById('az-resume-manage');
 
   if (!picker) return;
 
@@ -110,8 +110,8 @@ function _rvRenderPicker(resumes) {
 
   var html = '<div class="az-rv-picker"><div id="az-rv-reco-banner" style="display:none;"></div>';
   resumes.forEach(function(r) {
-    var ext  = r.original_name.split('.').pop().toUpperCase();
-    var sel  = (window._resumeId === r.id) ? ' selected' : '';
+    var ext = r.original_name.split('.').pop().toUpperCase();
+    var sel = (window._resumeId === r.id) ? ' selected' : '';
     var hist = '';
     if (r.last_score != null) {
       var tierCls = r.last_score >= 80 ? 'sc-exc' : r.last_score >= 60 ? 'sc-good' : r.last_score >= 40 ? 'sc-partial' : 'sc-poor';
@@ -274,9 +274,9 @@ window.rvDelete = function(id) {
 
 // === Preview ===
 window.rvPreview = function(id, filename) {
-  var modal   = document.getElementById('resume-preview-modal');
+  var modal = document.getElementById('resume-preview-modal');
   var content = document.getElementById('rp-content');
-  var sub     = document.querySelector('#resume-preview-modal .dt-sub');
+  var sub = document.querySelector('#resume-preview-modal .dt-sub');
   if (!modal || !content) return;
 
   modal.style.display = 'flex';
@@ -301,8 +301,8 @@ window.rvPreview = function(id, filename) {
           content.innerHTML = '<p class="rp-err">Could not extract: ' + (d.error || 'unknown') + '</p>';
           return;
         }
-        var total   = d.total_chars;
-        var trunc   = total > d.text.length
+        var total = d.total_chars;
+        var trunc = total > d.text.length
           ? '<div class="rp-trunc">Showing first ' + d.text.length.toLocaleString() + ' of ' + total.toLocaleString() + ' characters</div>'
           : '';
         content.innerHTML =
@@ -317,9 +317,9 @@ window.rvPreview = function(id, filename) {
 };
 
 // === Recommendation ===
-var _rvRecoTimer  = null;
+var _rvRecoTimer = null;
 var _rvRecoActive = false; // true while a request is in flight
-var _rvLastJD     = '';
+var _rvLastJD = '';
 
 function _rvRenderBanner(scores, recommendedId) {
   var banner = document.getElementById('az-rv-reco-banner');
@@ -331,7 +331,7 @@ function _rvRenderBanner(scores, recommendedId) {
     return;
   }
 
-  var best   = scores[0];
+  var best = scores[0];
   var others = scores.slice(1).map(function(s) {
     return _esc(s.label) + ': ' + s.score + '%';
   }).join(' &nbsp;&middot;&nbsp; ');

@@ -45,7 +45,7 @@ def score_certifications(resume: dict, jd: dict) -> float:
 
     Args:
         resume (dict): Extracted resume data
-        jd     (dict): Extracted JD data
+        jd (dict): Extracted JD data
 
     Returns:
         float: Certification score 0-100
@@ -53,7 +53,7 @@ def score_certifications(resume: dict, jd: dict) -> float:
     jd_certs = [c.strip() for c in jd.get("certifications", []) if c]
     resume_certs = [c.strip() for c in resume.get("certifications", []) if c]
 
-    logger.info("JD certifications     : %s", jd_certs)
+    logger.info("JD certifications : %s", jd_certs)
     logger.info("Resume certifications : %s", resume_certs)
 
     # --- Edge case: no requirements ---
