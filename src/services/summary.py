@@ -1,6 +1,12 @@
 # src/services/summary.py
-# Generates a concise candidate summary using LLM
-# Called after scoring - uses score data for accurate narrative
+"""
+Generates the LLM-powered candidate summary shown in the Summary tab.
+
+Called after scoring so the narrative can reference concrete match data
+(which required skills were matched/missing, section score breakdowns).
+Produces structured JSON with four sections: profile, strengths, gaps, focus.
+Falls back to a deterministic template if the LLM call fails.
+"""
 
 from src.utils.router import call_llm
 

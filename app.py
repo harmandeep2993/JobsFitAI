@@ -404,6 +404,7 @@ async def api_resume_file(tmp: str) -> FileResponse:
 
 @app.post("/api/resume-preview")
 async def api_resume_preview(request: Request) -> JSONResponse:
+    """Extract raw text from a stored or temp resume file - no LLM, no scoring."""
     body = await request.json()
     tmp = (body.get("tmp") or "").strip()
     resume_id = (body.get("resume_id") or "").strip()
@@ -765,6 +766,7 @@ async def api_get_llm_settings() -> JSONResponse:
 
 @app.post("/api/llm-settings")
 async def api_set_llm_settings(request: Request) -> JSONResponse:
+    """Switch the active LLM provider and/or model; verifies connectivity after switching."""
     body = await request.json()
     provider = (body.get("provider") or "").strip()
     model = (body.get("model") or "").strip()
@@ -881,6 +883,13 @@ async def api_match_resume(request: Request) -> JSONResponse:
 
 @app.get("/api/match/run")
 async def api_match_run(request: Request) -> JSONResponse:
+    """
+    Kick off a background job-fetch-and-score run.
+
+    Returns immediately with {started: true} and runs the pipeline in a
+    background task. Only one run can be active at a time; subsequent calls
+    return {started: false, already_running: true} until the run completes.
+    """
     if not session.has_resume():
         return JSONResponse(
             {"ok": False, "error": "no_resume", "results": match_store.get_all()},
@@ -919,6 +928,7 @@ async def api_match_run(request: Request) -> JSONResponse:
 
 @app.get("/api/match/state")
 async def api_match_state() -> JSONResponse:
+    """Full state snapshot polled by the frontend while a run is active."""
     return JSONResponse(
         {
             "ok": True,
@@ -944,6 +954,7 @@ async def api_match_state() -> JSONResponse:
 
 @app.post("/api/match/applied")
 async def api_match_applied(request: Request) -> JSONResponse:
+    """Toggle the applied flag on a scored job and log an 'applied' event."""
     body = await request.json()
     job_id = (body.get("id") or "").strip()
     applied = bool(body.get("applied"))
@@ -957,6 +968,12 @@ async def api_match_applied(request: Request) -> JSONResponse:
 
 @app.get("/api/match/detail")
 async def api_match_detail(request: Request) -> JSONResponse:
+    """
+    Return full detail for a scored job, lazily generating an LLM summary if absent.
+
+    The summary is generated on first request for a job and then cached in
+    the matches table so subsequent calls return immediately.
+    """
     job_id = (request.query_params.get("id") or "").strip()
     row = match_store.get_one(job_id)
     if not row:
@@ -1010,6 +1027,7 @@ async def api_match_detail(request: Request) -> JSONResponse:
 
 @app.post("/api/match/filters")
 async def api_match_filters(request: Request) -> JSONResponse:
+    """Update target titles, countries, and/or location filter; returns the new values."""
     body = await request.json()
 
     if isinstance(body.get("target_titles"), list):
@@ -1107,6 +1125,7 @@ async def api_score_jd(request: Request) -> JSONResponse:
 
 @app.post("/api/match/scheduler")
 async def api_match_scheduler(request: Request) -> JSONResponse:
+    """Enable/disable the auto-fetch scheduler or change its interval (minutes)."""
     global _sched_last
     body = await request.json()
     if "enabled" in body:

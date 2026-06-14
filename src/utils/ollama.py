@@ -1,4 +1,10 @@
 # src/utils/ollama.py
+"""
+Thin HTTP wrapper around a locally-running Ollama instance.
+
+These functions are called only from src/utils/router.py via the ollama
+provider path. Do not import this module directly from routes or services.
+"""
 
 import re
 import json

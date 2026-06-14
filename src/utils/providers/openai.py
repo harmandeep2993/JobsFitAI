@@ -1,5 +1,11 @@
 # src/utils/providers/openai.py
-# OpenAI API provider
+"""
+OpenAI provider adapter used by src/utils/router.py.
+
+Exposes check() and call() following the same interface as groq.py so
+the router can switch providers without knowing their internals.
+Do not call this module directly from routes or services.
+"""
 
 import os
 import time

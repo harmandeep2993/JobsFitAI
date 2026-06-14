@@ -39,6 +39,7 @@ def _get_jd_schema() -> str:
 
 
 def get_jd_prompt(jd_text: str) -> str:
+    """Build the LLM extraction prompt for a raw job description string."""
     schema_text = _get_jd_schema()
 
     prompt = f"""Extract job description data into this JSON schema. Follow all rules strictly.

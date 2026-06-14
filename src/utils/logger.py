@@ -79,6 +79,7 @@ class _ColourFormatter(logging.Formatter):
     RESET = "\033[0m"
 
     def format(self, record):
+        """Apply ANSI colour to the level name before delegating to stdlib Formatter."""
         colour = self.COLOURS.get(record.levelno, "")
         reset = self.RESET
         fmt = (

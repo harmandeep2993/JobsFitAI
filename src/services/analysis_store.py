@@ -1,3 +1,11 @@
+"""
+Per-resume analysis history store.
+
+Records every successful analyze() run, keyed on (resume_id, jd_snippet).
+Repeated runs for the same resume+JD pair update the existing row rather
+than inserting a duplicate, so the history shows the most recent score.
+"""
+
 import uuid
 from datetime import datetime, timezone
 
@@ -5,6 +13,7 @@ from src.services import db
 
 
 def save(resume_id: str, jd_snippet: str, score: float, label: str) -> None:
+    """Upsert an analysis result; update score/label if the same resume+JD pair already exists."""
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
     snippet = (jd_snippet or "")[:120]
     with db.connect() as conn:

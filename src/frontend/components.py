@@ -1,7 +1,10 @@
 # src/frontend/components.py
-# Pure HTML string builders - no NiceGUI, no state
-# All functions take data in, return HTML strings out
+"""
+Shared HTML helper functions used by results.py and other server-side renderers.
 
+All functions are pure: they take data in and return HTML strings out.
+No framework, no state, no side effects.
+"""
 
 from src.utils.config import THRESHOLDS
 

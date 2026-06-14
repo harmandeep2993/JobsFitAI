@@ -45,6 +45,7 @@ class MatcherWeights(BaseModel):
 
     @model_validator(mode="after")
     def weights_sum_to_one(self) -> "MatcherWeights":
+        """Reject configs where weights don't sum to 1.0 (within 0.001 tolerance)."""
         total = round(
             sum(
                 [
