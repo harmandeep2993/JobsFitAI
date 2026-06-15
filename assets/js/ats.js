@@ -4,6 +4,7 @@
 
 var _atsInitDone = false;
 var _atsResumeId = null;  // currently selected resume id
+var _atsMergeAll = false; // include content from other resume slots
 
 var ATS_SLOT_LABELS = ['Base', 'Tailored 1', 'Tailored 2'];
 
@@ -128,6 +129,7 @@ function _atsRenderPicker(resumes) {
   }
 
   var html = '<div class="az-rv-picker">';
+  var multiSlot = resumes.length > 1;
   resumes.forEach(function(r) {
     var ext = r.original_name.split('.').pop().toUpperCase();
     var slotLbl = ATS_SLOT_LABELS[r.slot] || ('Slot ' + (r.slot + 1));
@@ -164,6 +166,20 @@ function _atsRenderPicker(resumes) {
   });
   html += '</div>';
 
+  if (multiSlot) {
+    html +=
+      '<div class="ats-merge-opt">' +
+        '<label class="ats-merge-label">' +
+          '<input type="checkbox" id="ats-merge-check" onchange="atsToggleMerge(this)"' +
+            (_atsMergeAll ? ' checked' : '') + '> ' +
+          '<span class="ats-merge-text">' +
+            '<strong>Merge all resume slots</strong> &mdash; pull skills, experience, and certifications ' +
+            'from every stored slot for a richer ATS output' +
+          '</span>' +
+        '</label>' +
+      '</div>';
+  }
+
   picker.innerHTML = html;
 
   // Auto-select first if nothing selected
@@ -182,6 +198,10 @@ window.atsSelectResume = function(id, name) {
 
   _atsUpdateButtons();
   if (typeof toast === 'function') toast('Resume selected: ' + name, 'ok', 2000);
+};
+
+window.atsToggleMerge = function(cb) {
+  _atsMergeAll = cb.checked;
 };
 
 // === JD binding ===
@@ -246,7 +266,7 @@ window.atGenerate = function() {
   fetch('/api/ats/optimise', {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ resume_id: _atsResumeId, jd: jd }),
+    body:    JSON.stringify({ resume_id: _atsResumeId, jd: jd, merge_all: _atsMergeAll }),
   })
     .then(function(r) { return r.json(); })
     .then(function(d) {
@@ -386,8 +406,10 @@ function _atsCoverageStatHTML(before, after) {
 
 // === Full resume card ===
 function _atsResumeHTML(resume, plainText) {
+  var escapedText = _atsEscAttr(plainText);
+
   var copyBtn =
-    '<button class="ats-copy-resume-btn" onclick="atCopyResume(this)" data-text="' + _atsEscAttr(plainText) + '">' +
+    '<button class="ats-copy-resume-btn" onclick="atCopyResume(this)" data-text="' + escapedText + '">' +
       '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
         '<rect x="5" y="5" width="9" height="10" rx="1.5"/>' +
         '<path d="M11 5V3.5A1.5 1.5 0 0 0 9.5 2h-6A1.5 1.5 0 0 0 2 3.5v8A1.5 1.5 0 0 0 3.5 13H5"/>' +
@@ -395,10 +417,22 @@ function _atsResumeHTML(resume, plainText) {
       'Copy full resume' +
     '</button>';
 
+  var downloadBtn =
+    '<button class="ats-download-btn" onclick="atDownloadResume(this)" data-text="' + escapedText + '">' +
+      '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+        '<path d="M8 2v8M4 10l4 4 4-4"/>' +
+        '<path d="M2 14h12"/>' +
+      '</svg>' +
+      'Download .txt' +
+    '</button>';
+
   var toolbar =
     '<div class="ats-resume-toolbar">' +
       '<span class="ats-resume-label">ATS-Optimised Resume</span>' +
-      copyBtn +
+      '<div class="ats-toolbar-actions">' +
+        copyBtn +
+        downloadBtn +
+      '</div>' +
     '</div>';
 
   var body = '<div class="ats-resume-body">';
@@ -593,7 +627,7 @@ function _atsFormattingFlagsHTML(flags) {
   );
 }
 
-// === Copy ===
+// === Copy and Download ===
 window.atCopyResume = function(btn) {
   var text = btn.getAttribute('data-text') || '';
   if (!text) {
@@ -618,4 +652,22 @@ window.atCopyResume = function(btn) {
     btn.textContent = 'Copied!';
     setTimeout(function() { btn.innerHTML = origHtml; }, 1400);
   }
+};
+
+window.atDownloadResume = function(btn) {
+  var text = btn.getAttribute('data-text') || '';
+  if (!text) {
+    if (typeof toast === 'function') toast('No resume content to download.', 'warn');
+    return;
+  }
+  var blob = new Blob([text], { type: 'text/plain' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'ats-resume.txt';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  if (typeof toast === 'function') toast('Resume downloaded.', 'ok', 2000);
 };

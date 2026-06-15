@@ -105,8 +105,16 @@ window.rwGenerate = function() {
         return n + (s.items || []).filter(function(i) { return i.after; }).length;
       }, 0);
 
+      var toggleBtn = changed && changed < total
+        ? '<button class="rw-toggle-btn" id="rw-changed-toggle" onclick="rwToggleChanged(this)">' +
+            'Show changed only (' + changed + ')' +
+          '</button>'
+        : '';
+
       var summary = '<div class="rw-summary">' + total + ' bullet' + (total !== 1 ? 's' : '') + ' generated' +
-        (changed ? ', <span class="rw-summary--green">' + changed + ' improved</span>' : '') + '</div>';
+        (changed ? ', <span class="rw-summary--green">' + changed + ' improved</span>' : '') +
+        toggleBtn +
+        '</div>';
 
       if (output) output.innerHTML = summary + sections.join('');
     })
@@ -129,6 +137,27 @@ window.rwCopyBullet = function(btn) {
   }).catch(function() {
     toast('Could not copy - please copy manually.', 'warn');
   });
+};
+
+window.rwToggleChanged = function(btn) {
+  var output = document.getElementById('rw-output');
+  if (!output) return;
+  var active = btn.getAttribute('data-active') === '1';
+  if (active) {
+    output.querySelectorAll('.rw-item').forEach(function(el) {
+      el.style.display = '';
+    });
+    btn.setAttribute('data-active', '0');
+    btn.textContent = btn.getAttribute('data-label-off');
+  } else {
+    var label = btn.textContent;
+    btn.setAttribute('data-label-off', label);
+    output.querySelectorAll('.rw-item').forEach(function(el) {
+      el.style.display = el.classList.contains('rw-item--changed') ? '' : 'none';
+    });
+    btn.setAttribute('data-active', '1');
+    btn.textContent = 'Show all bullets';
+  }
 };
 
 // Minimal HTML escaping for injected text

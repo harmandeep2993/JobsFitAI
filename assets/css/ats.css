@@ -276,7 +276,14 @@
   color: var(--t3);
 }
 
-.ats-copy-resume-btn {
+.ats-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ats-copy-resume-btn,
+.ats-download-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -293,6 +300,36 @@
   white-space: nowrap;
 }
 .ats-copy-resume-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+.ats-download-btn:hover    { background: var(--blue); color: #fff; border-color: var(--blue); }
+
+/* === Merge all slots option === */
+
+.ats-merge-opt {
+  padding: 10px 16px;
+  border-top: 1px solid var(--bd-s);
+  background: var(--bg-c);
+}
+
+.ats-merge-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.ats-merge-label input[type="checkbox"] {
+  margin-top: 2px;
+  flex-shrink: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.ats-merge-text {
+  font-size: 12px;
+  color: var(--t2);
+  line-height: 1.5;
+}
+.ats-merge-text strong { color: var(--t1); }
 
 /* === Resume body === */
 

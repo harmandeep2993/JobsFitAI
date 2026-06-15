@@ -613,10 +613,14 @@ async def api_ats_optimise(request: Request) -> JSONResponse:
     """
     Full ATS resume generation pipeline.
 
-    Accepts {resume_id, jd}. Extracts raw resume text from the stored file,
-    checks keyword coverage and structural flags, then calls the LLM once to
-    produce a complete ATS-optimised resume (summary, experience, skills,
-    education) with exact JD keywords injected verbatim.
+    Accepts {resume_id, jd, merge_all?}. Extracts raw resume text from the
+    stored file, checks keyword coverage and structural flags, then calls the
+    LLM once to produce a complete ATS-optimised resume (summary, experience,
+    skills, education) with exact JD keywords injected verbatim.
+
+    When merge_all=true, skills, experience, certifications, and projects from
+    all other stored resume slots are merged into the primary resume JSON before
+    generation so the LLM has the full breadth of the candidate's history.
 
     Returns {resume, coverage_before, coverage_after, section_flags,
     formatting_flags, plain_text}.
@@ -626,6 +630,7 @@ async def api_ats_optimise(request: Request) -> JSONResponse:
     body = await request.json()
     resume_id = (body.get("resume_id") or "").strip()
     jd_text = (body.get("jd") or "").strip()
+    merge_all = bool(body.get("merge_all", False))
 
     if not resume_id:
         return JSONResponse(
@@ -654,6 +659,35 @@ async def api_ats_optimise(request: Request) -> JSONResponse:
             resume_json = {}
     else:
         resume_json = await run_in_threadpool(extract_resume, resume_text)
+
+    # Merge content from other slots when requested
+    if merge_all:
+        all_slots = resume_store.list_scoreable("local")
+        seen_exp = {
+            (e.get("title", ""), e.get("company", ""))
+            for e in resume_json.get("experience_entries", [])
+        }
+        seen_skills = {s.lower() for s in resume_json.get("skills", [])}
+        for slot_rec in all_slots:
+            if slot_rec["id"] == resume_id:
+                continue
+            try:
+                other = _json.loads(slot_rec["extracted_json"] or "{}")
+            except Exception:
+                continue
+            for exp in other.get("experience_entries", []):
+                key = (exp.get("title", ""), exp.get("company", ""))
+                if key not in seen_exp:
+                    seen_exp.add(key)
+                    resume_json.setdefault("experience_entries", []).append(exp)
+            for skill in other.get("skills", []):
+                if skill.lower() not in seen_skills:
+                    seen_skills.add(skill.lower())
+                    resume_json.setdefault("skills", []).append(skill)
+            for cert in other.get("certifications", []):
+                resume_json.setdefault("certifications", []).append(cert)
+            for proj in other.get("projects", []):
+                resume_json.setdefault("projects", []).append(proj)
 
     jd_json = await run_in_threadpool(extract_jd, jd_text)
 
