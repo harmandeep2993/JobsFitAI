@@ -716,7 +716,8 @@ async def api_history() -> JSONResponse:
         ).fetchall()
 
         applications = conn.execute(
-            """SELECT e.created_at AS applied_at, m.title, m.company, m.url, m.score, m.label
+            """SELECT e.created_at AS applied_at, m.title, m.company, m.url,
+                      m.score, m.label, m.app_status
                FROM events e
                LEFT JOIN matches m ON m.id = e.job_id
                WHERE e.type = 'applied'
@@ -912,6 +913,8 @@ async def api_match_run(request: Request) -> JSONResponse:
                 location=location,
                 countries=countries,
                 per_title=SEARCH_PER_TITLE,
+                arbeitnow_limit=settings_store.get_arbeitnow_limit(),
+                bundesagentur_limit=settings_store.get_bundesagentur_limit(),
             )
             discover_and_score(jobs, entry_only=entry_only)
 
@@ -938,6 +941,9 @@ async def api_match_state() -> JSONResponse:
                 "countries": settings_store.country_names(),
                 "location": settings_store.get_location(),
                 "max_age_days": MAX_AGE_DAYS,
+                "entry_only": settings_store.get_entry_only(),
+                "arbeitnow_limit": settings_store.get_arbeitnow_limit(),
+                "bundesagentur_limit": settings_store.get_bundesagentur_limit(),
             },
             "stats": event_store.stats(),
             "run_status": get_run_status(),
@@ -963,6 +969,20 @@ async def api_match_applied(request: Request) -> JSONResponse:
     if applied:
         event_store.log_event("applied", job_id)
     return JSONResponse({"ok": True, "id": job_id, "applied": applied})
+
+
+@app.post("/api/match/app-status")
+async def api_match_app_status(request: Request) -> JSONResponse:
+    """Set the application status for a job (applied / interview / offer / rejected)."""
+    body = await request.json()
+    job_id = (body.get("id") or "").strip()
+    status = (body.get("status") or "").strip().lower()
+    if not job_id:
+        return JSONResponse({"ok": False, "error": "id required"}, status_code=400)
+    match_store.set_app_status(job_id, status)
+    if status == "applied":
+        event_store.log_event("applied", job_id)
+    return JSONResponse({"ok": True, "id": job_id, "app_status": status})
 
 
 @app.get("/api/match/detail")
@@ -1040,12 +1060,30 @@ async def api_match_filters(request: Request) -> JSONResponse:
     if "location" in body:
         settings_store.set_location(body.get("location") or "")
 
+    if "entry_only" in body:
+        settings_store.set_entry_only(bool(body["entry_only"]))
+
+    if "arbeitnow_limit" in body:
+        try:
+            settings_store.set_arbeitnow_limit(int(body["arbeitnow_limit"]))
+        except (ValueError, TypeError):
+            pass
+
+    if "bundesagentur_limit" in body:
+        try:
+            settings_store.set_bundesagentur_limit(int(body["bundesagentur_limit"]))
+        except (ValueError, TypeError):
+            pass
+
     return JSONResponse(
         {
             "ok": True,
             "target_titles": settings_store.get_titles(),
             "countries": settings_store.country_names(),
             "location": settings_store.get_location(),
+            "entry_only": settings_store.get_entry_only(),
+            "arbeitnow_limit": settings_store.get_arbeitnow_limit(),
+            "bundesagentur_limit": settings_store.get_bundesagentur_limit(),
         }
     )
 
@@ -1239,8 +1277,12 @@ async def _auto_fetch_loop() -> None:
                     location=settings_store.get_location(),
                     countries=settings_store.get_countries(),
                     per_title=SEARCH_PER_TITLE,
+                    arbeitnow_limit=settings_store.get_arbeitnow_limit(),
+                    bundesagentur_limit=settings_store.get_bundesagentur_limit(),
                 )
-                return discover_and_score(jobs, entry_only=True)
+                return discover_and_score(
+                    jobs, entry_only=settings_store.get_entry_only()
+                )
 
             out = await run_in_threadpool(_run)
             logger.info(

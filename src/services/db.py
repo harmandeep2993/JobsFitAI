@@ -66,6 +66,8 @@ def init() -> None:
                 conn.execute(f"ALTER TABLE matches ADD COLUMN {col} TEXT")
         if "status" not in cols:
             conn.execute("ALTER TABLE matches ADD COLUMN status TEXT DEFAULT 'scored'")
+        if "app_status" not in cols:
+            conn.execute("ALTER TABLE matches ADD COLUMN app_status TEXT DEFAULT ''")
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS resume (

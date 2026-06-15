@@ -118,7 +118,7 @@ def set_status(job_id: str, status: str) -> None:
 # Columns returned to the UI (jd_json is large - excluded).
 _LIST_COLS = (
     "id, source, title, company, location, url, language, posted_at, "
-    "score, label, matched_required, missing_required, scored_at, applied, status"
+    "score, label, matched_required, missing_required, scored_at, applied, status, app_status"
 )
 
 
@@ -227,6 +227,22 @@ def set_applied(job_id: str, applied: bool) -> None:
         conn.execute(
             "UPDATE matches SET applied = ? WHERE id = ?",
             (1 if applied else 0, job_id),
+        )
+
+
+_VALID_APP_STATUSES = {"", "applied", "interview", "offer", "rejected"}
+
+
+def set_app_status(job_id: str, status: str) -> None:
+    """Set the application status for a job (applied/interview/offer/rejected)."""
+    status = (status or "").strip().lower()
+    if status not in _VALID_APP_STATUSES:
+        return
+    applied = 1 if status else 0
+    with db.connect() as conn:
+        conn.execute(
+            "UPDATE matches SET app_status = ?, applied = ? WHERE id = ?",
+            (status, applied, job_id),
         )
 
 

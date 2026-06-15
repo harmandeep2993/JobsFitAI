@@ -173,6 +173,9 @@ function renderStats(s) {
 function renderFilters(f) {
   if (!f) return;
   window._filtersData = f;
+  // Sync the entry-level checkbox from persisted settings.
+  var entryEl = document.getElementById('mt-entry');
+  if (entryEl && f.entry_only != null) entryEl.checked = !!f.entry_only;
   const box = document.getElementById('mt-filters');
   if (!box || window._filtersRendered) return;
   window._filtersRendered = true;
@@ -192,9 +195,15 @@ function renderFilters(f) {
     '<div class="set-row"><label class="set-lbl"></label>' +
       '<input id="flt-newtitle" class="fetch-inp" placeholder="add a role keyword"/>' +
       '<button class="btn-ghost" onclick="addTitle()">Add</button></div>' +
+    '<div class="set-row"><label class="set-lbl">Arbeitnow limit</label>' +
+      '<input id="flt-arb-limit" class="fetch-inp" type="number" min="1" max="500" value="' +
+        (f.arbeitnow_limit || 100) + '" style="width:80px;"/></div>' +
+    '<div class="set-row"><label class="set-lbl">Bundesagentur limit</label>' +
+      '<input id="flt-ba-limit" class="fetch-inp" type="number" min="1" max="100" value="' +
+        (f.bundesagentur_limit || 10) + '" style="width:80px;"/></div>' +
     '<div class="set-actions"><button class="btn-primary" onclick="saveFilters()">Save</button>' +
       '<span class="mt-status" id="flt-status">≤ ' + f.max_age_days +
-        ' days old · LLM relevance + entry-level gate</span></div>';
+        ' days old · LLM relevance gate</span></div>';
   rerenderChips();
 }
 
@@ -218,13 +227,19 @@ window.addTitle = function() {
 window.saveFilters = function() {
   const st = document.getElementById('flt-status');
   st.textContent = 'Saving…';
+  var entryEl = document.getElementById('mt-entry');
+  var arbEl   = document.getElementById('flt-arb-limit');
+  var baEl    = document.getElementById('flt-ba-limit');
   fetch('/api/match/filters', {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      target_titles: window._titles,
-      countries:     document.getElementById('flt-countries').value,
-      location:      document.getElementById('flt-location').value,
+      target_titles:       window._titles,
+      countries:           document.getElementById('flt-countries').value,
+      location:            document.getElementById('flt-location').value,
+      entry_only:          entryEl ? entryEl.checked : true,
+      arbeitnow_limit:     arbEl   ? parseInt(arbEl.value, 10) || 100 : 100,
+      bundesagentur_limit: baEl    ? parseInt(baEl.value, 10) || 10  : 10,
     }),
   })
     .then(r => r.json())
@@ -441,7 +456,7 @@ function gaugeHTML(cls, pct, label) {
 window.matchCardHTML = function(r, isNew) {
   const posted  = relTime(r.posted_at);
   const fetched = fetchedAgo(r.scored_at);
-  const applied = !!r.applied;
+  const applied = !!(r.app_status || r.applied);
   const pending = r.status === 'pending';
   const noJd    = r.status === 'jd_unavailable';
 
@@ -459,7 +474,7 @@ window.matchCardHTML = function(r, isNew) {
   const chips =
     (isNew   ? '<span class="match-new">NEW</span>' : '') +
     (noJd    ? '<span class="match-na-tag">manual</span>' : '') +
-    (applied ? '<span class="match-applied-tag">Applied</span>' : '');
+    (applied ? '<span class="match-applied-tag">' + _appStatusLabel(r.app_status) + '</span>' : '');
 
   // Skill tags - 4 matched (green) + 4 missing (red)
   let skillsHTML = '';
@@ -475,11 +490,19 @@ window.matchCardHTML = function(r, isNew) {
     skillsHTML = '<span class="jt-na-hint">Scoring…</span>';
   }
 
-  // Single meta line: date . lang . source
+  // Source badge
+  const srcNames = { adzuna: 'Adzuna', arbeitnow: 'Arbeitnow', bundesagentur: 'Bundesagentur' };
+  const srcCls   = { adzuna: 'hv-src-az', arbeitnow: 'hv-src-arb', bundesagentur: 'hv-src-ba' };
+  const srcBadge = r.source
+    ? '<span class="hv-src-badge ' + (srcCls[r.source] || '') + '">' +
+        (srcNames[r.source] || mtEsc(r.source)) + '</span>'
+    : null;
+
+  // Single meta line: date . lang . source badge
   const metaParts = [
     posted     ? posted        : null,
     r.language || null,
-    r.source   || null,
+    srcBadge   || null,
   ].filter(Boolean);
 
   // Footer actions
@@ -491,10 +514,12 @@ window.matchCardHTML = function(r, isNew) {
     ? '<a class="jt-btn" href="' + mtEsc(r.url) + '" target="_blank" rel="noopener">Open ↗</a>'
     : '';
 
-  const applyBtn =
-    '<button class="jt-btn jt-apply' + (applied ? ' on' : '') +
-    '" onclick="toggleApplied(\'' + mtEsc(r.id) + '\',' + (applied ? 1 : 0) + ')">' +
-    (applied ? '✓ Applied' : 'Applied?') + '</button>';
+  const appStatus = r.app_status || '';
+  const applyBtn = appStatus
+    ? _appStatusButtons(r.id, appStatus)
+    : '<button class="jt-btn jt-apply" onclick="setAppStatus(\'' + mtEsc(r.id) + '\',\'applied\')">' +
+        'Applied?' +
+      '</button>';
 
   const delBtn =
     '<button class="jt-del" onclick="deleteMatch(\'' + mtEsc(r.id) + '\')" title="Remove">' +
@@ -653,6 +678,47 @@ function renderDetail(d) {
     (j.url ? '<a class="btn-primary" href="' + mtEsc(j.url) + '" target="_blank" rel="noopener" style="margin-top:14px;">Open posting ↗</a>' : '');
 }
 
+// Application status helpers.
+var _appStatusCfg = {
+  applied:   { label: 'Applied',   cls: 'aps-applied',   next: ['interview', 'rejected', ''] },
+  interview: { label: 'Interview', cls: 'aps-interview',  next: ['offer',     'rejected', ''] },
+  offer:     { label: 'Offer',     cls: 'aps-offer',      next: [''] },
+  rejected:  { label: 'Rejected',  cls: 'aps-rejected',   next: [''] },
+};
+
+function _appStatusLabel(status) {
+  return (_appStatusCfg[status] && _appStatusCfg[status].label) || 'Applied';
+}
+
+function _appStatusButtons(id, status) {
+  var cfg = _appStatusCfg[status];
+  if (!cfg) return '';
+  var escaped = mtEsc(id);
+  var current = '<button class="jt-btn jt-apply on ' + cfg.cls + '">' + cfg.label + '</button>';
+  var nextBtns = (cfg.next || []).map(function(s) {
+    if (!s) return '<button class="jt-btn jt-apply-undo" onclick="setAppStatus(\'' + escaped + '\',\'\')" title="Undo">x</button>';
+    var nc = _appStatusCfg[s];
+    return '<button class="jt-btn jt-apply-next" onclick="setAppStatus(\'' + escaped + '\',\'' + s + '\')">' +
+      (nc ? nc.label : s) + '</button>';
+  }).join('');
+  return current + nextBtns;
+}
+
+window.setAppStatus = function(id, status) {
+  fetch('/api/match/app-status', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ id: id, status: status }),
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (!d.ok) return;
+      if (typeof loadMatchState === 'function') loadMatchState();
+      if (typeof loadHistory === 'function' && window._historyOpen) loadHistory();
+    })
+    .catch(function() {});
+};
+
 // Toggle a job's applied state, then refresh whichever views are open.
 window.toggleApplied = function(id, applied) {
   fetch('/api/match/applied', {
@@ -792,7 +858,7 @@ function renderMatches(results, newIds) {
     if ((r.score || 0) < minScore) return false;
     if (lang && (r.language || '') !== lang) return false;
     if (showNew && !newIds.has(r.id)) return false;
-    if (hideApplied && r.applied) return false;
+    if (hideApplied && (r.applied || r.app_status)) return false;
     if (source !== 'all' && (r.source || '') !== source) return false;
     if (maxAge !== 'all') {
       var ts = parseInt(r.posted_at, 10) || 0;

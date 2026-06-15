@@ -108,10 +108,10 @@ function _hvParseFetchDetail(raw) {
   } catch (e) {}
   // Fallback: old "X checked, Y relevant, Z scored" string format
   var p3 = (raw || '').match(/(\d+) checked.*?(\d+) relevant.*?(\d+) scored/);
-  if (p3) return { fetched: null, new: null, recent: +p3[1], relevant: +p3[2], scored: +p3[3], adzuna: null, arbeitnow: null, total_seen: null };
+  if (p3) return { fetched: null, new: null, recent: +p3[1], relevant: +p3[2], scored: +p3[3], adzuna: null, arbeitnow: null, bundesagentur: null, total_seen: null };
   var p2 = (raw || '').match(/(\d+) checked.*?(\d+) scored/);
-  if (p2) return { fetched: null, new: null, recent: +p2[1], relevant: null, scored: +p2[2], adzuna: null, arbeitnow: null, total_seen: null };
-  return { fetched: null, new: null, recent: null, relevant: null, scored: 0, adzuna: null, arbeitnow: null, total_seen: null };
+  if (p2) return { fetched: null, new: null, recent: +p2[1], relevant: null, scored: +p2[2], adzuna: null, arbeitnow: null, bundesagentur: null, total_seen: null };
+  return { fetched: null, new: null, recent: null, relevant: null, scored: 0, adzuna: null, arbeitnow: null, bundesagentur: null, total_seen: null };
 }
 
 function _hTime(iso) {
@@ -133,8 +133,9 @@ function _hvFetcherEntryFull(e, d) {
 
   var sources = (d.adzuna != null)
     ? '<div class="hv-entry-meta hv-entry-sources"><span class="hv-src-row">' +
-        '<span class="hv-src-badge hv-src-az">Adzuna ' + d.adzuna + '</span>' +
-        '<span class="hv-src-badge hv-src-arb">Arbeitnow ' + d.arbeitnow + '</span>' +
+        '<span class="hv-src-badge hv-src-az">Adzuna ' + (d.adzuna || 0) + '</span>' +
+        '<span class="hv-src-badge hv-src-arb">Arbeitnow ' + (d.arbeitnow || 0) + '</span>' +
+        '<span class="hv-src-badge hv-src-ba">Bundesagentur ' + (d.bundesagentur || 0) + '</span>' +
       '</span></div>'
     : '';
 
@@ -230,11 +231,17 @@ function _hvRenderApplications(entries) {
     el.innerHTML = '<p class="hv-empty">No applications tracked yet. Mark jobs as Applied in Job Matches.</p>';
     return;
   }
+  var statusLabels = { applied: 'Applied', interview: 'Interview', offer: 'Offer', rejected: 'Rejected' };
+  var statusCls    = { applied: 'aps-applied', interview: 'aps-interview', offer: 'aps-offer', rejected: 'aps-rejected' };
+
   el.innerHTML = entries.map(function(e) {
     var tier = e.score != null ? _hTierCls(e.score) : '';
     var link = e.url
       ? ' &middot; <a class="hv-entry-link" href="' + _hEsc(e.url) + '" target="_blank" rel="noopener">View posting</a>'
       : '';
+    var appSt = e.app_status || 'applied';
+    var stBadge = '<span class="hv-app-status ' + (statusCls[appSt] || 'aps-applied') + '">' +
+      (statusLabels[appSt] || 'Applied') + '</span>';
     return (
       '<div class="hv-entry">' +
         '<div class="hv-entry-left">' +
@@ -249,13 +256,14 @@ function _hvRenderApplications(entries) {
           '<div class="hv-entry-title">' + _hEsc(e.title || 'Role') + '</div>' +
           '<div class="hv-entry-meta">' +
             _hEsc(e.company || '') +
-            ' &middot; Applied ' + _hAgo(e.applied_at) +
+            ' &middot; ' + _hAgo(e.applied_at) +
             link +
           '</div>' +
         '</div>' +
-        (e.score != null
-          ? '<div class="hv-entry-right"><span class="hv-score ' + tier + '">' + Math.round(e.score) + '%</span></div>'
-          : '') +
+        '<div class="hv-entry-right">' +
+          stBadge +
+          (e.score != null ? '<span class="hv-score ' + tier + '">' + Math.round(e.score) + '%</span>' : '') +
+        '</div>' +
       '</div>'
     );
   }).join('');

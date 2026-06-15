@@ -146,3 +146,28 @@ def get_scheduler_interval() -> int:
 
 def set_scheduler_interval(minutes: int) -> None:
     _set("scheduler_interval", max(5, int(minutes)))
+
+
+# --- Fetch pipeline options ---
+def get_entry_only() -> bool:
+    return bool(_get("entry_only", True))
+
+
+def set_entry_only(value: bool) -> None:
+    _set("entry_only", bool(value))
+
+
+def get_arbeitnow_limit() -> int:
+    return int(_get("arbeitnow_limit", 100))
+
+
+def set_arbeitnow_limit(n: int) -> None:
+    _set("arbeitnow_limit", max(1, int(n)))
+
+
+def get_bundesagentur_limit() -> int:
+    return int(_get("bundesagentur_limit", 10))
+
+
+def set_bundesagentur_limit(n: int) -> None:
+    _set("bundesagentur_limit", max(1, int(n)))
