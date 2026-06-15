@@ -49,7 +49,7 @@ def _fetch_detail(hash_id: str) -> tuple[str, str]:
         )
         externe_url = data.get("externeUrl") or data.get("externerLink") or ""
         return _clean_html(raw), externe_url.strip()
-    except requests.RequestException as e:
+    except (requests.RequestException, ValueError) as e:
         logger.warning("BA detail fetch failed for %s: %s", hash_id, e)
         return "", ""
 
@@ -112,7 +112,7 @@ def fetch_bundesagentur_jobs(
         )
         resp.raise_for_status()
         data = resp.json()
-    except requests.RequestException as e:
+    except (requests.RequestException, ValueError) as e:
         logger.error("Bundesagentur list request failed: %s", e)
         return []
 

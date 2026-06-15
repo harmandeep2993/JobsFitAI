@@ -135,20 +135,30 @@ def fetch_combined(
     arbeitnow: list[Job] = []
     bundesagentur: list[Job] = []
     if "de" in countries:
+        # Arbeitnow: word-union query is fine since it filters in Python afterwards
         terms = sorted({w for t in titles for w in t.split()})
-        query = " ".join(terms)
-
         arb_raw = fetch_arbeitnow_jobs(
-            query=query, location=location, limit=arbeitnow_limit
+            query=" ".join(terms), location=location, limit=arbeitnow_limit
         )
         arbeitnow = [j for j in arb_raw if role_filter.is_target_role(j.title, titles)]
 
-        ba_raw = fetch_bundesagentur_jobs(
-            query=query, location=location, limit=bundesagentur_limit
-        )
-        bundesagentur = [
-            j for j in ba_raw if role_filter.is_target_role(j.title, titles)
-        ]
+        # Bundesagentur: search each title separately so the API's own keyword
+        # matching works on a clean phrase rather than a sorted word-soup.
+        # Skip is_target_role here - the API already filtered by keyword and the
+        # LLM relevance gate makes the final call.
+        seen_ba: set[str] = set()
+        per_title_ba = max(1, bundesagentur_limit // max(len(titles), 1))
+        for title in titles[:4]:
+            for job in fetch_bundesagentur_jobs(
+                query=title, location=location, limit=per_title_ba
+            ):
+                if job.id not in seen_ba:
+                    seen_ba.add(job.id)
+                    bundesagentur.append(job)
+                    if len(bundesagentur) >= bundesagentur_limit:
+                        break
+            if len(bundesagentur) >= bundesagentur_limit:
+                break
 
     merged, seen_ids, seen_content = [], set(), set()
     for job in adzuna + arbeitnow + bundesagentur:
@@ -299,10 +309,17 @@ def discover_and_score(jobs: list[Job], entry_only: bool = True) -> dict:
                 event_store.mark_seen(job, "jd_unavailable")
                 logger.debug("   jd-unavailable | %s", tag)
 
-        by_source = {}
+        logger.info(
+            "== Run complete: %d candidates, %d survivors, %d scored",
+            len(candidates),
+            len(survivors),
+            scored,
+        )
+    finally:
+        # Always log the run event - even if scoring was interrupted by an error.
+        by_source: dict[str, int] = {}
         for j in jobs:
             by_source[j.source] = by_source.get(j.source, 0) + 1
-
         run_detail = _json.dumps(
             {
                 "fetched": len(jobs),
@@ -316,14 +333,10 @@ def discover_and_score(jobs: list[Job], entry_only: bool = True) -> dict:
                 "total_seen": len(seen) + len(new_jobs),
             }
         )
-        event_store.log_event("run", "", run_detail)
-        logger.info(
-            "== Run complete: %d candidates, %d survivors, %d scored",
-            len(candidates),
-            len(survivors),
-            scored,
-        )
-    finally:
+        try:
+            event_store.log_event("run", "", run_detail)
+        except Exception as _log_err:
+            logger.warning("Could not log run event: %s", _log_err)
         _run_status.update({"running": False, "phase": "idle"})
 
     return {
