@@ -831,6 +831,34 @@ function animateScores() {
   });
 }
 
+window.resetMtFilters = function() {
+  window._mtMinScore    = 0;
+  window._mtLang        = '';
+  window._mtShowNew     = false;
+  window._mtHideApplied = false;
+  window._mtMaxAge      = 'all';
+  window._mtSource      = 'all';
+
+  var langEl = document.getElementById('flt-lang');
+  if (langEl) langEl.value = '';
+
+  document.querySelectorAll('.sort-btn[data-score]').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.score === '0');
+  });
+  document.querySelectorAll('.sort-btn[data-age]').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.age === 'all');
+  });
+  document.querySelectorAll('.sort-btn[data-src]').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.src === 'all');
+  });
+  var newBtn = document.getElementById('mt-fn-btn');
+  if (newBtn) newBtn.classList.remove('active');
+  var appBtn = document.getElementById('mt-fa-btn');
+  if (appBtn) appBtn.classList.remove('active');
+
+  renderMatches(window._mtAllData, window._mtLastNewIds || new Set());
+};
+
 window.onLangFilter = function() {
   const el = document.getElementById('flt-lang');
   window._mtLang = el ? el.value : '';
@@ -889,10 +917,15 @@ function renderMatches(results, newIds) {
   }
 
   if (!filtered.length) {
-    const msg = results.length
-      ? 'No jobs match the current filters.'
-      : 'No matches yet. Load a resume and click Fetch &amp; Score.';
-    box.innerHTML = '<div class="fetch-empty">' + msg + '</div>';
+    if (results.length) {
+      box.innerHTML =
+        '<div class="fetch-empty">' +
+          'No jobs match the current filters.' +
+          '<button class="mt-reset-filters" onclick="resetMtFilters()">Clear filters</button>' +
+        '</div>';
+    } else {
+      box.innerHTML = '<div class="fetch-empty">No matches yet. Load a resume and click Fetch &amp; Score.</div>';
+    }
     return;
   }
 
