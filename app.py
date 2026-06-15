@@ -956,6 +956,31 @@ async def api_match_run(request: Request) -> JSONResponse:
             await run_in_threadpool(_run)
         except Exception as e:
             logger.error("match run failed: %s", e)
+            # Log a minimal run entry so the Fetcher history always has a record,
+            # even when fetch_combined crashes before discover_and_score runs.
+            try:
+                import json as _j
+
+                event_store.log_event(
+                    "run",
+                    "",
+                    _j.dumps(
+                        {
+                            "fetched": 0,
+                            "new": 0,
+                            "recent": 0,
+                            "relevant": 0,
+                            "scored": 0,
+                            "adzuna": 0,
+                            "arbeitnow": 0,
+                            "bundesagentur": 0,
+                            "total_seen": 0,
+                            "error": str(e)[:120],
+                        }
+                    ),
+                )
+            except Exception:
+                pass
             end_run()
 
     asyncio.create_task(_bg())
