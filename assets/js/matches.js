@@ -854,16 +854,17 @@ function renderMatches(results, newIds) {
   const nowSec      = Date.now() / 1000;
 
   const filtered = results.filter(function(r) {
-    if (r.status === 'jd_unavailable') return true;
-    if ((r.score || 0) < minScore) return false;
+    // Source, language, age, new, applied filters apply to every job
+    if (source !== 'all' && (r.source || '') !== source) return false;
     if (lang && (r.language || '') !== lang) return false;
     if (showNew && !newIds.has(r.id)) return false;
     if (hideApplied && (r.applied || r.app_status)) return false;
-    if (source !== 'all' && (r.source || '') !== source) return false;
     if (maxAge !== 'all') {
       var ts = parseInt(r.posted_at, 10) || 0;
       if (ts && (nowSec - ts) > maxAge * 86400) return false;
     }
+    // Score filter skipped for unscored jobs so they remain visible
+    if (r.status !== 'jd_unavailable' && (r.score || 0) < minScore) return false;
     return true;
   });
 
