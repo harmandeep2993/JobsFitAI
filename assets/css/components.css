@@ -1090,6 +1090,12 @@
 .hv-src-arb { background: var(--green-bg);  color: var(--green);  }
 .hv-src-ba  { background: var(--amber-bg);  color: var(--amber);  }
 
+/* Source badge on job cards - more prominent than history variant */
+.jt-src-badge { font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 99px; letter-spacing: 0.02em; flex-shrink: 0; }
+.jt-src-az    { background: var(--blue-bg);   color: var(--blue);   border: 1px solid var(--blue-bd);  }
+.jt-src-arb   { background: var(--green-bg);  color: var(--green);  border: 1px solid var(--green-bd); }
+.jt-src-ba    { background: var(--amber-bg);  color: var(--amber);  border: 1px solid var(--amber-bd); }
+
 /* Application status badges (history + job cards) */
 .hv-app-status { font-size: 10.5px; font-weight: 600; padding: 1px 6px; border-radius: 4px; margin-right: 4px; }
 .aps-applied   { background: var(--blue-bg);   color: var(--blue);   }

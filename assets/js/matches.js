@@ -490,19 +490,18 @@ window.matchCardHTML = function(r, isNew) {
     skillsHTML = '<span class="jt-na-hint">Scoring…</span>';
   }
 
-  // Source badge
-  const srcNames = { adzuna: 'Adzuna', arbeitnow: 'Arbeitnow', bundesagentur: 'Bundesagentur' };
-  const srcCls   = { adzuna: 'hv-src-az', arbeitnow: 'hv-src-arb', bundesagentur: 'hv-src-ba' };
+  // Source badge - shown on the card in the company row
+  const srcNames   = { adzuna: 'Adzuna', arbeitnow: 'Arbeitnow', bundesagentur: 'Bundesagentur' };
+  const srcCardCls = { adzuna: 'jt-src-az', arbeitnow: 'jt-src-arb', bundesagentur: 'jt-src-ba' };
   const srcBadge = r.source
-    ? '<span class="hv-src-badge ' + (srcCls[r.source] || '') + '">' +
+    ? '<span class="jt-src-badge ' + (srcCardCls[r.source] || '') + '">' +
         (srcNames[r.source] || mtEsc(r.source)) + '</span>'
-    : null;
+    : '';
 
-  // Single meta line: date . lang . source badge
+  // Meta line: date and language only (source is now a card badge)
   const metaParts = [
     posted     ? posted        : null,
     r.language || null,
-    srcBadge   || null,
   ].filter(Boolean);
 
   // Footer actions
@@ -542,6 +541,7 @@ window.matchCardHTML = function(r, isNew) {
         (r.location ? '<div class="jt-loc">&#128205; ' + mtEsc(r.location) + '</div>' : '') +
         '<div class="jt-company-row">' +
           '<span class="jt-company">' + mtEsc(r.company || 'Unknown') + '</span>' +
+          srcBadge +
           (chips ? '<span class="jt-chips">' + chips + '</span>' : '') +
         '</div>' +
         (metaParts.length
