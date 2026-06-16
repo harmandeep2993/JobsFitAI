@@ -301,6 +301,7 @@
   transition: color .12s;
 }
 .mt-toggle:hover { color: var(--accent); }
+.mt-toggle.active { color: var(--accent); font-weight: 600; }
 
 .mt-filters {
   padding: 14px 0 2px;

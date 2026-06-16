@@ -274,11 +274,12 @@ window.toggleSortRow = function() {
 window.toggleFilters = function() {
   const p = document.getElementById('mt-filters');
   const t = document.getElementById('mt-filters-toggle');
-  const show = p.style.display === 'none';
+  if (!p) return;
+  const show = p.style.display === 'none' || p.style.display === '';
   p.style.display = show ? 'block' : 'none';
   if (t) {
-    t.innerHTML = '⚙ Filters &amp; keywords ' + (show ? '▾' : '▸');
     t.setAttribute('aria-expanded', show ? 'true' : 'false');
+    t.classList.toggle('active', show);
   }
 };
 
