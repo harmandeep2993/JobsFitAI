@@ -15,6 +15,9 @@ os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
 os.environ.setdefault("TRANSFORMERS_VERBOSITY", "error")
 os.environ.setdefault("TRANSFORMERS_NO_ADVISORY_WARNINGS", "1")
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+# TQDM_DISABLE is checked by tqdm per-instance at __init__ time (not import time),
+# so setting it here silences all progress bars for this process.
+os.environ["TQDM_DISABLE"] = "1"
 
 from sentence_transformers import SentenceTransformer
 
@@ -45,20 +48,11 @@ def _suppress_native_output():
     """
     Silence the tqdm weights bar and any native prints during model load.
 
-    Strategy 1 (always applied): disable tqdm globally for the duration.
-      This is reliable on all platforms including Windows threadpools and
-      also prevents the tqdm_asyncio __del__ traceback caused by progress
-      bar objects being garbage-collected after an async encode call.
-
-    Strategy 2 (best-effort): redirect fd 1 & 2 to devnull.
-      Catches OSError silently - e.g. WinError 1 inside a server threadpool
-      - and skips fd suppression without aborting the load.
+    Best-effort: redirect fd 1 & 2 to devnull to silence any remaining
+    native prints. tqdm is already disabled globally via TQDM_DISABLE=1 set
+    at module import. Catches OSError silently (e.g. WinError 1 on Windows
+    threadpools) and skips fd suppression without aborting the load.
     """
-    import tqdm as _tqdm
-
-    old_disable = _tqdm.tqdm.disable
-    _tqdm.tqdm.disable = True
-
     saved_out = saved_err = devnull = None
     try:
         saved_out, saved_err = os.dup(1), os.dup(2)
@@ -77,7 +71,6 @@ def _suppress_native_output():
     try:
         yield
     finally:
-        _tqdm.tqdm.disable = old_disable
         try:
             if saved_out is not None:
                 os.dup2(saved_out, 1)
