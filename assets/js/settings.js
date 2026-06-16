@@ -162,8 +162,11 @@ function updateKeyRow(providerName) {
   if (row)     row.style.display     = show;
   if (actions) actions.style.display = show;
   if (lbl)     lbl.textContent = (providerName || 'Provider') + ' key';
-  if (hintEl)  hintEl.textContent = hint ? ('Current: ' + hint) : (needsKey ? 'No key saved' : '');
-  if (input)   input.value = '';
+  if (hintEl)  hintEl.textContent = hint ? ('Saved: ' + hint) : (needsKey ? 'No key saved yet' : '');
+  if (input) {
+    input.value = '';
+    input.placeholder = hint ? 'Enter new key to replace current' : 'Paste API key…';
+  }
   if (kstatus) { kstatus.textContent = ''; kstatus.className = 'set-status'; }
 }
 
@@ -195,8 +198,8 @@ window.saveApiKey = function() {
       }
       var entry = (window._llmCatalog || []).find(function(p) { return p.name === d.provider; });
       if (entry) { entry.has_key = true; entry.key_hint = d.hint; }
-      if (hintEl) hintEl.textContent = d.hint ? ('Current: ' + d.hint) : '';
-      if (input)  input.value = '';
+      if (hintEl) hintEl.textContent = d.hint ? ('Saved: ' + d.hint) : '';
+      if (input)  { input.value = ''; input.placeholder = 'Enter new key to replace current'; }
       if (status) { status.textContent = '✓ Key saved'; status.className = 'set-status ok'; }
     })
     .catch(function(e) {

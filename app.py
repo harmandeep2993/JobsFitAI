@@ -789,7 +789,8 @@ async def api_set_llm_key(request: Request) -> JSONResponse:
     try:
         from dotenv import set_key as _dotenv_set
 
-        _dotenv_set(".env", env_var, api_key)
+        _env_path = Path(__file__).parent / ".env"
+        _dotenv_set(str(_env_path), env_var, api_key, quote_mode="never")
     except Exception as e:
         logger.warning("Could not persist API key to .env: %s", e)
 
