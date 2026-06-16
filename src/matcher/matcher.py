@@ -84,7 +84,7 @@ def match(resume: dict, jd: dict) -> dict:
     edu_score = score_education(resume, jd)
     logger.debug("Education : %.1f", edu_score)
 
-    lang_score = score_languages(resume, jd)
+    lang_score, matched_languages, weak_languages = score_languages(resume, jd)
     logger.debug("Languages : %.1f", lang_score)
 
     cert_score = score_certifications(resume, jd)
@@ -153,6 +153,8 @@ def match(resume: dict, jd: dict) -> dict:
         "missing_required": missing_required,
         "matched_preferred": matched_preferred,
         "missing_preferred": missing_preferred,
+        "matched_languages": matched_languages,
+        "weak_languages": weak_languages,
     }
 
     return results

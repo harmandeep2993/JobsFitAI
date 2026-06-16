@@ -306,9 +306,9 @@ def render_breakdown(
     missing_req,
     matched_pref,
     missing_pref,
-    c_langs,
-    r_langs,
     c_yrs=0,
+    matched_langs=None,
+    weak_langs=None,
 ):
     """
     Render the Breakdown tab: one collapsible accordion row per scoring section.
@@ -340,13 +340,8 @@ def render_breakdown(
                 "Missing", missing_pref, "ta"
             )
         elif k == "languages":
-            c_lower = {lang.lower() for lang in c_langs}
-            lang_matched = [lang for lang in r_langs if lang.lower() in c_lower]
-            lang_missing = [lang for lang in r_langs if lang.lower() not in c_lower]
-            detail = (
-                _bd_tag_row("Candidate", c_langs, "tg")
-                + _bd_tag_row("Matched", lang_matched, "tg")
-                + _bd_tag_row("Missing", lang_missing, "tr")
+            detail = _bd_tag_row("Matched", matched_langs or [], "tg") + _bd_tag_row(
+                "Below required level", weak_langs or [], "ta"
             )
         else:
             why = _bd_why(k, v, c_yrs)
@@ -640,7 +635,7 @@ def render_recommendations(
             "</div>"
         )
 
-    word = f'recommendation{"s" if len(items) != 1 else ""}'
+    word = f"recommendation{'s' if len(items) != 1 else ''}"
     header = (
         f'<div class="reco-panel-hd">'
         f'<span class="reco-panel-count">{len(items)}</span>'
@@ -700,15 +695,22 @@ def score_tier(score):
     return "sc-poor"
 
 
+def _lang_display(entry) -> str:
+    """Extract language name from dict or string entry."""
+    if isinstance(entry, dict):
+        return (entry.get("language") or "").strip()
+    return str(entry).split("(")[0].strip()
+
+
 def _bd_items_html(
     scores,
     matched_req,
     missing_req,
     matched_pref,
     missing_pref,
-    c_langs,
-    r_langs,
     c_yrs=0,
+    matched_langs=None,
+    weak_langs=None,
 ):
     items = []
     for k in SCORE_ORDER:
@@ -729,13 +731,8 @@ def _bd_items_html(
                 "Missing", missing_pref, "ta"
             )
         elif k == "languages":
-            c_lower = {lang.lower() for lang in c_langs}
-            lang_matched = [lang for lang in r_langs if lang.lower() in c_lower]
-            lang_missing = [lang for lang in r_langs if lang.lower() not in c_lower]
-            detail = (
-                _bd_tag_row("Candidate", c_langs, "tg")
-                + _bd_tag_row("Matched", lang_matched, "tg")
-                + _bd_tag_row("Missing", lang_missing, "tr")
+            detail = _bd_tag_row("Matched", matched_langs or [], "tg") + _bd_tag_row(
+                "Below required level", weak_langs or [], "ta"
             )
         else:
             why = _bd_why(k, v, c_yrs)
@@ -768,7 +765,7 @@ def _bd_items_html(
 
 
 def _reco_cards_html(
-    score, missing_req, missing_pref, c_yrs, c_edu, r_edu_list, scores
+    score, missing_req, missing_pref, c_yrs, c_edu, r_edu_list, scores, weak_langs=None
 ):
     def _rc(level, icon, title, body):
         return (
@@ -807,6 +804,21 @@ def _reco_cards_html(
                 "Strengthen with Preferred Skills",
                 f"Nice-to-have skills that increase competitiveness over minimum-qualified candidates."
                 f'<div class="tags-row" style="margin-top:8px;">{tags}</div>',
+            )
+        )
+
+    if weak_langs:
+        lang_tags = "".join(
+            f"<span class='tag ta'>{safe_html(s)}</span>" for s in weak_langs[:4]
+        )
+        cards.append(
+            _rc(
+                "med",
+                _ICO_ALERT,
+                "Improve Your Language Proficiency",
+                "These languages are on your resume but below the level this role requires. "
+                "Consider taking a course or certification to close the gap."
+                f'<div class="tags-row" style="margin-top:8px;">{lang_tags}</div>',
             )
         )
 
@@ -911,9 +923,9 @@ def _render_breakdown_panel(
     missing_req,
     matched_pref,
     missing_pref,
-    c_langs,
-    r_langs,
     c_yrs,
+    matched_langs=None,
+    weak_langs=None,
 ):
     ctrl = (
         '<div class="bd-panel-hd">'
@@ -927,9 +939,9 @@ def _render_breakdown_panel(
         missing_req,
         matched_pref,
         missing_pref,
-        c_langs,
-        r_langs,
         c_yrs,
+        matched_langs,
+        weak_langs,
     )
     return (
         f'<div id="jf-breakdown" class="jf-panel" style="display:none;">'
@@ -1006,10 +1018,10 @@ def build_results_html(
     missing_req = results.get("missing_required", [])
     matched_pref = results.get("matched_preferred", [])
     missing_pref = results.get("missing_preferred", [])
+    matched_langs = results.get("matched_languages", [])
+    weak_langs = results.get("weak_languages", [])
 
     c_yrs = resume_json.get("meta", {}).get("total_experience_years", 0)
-    c_langs = resume_json.get("languages", [])
-    r_langs = jd_json.get("languages", [])
     c_edu = resume_json.get("education", [])
     r_edu_list = jd_json.get("education_requirements", [])
 
@@ -1041,9 +1053,9 @@ def build_results_html(
         missing_req,
         matched_pref,
         missing_pref,
-        c_langs,
-        r_langs,
         c_yrs,
+        matched_langs,
+        weak_langs,
     )
     keywords_panel = _render_keywords_panel(
         matched_req, missing_req, matched_pref, missing_pref
@@ -1051,7 +1063,14 @@ def build_results_html(
     reco_panel = (
         '<div id="jf-reco" class="jf-panel" style="display:none;">'
         + _reco_cards_html(
-            score, missing_req, missing_pref, c_yrs, c_edu, r_edu_list, scores
+            score,
+            missing_req,
+            missing_pref,
+            c_yrs,
+            c_edu,
+            r_edu_list,
+            scores,
+            weak_langs,
         )
         + "</div>"
     )

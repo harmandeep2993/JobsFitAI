@@ -18,15 +18,6 @@
     }
   ],
 
-  "projects": [
-    {
-      "id": 1,
-      "title": "",
-      "description": "",
-      "technologies": []
-    }
-  ],
-
   "education": [
     {
       "id": 1,
@@ -36,11 +27,28 @@
     }
   ],
 
+    "projects": [
+    {
+      "id": 1,
+      "title": "",
+      "description": "",
+      "technologies": []
+    }
+  ],
+
+  "languages": [
+    {
+      "id": 1,
+      "language": "",
+      "proficiency": ""
+    }
+  ],
+
   "skills": [],
-  "languages": [],
   "certifications": [],
 
   "meta": {
-    "total_experience_years": 0
+    "total_experience_years": 0,
+    "relevant_experience_years": 0
   }
 }

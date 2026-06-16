@@ -16,7 +16,13 @@
   "experience_requirements": [],
   "education_requirements": [],
 
-  "languages": [],
+  "languages": [
+    {
+      "id": "1",
+      "language": "",
+      "proficiency": ""
+    }
+  ],
   "certifications": [],
 
   "job_summary": ""
