@@ -25,7 +25,7 @@ from src.utils.logger import get_logger
 logger = get_logger(__name__)
 
 _BASE = "https://rest.arbeitsagentur.de/jobboerse/jobsuche-service"
-_HEADERS = {"X-API-Key": "jobboerse-jobsuche", "User-Agent": "JobFitAI/1.0"}
+_HEADERS = {"X-API-Key": "jobboerse-jobsuche", "User-Agent": "JobsFitAI/1.0"}
 _JOB_URL = "https://www.arbeitsagentur.de/jobsuche/jobdetail/{}"
 _PAGE_SIZE = 100  # API maximum per page
 _DETAIL_WORKERS = 8  # parallel detail calls
