@@ -132,7 +132,7 @@ def match(resume: dict, jd: dict) -> dict:
     label = get_score_label(overall_score)
 
     role = (jd.get("job") or {}).get("title") or "role"
-    logger.info(
+    logger.debug(
         "Scored %.0f%% %s · %s  (skills %.0f · resp %.0f · exp %.0f · edu %.0f · lang %.0f)",
         overall_score,
         label,

@@ -157,7 +157,7 @@ def score_experience(resume: dict, jd: dict) -> float:
             )
             return 60.0
         else:
-            logger.warning(
+            logger.debug(
                 "No explicit requirements and no relevant experience - returning 20"
             )
             return 20.0

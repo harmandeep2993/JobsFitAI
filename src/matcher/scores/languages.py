@@ -184,7 +184,7 @@ def score_languages(resume: dict, jd: dict) -> tuple[float, list[str], list[str]
 
     for req_lang, req_level in required_parsed:
         if req_lang not in candidate_map:
-            logger.warning("Required language '%s' missing from resume", req_lang)
+            logger.debug("Required language '%s' missing from resume", req_lang)
             per_scores.append(0.0)
             continue
 
@@ -211,7 +211,7 @@ def score_languages(resume: dict, jd: dict) -> tuple[float, list[str], list[str]
             matched.append(req_lang)
 
         else:
-            logger.warning(
+            logger.debug(
                 "Language '%s': candidate level %d < required %d - weak match",
                 req_lang,
                 cand_level,
