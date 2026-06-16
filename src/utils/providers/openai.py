@@ -30,6 +30,22 @@ _API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
 _MODEL = OPENAI_CONFIG.get("model", "gpt-4o-mini")
 
 
+def set_api_key(key: str) -> None:
+    global _API_KEY
+    _API_KEY = key.strip()
+    os.environ["OPENAI_API_KEY"] = _API_KEY
+
+
+def has_key() -> bool:
+    return bool(_API_KEY)
+
+
+def get_key_hint() -> str:
+    if not _API_KEY:
+        return ""
+    return "****" + _API_KEY[-4:] if len(_API_KEY) > 4 else "****"
+
+
 def check() -> bool:
     """
     Check if OpenAI API key is configured and valid.

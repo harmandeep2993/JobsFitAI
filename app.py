@@ -754,6 +754,48 @@ async def api_set_llm_settings(request: Request) -> JSONResponse:
     )
 
 
+@app.post("/api/llm-settings/key")
+async def api_set_llm_key(request: Request) -> JSONResponse:
+    """Set the API key for a provider at runtime; persists to .env."""
+    body = await request.json()
+    provider = (body.get("provider") or "").strip()
+    api_key = (body.get("api_key") or "").strip()
+
+    if not provider:
+        return JSONResponse(
+            {"ok": False, "error": "provider required"}, status_code=400
+        )
+    if not api_key:
+        return JSONResponse({"ok": False, "error": "api_key required"}, status_code=400)
+
+    if provider == "openai":
+        from src.utils.providers import openai as _op
+
+        _op.set_api_key(api_key)
+        env_var = "OPENAI_API_KEY"
+        hint = _op.get_key_hint()
+    elif provider == "groq":
+        from src.utils.providers import groq as _gp
+
+        _gp.set_api_key(api_key)
+        env_var = "GROQ_API_KEY"
+        hint = _gp.get_key_hint()
+    else:
+        return JSONResponse(
+            {"ok": False, "error": f"key setting not supported for {provider}"},
+            status_code=400,
+        )
+
+    try:
+        from dotenv import set_key as _dotenv_set
+
+        _dotenv_set(".env", env_var, api_key)
+    except Exception as e:
+        logger.warning("Could not persist API key to .env: %s", e)
+
+    return JSONResponse({"ok": True, "provider": provider, "hint": hint})
+
+
 # --- Resume diff ---
 
 

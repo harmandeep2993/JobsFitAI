@@ -445,6 +445,18 @@
       <button class="btn-ghost"   id="set-test"  onclick="testConnection()">Test connection</button>
       <span class="set-status" id="set-status"></span>
     </div>
+    <div class="set-section-title" id="set-key-section-title" style="display:none;">API Key (BYOK)</div>
+    <div class="set-row set-key-row" id="set-key-row" style="display:none;">
+      <label class="set-lbl" id="set-key-lbl">Key</label>
+      <div class="set-key-wrap">
+        <input type="password" id="set-api-key" class="fetch-inp" placeholder="Paste API key&hellip;" autocomplete="off"/>
+        <div class="set-key-hint" id="set-key-hint"></div>
+      </div>
+    </div>
+    <div class="set-actions set-key-actions" id="set-key-actions" style="display:none;">
+      <button class="btn-primary" id="set-save-key" onclick="saveApiKey()">Save key</button>
+      <span class="set-status" id="set-key-status"></span>
+    </div>
   </div>
 </aside>
 

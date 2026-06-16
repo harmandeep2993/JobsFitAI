@@ -1369,6 +1369,30 @@
   margin-top: 4px;
 }
 
+.set-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--t3);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding-top: 16px;
+  margin-top: 8px;
+  border-top: 1px solid var(--bd-s);
+  margin-bottom: 4px;
+}
+
+.set-key-wrap { flex: 1; }
+.set-key-wrap .fetch-inp { width: 100%; }
+
+.set-key-hint {
+  font-size: 11px;
+  color: var(--t3);
+  font-family: 'DM Mono', monospace;
+  margin-top: 5px;
+}
+
+.set-key-actions { margin-top: 0; border-top: none; }
+
 /* Custom dropdown */
 .dd {
   position: relative;

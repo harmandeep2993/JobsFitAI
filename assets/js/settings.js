@@ -21,6 +21,7 @@ function loadLlmSettings() {
       renderModelMenu();
       setVal('provider', window._sel.provider);
       setVal('model', window._sel.model);
+      updateKeyRow(window._sel.provider);
       updateTopbar(d.current || {}, null);
     })
     .catch(() => {});
@@ -80,6 +81,7 @@ window.selectProvider = function(name) {
   setVal('model', window._sel.model);
   renderProviderMenu();
   renderModelMenu();
+  updateKeyRow(name);
 
   const custom = document.getElementById('set-model-custom');
   if (custom) custom.value = '';
@@ -137,6 +139,69 @@ window.applySettings = function() {
       btn.disabled = false;
       status.textContent = '✕ ' + e;
       status.className = 'set-status err';
+    });
+};
+
+// Show/hide the API key row based on whether the provider needs a key.
+function updateKeyRow(providerName) {
+  var catalog  = window._llmCatalog || [];
+  var entry    = catalog.find(function(p) { return p.name === providerName; });
+  var needsKey = entry && entry.needs_key;
+  var hint     = (entry && entry.key_hint) || '';
+
+  var title   = document.getElementById('set-key-section-title');
+  var row     = document.getElementById('set-key-row');
+  var actions = document.getElementById('set-key-actions');
+  var hintEl  = document.getElementById('set-key-hint');
+  var lbl     = document.getElementById('set-key-lbl');
+  var input   = document.getElementById('set-api-key');
+  var kstatus = document.getElementById('set-key-status');
+
+  var show = needsKey ? '' : 'none';
+  if (title)   title.style.display   = show;
+  if (row)     row.style.display     = show;
+  if (actions) actions.style.display = show;
+  if (lbl)     lbl.textContent = (providerName || 'Provider') + ' key';
+  if (hintEl)  hintEl.textContent = hint ? ('Current: ' + hint) : (needsKey ? 'No key saved' : '');
+  if (input)   input.value = '';
+  if (kstatus) { kstatus.textContent = ''; kstatus.className = 'set-status'; }
+}
+
+window.saveApiKey = function() {
+  var input   = document.getElementById('set-api-key');
+  var status  = document.getElementById('set-key-status');
+  var btn     = document.getElementById('set-save-key');
+  var hintEl  = document.getElementById('set-key-hint');
+  var key     = input ? input.value.trim() : '';
+
+  if (!key) {
+    if (status) { status.textContent = 'Enter a key first'; status.className = 'set-status err'; }
+    return;
+  }
+  if (btn) btn.disabled = true;
+  if (status) { status.textContent = 'Saving…'; status.className = 'set-status'; }
+
+  fetch('/api/llm-settings/key', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ provider: window._sel.provider, api_key: key }),
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (btn) btn.disabled = false;
+      if (!d.ok) {
+        if (status) { status.textContent = '✕ ' + (d.error || 'failed'); status.className = 'set-status err'; }
+        return;
+      }
+      var entry = (window._llmCatalog || []).find(function(p) { return p.name === d.provider; });
+      if (entry) { entry.has_key = true; entry.key_hint = d.hint; }
+      if (hintEl) hintEl.textContent = d.hint ? ('Current: ' + d.hint) : '';
+      if (input)  input.value = '';
+      if (status) { status.textContent = '✓ Key saved'; status.className = 'set-status ok'; }
+    })
+    .catch(function(e) {
+      if (btn) btn.disabled = false;
+      if (status) { status.textContent = '✕ ' + e; status.className = 'set-status err'; }
     });
 };
 
