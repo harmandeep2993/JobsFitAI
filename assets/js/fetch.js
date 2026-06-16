@@ -1,4 +1,4 @@
-// Sidebar navigation - switches views using .active class for CSS transitions
+// Topbar navigation - switches views using .active class for CSS transitions
 
 const VIEW_TITLES = { analyzer: 'Analyzer', ats: 'ATS Maker', matches: 'Job Matches', history: 'History', settings: 'Settings' };
 
@@ -7,7 +7,7 @@ window.showView = function(name) {
   const view = document.getElementById('view-' + name);
   if (view) view.classList.add('active');
 
-  document.querySelectorAll('.jfai-sidebar .sb-item')
+  document.querySelectorAll('.tb-nav .tb-item')
     .forEach(el => el.classList.remove('active'));
   const nav = document.getElementById('nav-' + name);
   if (nav) nav.classList.add('active');
