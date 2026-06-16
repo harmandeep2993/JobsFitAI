@@ -81,6 +81,10 @@ app.mount("/assets", StaticFiles(directory="assets"), name="assets")
 
 # --- Request logging middleware ---
 
+# High-frequency poll endpoints - logged at DEBUG to avoid console spam.
+# They're still captured in the file log at DEBUG level.
+_POLL_PATHS = {"/api/match/state", "/api/resumes", "/api/llm-ping"}
+
 
 @app.middleware("http")
 async def _request_logger(request: Request, call_next):
@@ -90,11 +94,12 @@ async def _request_logger(request: Request, call_next):
         req_id = uuid.uuid4().hex[:8]
         request.state.req_id = req_id
         method = request.method
-        logger.info("[%s] --> %s %s", req_id, method, path)
+        _log = logger.debug if path in _POLL_PATHS else logger.info
+        _log("[%s] --> %s %s", req_id, method, path)
         t0 = time.perf_counter()
         response = await call_next(request)
         duration_ms = round((time.perf_counter() - t0) * 1000)
-        logger.info(
+        _log(
             "[%s] <-- %s %s %s (%dms)",
             req_id,
             method,
@@ -1386,6 +1391,14 @@ async def _backfill_extractions() -> None:
 
 @app.on_event("startup")
 async def _start_scheduler() -> None:
+    import logging as _logging
+
+    # Uvicorn re-initialises its own loggers after our logger.py setup runs,
+    # restoring the access log to INFO. Re-silence it here so requests are not
+    # printed twice (our middleware already covers /api/* with richer context).
+    _logging.getLogger("uvicorn.access").setLevel(_logging.WARNING)
+    _logging.getLogger("uvicorn.access").propagate = False
+
     global _sched_last
     # Seed _sched_last from the last run event so server restarts don't
     # trigger an immediate re-fetch when the interval hasn't elapsed yet.
