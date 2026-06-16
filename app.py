@@ -950,7 +950,7 @@ async def api_match_run(request: Request) -> JSONResponse:
                 arbeitnow_limit=settings_store.get_arbeitnow_limit(),
                 bundesagentur_limit=settings_store.get_bundesagentur_limit(),
             )
-            discover_and_score(jobs, entry_only=entry_only)
+            discover_and_score(jobs, entry_only=entry_only, manual=True)
 
         try:
             await run_in_threadpool(_run)
@@ -975,6 +975,7 @@ async def api_match_run(request: Request) -> JSONResponse:
                             "arbeitnow": 0,
                             "bundesagentur": 0,
                             "total_seen": 0,
+                            "manual": True,
                             "error": str(e)[:120],
                         }
                     ),
@@ -1405,7 +1406,7 @@ async def _start_scheduler() -> None:
 
 # --- Entry point ---
 
-PORT = 8080
+PORT = 8000
 
 
 def _port_in_use(port: int) -> bool:

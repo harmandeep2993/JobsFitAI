@@ -212,7 +212,9 @@ def rescore_all() -> int:
     return count
 
 
-def discover_and_score(jobs: list[Job], entry_only: bool = True) -> dict:
+def discover_and_score(
+    jobs: list[Job], entry_only: bool = True, manual: bool = False
+) -> dict:
     """
     Token-efficient funnel:
       skip already-seen -> recency -> cheap LLM relevance gate ->
@@ -331,6 +333,7 @@ def discover_and_score(jobs: list[Job], entry_only: bool = True) -> dict:
                 "arbeitnow": by_source.get("arbeitnow", 0),
                 "bundesagentur": by_source.get("bundesagentur", 0),
                 "total_seen": len(seen) + len(new_jobs),
+                "manual": manual,
             }
         )
         try:

@@ -139,6 +139,8 @@ function _hvFetcherEntryFull(e, d) {
       '</span></div>'
     : '';
 
+  var runLabel = d.manual ? 'Manual run' : 'Fetcher run';
+  var manualBadge = d.manual ? ' <span class="hv-manual-badge">manual</span>' : '';
   return (
     '<div class="hv-entry hv-entry--fetch">' +
       '<div class="hv-entry-left">' +
@@ -149,7 +151,7 @@ function _hvFetcherEntryFull(e, d) {
         '</span>' +
       '</div>' +
       '<div class="hv-entry-body">' +
-        '<div class="hv-entry-title">Fetcher run &middot; <span class="hv-run-time">' + _hTime(e.created_at) + '</span></div>' +
+        '<div class="hv-entry-title">' + runLabel + manualBadge + ' &middot; <span class="hv-run-time">' + _hTime(e.created_at) + '</span></div>' +
         '<div class="hv-entry-meta">' + statParts.join(' &middot; ') + '</div>' +
         sources +
       '</div>' +
@@ -197,9 +199,9 @@ function _hvRenderFetcher(entries) {
       '<div class="hv-stat-last">Last run: ' + lastRun + '</div>' +
     '</div>';
 
-  // Split: runs with results vs zero-result runs
-  var withResults = parsed.filter(function(x) { return (x.d.scored || 0) > 0; });
-  var zeroRuns = parsed.filter(function(x) { return (x.d.scored || 0) === 0; });
+  // Split: manual runs and scored runs are always visible; auto zero-result runs are hidden
+  var withResults = parsed.filter(function(x) { return (x.d.scored || 0) > 0 || x.d.manual; });
+  var zeroRuns = parsed.filter(function(x) { return (x.d.scored || 0) === 0 && !x.d.manual; });
 
   var resultsHtml = '';
   if (withResults.length) {
