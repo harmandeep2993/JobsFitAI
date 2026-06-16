@@ -1415,7 +1415,7 @@
   display: none;
   animation: dd-open .12s ease;
 }
-.dd-menu.open { display: block; }
+.dd.open .dd-menu { display: block; }
 
 @keyframes dd-open {
   from { opacity: 0; transform: translateY(-4px); }
