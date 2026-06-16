@@ -1,36 +1,36 @@
 /* === Design tokens === */
 :root {
-  /* Brand -indigo */
-  --accent:   #6366f1;
-  --accent-s: rgba(99,102,241,0.10);
-  --accent-h: #4f46e5;
-  --accent-xl: rgba(99,102,241,0.05);
+  /* Brand */
+  --accent:   #e8471a;
+  --accent-s: rgba(232,71,26,0.09);
+  --accent-h: #cf3d12;
+  --accent-xl: rgba(232,71,26,0.06);
 
-  /* Surfaces -cool blue-white */
-  --bg:     #f5f7ff;
+  /* Surfaces - warm zinc */
+  --bg:     #f5f4f0;
   --bg-r:   #ffffff;
-  --bg-c:   #f8f9ff;
-  --bg-hov: rgba(99,102,241,0.06);
+  --bg-c:   #fafaf8;
+  --bg-hov: rgba(9,9,11,0.034);
 
-  /* Borders -indigo-tinted */
-  --bd:   rgba(99,102,241,0.14);
-  --bd-s: rgba(99,102,241,0.08);
+  /* Borders - zinc */
+  --bd:   rgba(9,9,11,0.08);
+  --bd-s: rgba(9,9,11,0.05);
 
   /* Text */
-  --t1: #0f0c29;   /* deep indigo-black */
-  --t2: #6b7280;   /* gray-500 */
-  --t3: #9ca3af;   /* gray-400 */
+  --t1: #09090b;   /* zinc-950 */
+  --t2: #71717a;   /* zinc-500 */
+  --t3: #a1a1aa;   /* zinc-400 */
 
-  /* Score palette */
+  /* Score palette - vivid & distinct */
   --green:    #10b981;   /* emerald-500  - Excellent */
   --green-bg: #ecfdf5;
   --green-bd: rgba(16,185,129,0.22);
   --green-glow: rgba(16,185,129,0.15);
 
-  --blue:    #8b5cf6;    /* violet-500   - Good (distinct from indigo accent) */
-  --blue-bg: #f5f3ff;
-  --blue-bd: rgba(139,92,246,0.22);
-  --blue-glow: rgba(139,92,246,0.15);
+  --blue:    #6366f1;    /* indigo-500   - Good */
+  --blue-bg: #eef2ff;
+  --blue-bd: rgba(99,102,241,0.22);
+  --blue-glow: rgba(99,102,241,0.15);
 
   --amber:    #f59e0b;   /* amber-500    - Partial */
   --amber-bg: #fffbeb;
@@ -42,11 +42,11 @@
   --red-bd: rgba(244,63,94,0.22);
   --red-glow: rgba(244,63,94,0.15);
 
-  /* Shadows -indigo-tinted */
-  --sha:   0 1px 3px rgba(99,102,241,0.08), 0 8px 28px rgba(99,102,241,0.07);
-  --sha-s: 0 1px 2px rgba(99,102,241,0.06), 0 2px 6px rgba(99,102,241,0.04);
-  --sha-m: 0 8px 40px rgba(99,102,241,0.13), 0 2px 8px rgba(99,102,241,0.07);
-  --sha-lg:0 20px 60px rgba(99,102,241,0.17), 0 4px 12px rgba(99,102,241,0.09);
+  /* Shadows */
+  --sha:   0 1px 3px rgba(9,9,11,0.07), 0 8px 28px rgba(9,9,11,0.07);
+  --sha-s: 0 1px 2px rgba(9,9,11,0.05), 0 2px 6px rgba(9,9,11,0.04);
+  --sha-m: 0 8px 40px rgba(9,9,11,0.14), 0 2px 8px rgba(9,9,11,0.07);
+  --sha-lg:0 20px 60px rgba(9,9,11,0.18), 0 4px 12px rgba(9,9,11,0.08);
 
   /* Layout */
   --sidebar-w: 224px;
@@ -58,32 +58,27 @@
 
 /* === Dark mode === */
 :root.dark {
-  --accent:   #818cf8;   /* lighter indigo for dark bg */
-  --accent-s: rgba(129,140,248,0.12);
-  --accent-h: #6366f1;
-  --accent-xl: rgba(129,140,248,0.06);
+  --bg:     #0a0a0c;
+  --bg-r:   #131316;
+  --bg-c:   #0f0f12;
+  --bg-hov: rgba(255,255,255,0.04);
 
-  --bg:     #0a0a14;
-  --bg-r:   #12121e;
-  --bg-c:   #0e0e18;
-  --bg-hov: rgba(129,140,248,0.07);
+  --bd:   rgba(255,255,255,0.08);
+  --bd-s: rgba(255,255,255,0.045);
 
-  --bd:   rgba(129,140,248,0.13);
-  --bd-s: rgba(129,140,248,0.07);
-
-  --t1: #eef0ff;
-  --t2: #6b7280;
-  --t3: #4b5563;
+  --t1: #fafafa;
+  --t2: #71717a;
+  --t3: #52525b;
 
   --green:    #34d399;
   --green-bg: rgba(52,211,153,0.08);
   --green-bd: rgba(52,211,153,0.2);
   --green-glow: rgba(52,211,153,0.12);
 
-  --blue:    #a78bfa;    /* violet in dark mode */
-  --blue-bg: rgba(167,139,250,0.08);
-  --blue-bd: rgba(167,139,250,0.2);
-  --blue-glow: rgba(167,139,250,0.12);
+  --blue:    #818cf8;
+  --blue-bg: rgba(129,140,248,0.08);
+  --blue-bd: rgba(129,140,248,0.2);
+  --blue-glow: rgba(129,140,248,0.12);
 
   --amber:    #fbbf24;
   --amber-bg: rgba(251,191,36,0.08);
