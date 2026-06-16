@@ -7,7 +7,7 @@ window.showView = function(name) {
   const view = document.getElementById('view-' + name);
   if (view) view.classList.add('active');
 
-  document.querySelectorAll('.tb-nav .tb-item')
+  document.querySelectorAll('.jfai-sidebar .sb-item')
     .forEach(el => el.classList.remove('active'));
   const nav = document.getElementById('nav-' + name);
   if (nav) nav.classList.add('active');
