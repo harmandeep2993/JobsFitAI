@@ -126,6 +126,7 @@ function schedLabel(m) {
 
 function renderScheduler(s) {
   s = s || {};
+  window._schedData = s;
   const cb = document.getElementById('mt-sched');
   const iv = document.getElementById('mt-sched-interval');
   const st = document.getElementById('mt-sched-status');
@@ -187,8 +188,30 @@ function renderFilters(f) {
   if (!box || window._filtersRendered) return;
   window._filtersRendered = true;
 
+  var sc = window._schedData || {};
+  var iv = sc.interval || 60;
   window._titles = (f.target_titles || []).slice();
   box.innerHTML =
+    '<div class="set-row"><label class="set-lbl">Entry-level only</label>' +
+      '<label class="ctrl-check">' +
+        '<input type="checkbox" id="mt-entry"' + (f.entry_only ? ' checked' : '') + '/>' +
+        '<span>Show only junior &amp; entry-level roles</span>' +
+      '</label></div>' +
+    '<div class="set-row"><label class="set-lbl">Auto-fetch</label>' +
+      '<label class="ctrl-check">' +
+        '<input type="checkbox" id="mt-sched"' + (sc.enabled ? ' checked' : '') + ' onchange="toggleScheduler()"/>' +
+        '<span>Run on a schedule</span>' +
+      '</label>' +
+      '<select id="mt-sched-interval" class="mt-select" onchange="toggleScheduler()">' +
+        '<option value="30"' + (iv === 30 ? ' selected' : '') + '>every 30 min</option>' +
+        '<option value="60"' + (iv === 60 ? ' selected' : '') + '>every 1 hr</option>' +
+        '<option value="180"' + (iv === 180 ? ' selected' : '') + '>every 3 hr</option>' +
+        '<option value="360"' + (iv === 360 ? ' selected' : '') + '>every 6 hr</option>' +
+      '</select>' +
+      '<span class="mt-status' + (sc.enabled ? ' ok' : '') + '" id="mt-sched-status">' +
+        (sc.enabled ? schedLabel(iv) : '&#9675; off') +
+      '</span>' +
+    '</div>' +
     '<div class="set-row"><label class="set-lbl">Countries</label>' +
       '<input id="flt-countries" class="fetch-inp" value="' +
         mtEsc((f.countries || []).join(', ')) +

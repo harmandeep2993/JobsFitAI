@@ -241,24 +241,8 @@
 
           <div class="ctrl-divider"></div>
 
-          <!-- Row 2: options + secondary actions -->
+          <!-- Row 2: secondary actions -->
           <div class="ctrl-row">
-            <label class="ctrl-check">
-              <input type="checkbox" id="mt-entry" checked/>
-              Entry-level only
-            </label>
-            <span class="ctrl-sep"></span>
-            <label class="ctrl-check">
-              <input type="checkbox" id="mt-sched" onchange="toggleScheduler()"/>
-              Auto-fetch
-            </label>
-            <select id="mt-sched-interval" class="mt-select" onchange="toggleScheduler()">
-              <option value="30">every 30 min</option>
-              <option value="60" selected>every 1 hr</option>
-              <option value="180">every 3 hr</option>
-              <option value="360">every 6 hr</option>
-            </select>
-            <span class="mt-status" id="mt-sched-status"></span>
             <div class="ctrl-right">
               <span class="mt-status" id="mt-poll-status"></span>
               <button class="mt-toggle" id="mt-sort-toggle" aria-expanded="false" onclick="toggleSortRow()">
