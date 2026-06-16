@@ -62,6 +62,7 @@ window.loadMatchState = function() {
       renderResume(d.resume);
       renderScheduler(d.scheduler);
       renderFilters(d.filters);
+      renderFetchSettings();
       // Restore "New" highlights from the last fetch run (survives page reload).
       var threshold = localStorage.getItem('jfa_run_threshold') || '';
       var newIds = threshold
@@ -74,12 +75,8 @@ window.loadMatchState = function() {
     .catch(() => {});
 };
 
-// Uploaded resume + the info extracted from it.
-// Store the resume and just show/hide the "View Resume Details" button.
 window.renderResume = function renderResume(r) {
-  const btn = document.getElementById('mt-resume-btn');
   window._resumeInfo = (r && r.name) ? r : null;
-  if (btn) btn.style.display = window._resumeInfo ? 'inline-flex' : 'none';
 };
 
 function resumeHTML(r) {
@@ -126,6 +123,7 @@ function schedLabel(m) {
 
 function renderScheduler(s) {
   s = s || {};
+  window._schedData = s;
   const cb = document.getElementById('mt-sched');
   const iv = document.getElementById('mt-sched-interval');
   const st = document.getElementById('mt-sched-status');
@@ -156,17 +154,24 @@ window.toggleScheduler = function() {
     .catch(() => { st.textContent = '✕'; });
 };
 
-// Live metrics bar.
+// Live metrics strip (compact single row).
 function renderStats(s) {
   const box = document.getElementById('mt-stats');
   if (!box || !s) return;
-  const cards = [
-    ['Seen', s.seen], ['Scored', s.scored], ['Good 60+', s.good], ['Applied', s.applied],
+  const items = [
+    { label: 'Seen',     val: s.seen,    cls: '' },
+    { label: 'Scored',   val: s.scored,  cls: '' },
+    { label: 'Good 60+', val: s.good,    cls: 'mf-stat--good' },
+    { label: 'Applied',  val: s.applied, cls: 'mf-stat--applied' },
   ];
-  box.innerHTML = cards.map(([k, v]) =>
-    '<div class="stat"><div class="stat-n">' + (v || 0) + '</div>' +
-    '<div class="stat-l">' + k + '</div></div>'
-  ).join('');
+  box.innerHTML = items.map(function(it) {
+    return (
+      '<div class="mf-stat ' + it.cls + '">' +
+        '<span class="mf-stat-n">' + (it.val || 0) + '</span>' +
+        '<span class="mf-stat-l">' + it.label + '</span>' +
+      '</div>'
+    );
+  }).join('');
 }
 
 // Editable filter panel - built once so polling doesn't clobber edits.
@@ -182,6 +187,11 @@ function renderFilters(f) {
 
   window._titles = (f.target_titles || []).slice();
   box.innerHTML =
+    '<div class="set-row"><label class="set-lbl">Entry-level only</label>' +
+      '<label class="ctrl-check">' +
+        '<input type="checkbox" id="mt-entry"' + (f.entry_only ? ' checked' : '') + '/>' +
+        '<span>Show only junior &amp; entry-level roles</span>' +
+      '</label></div>' +
     '<div class="set-row"><label class="set-lbl">Countries</label>' +
       '<input id="flt-countries" class="fetch-inp" value="' +
         mtEsc((f.countries || []).join(', ')) +
@@ -254,35 +264,135 @@ window.saveFilters = function() {
     .catch(() => { st.textContent = '✕ save error'; });
 };
 
+window.toggleSortRow = function() {
+  var row = document.getElementById('sort-row');
+  var btn = document.getElementById('mt-sort-toggle');
+  if (!row) return;
+  var show = row.style.display === 'none' || row.style.display === '';
+  row.style.display = show ? 'flex' : 'none';
+  if (btn) btn.setAttribute('aria-expanded', show ? 'true' : 'false');
+  if (btn) btn.classList.toggle('active', show);
+};
+
 window.toggleFilters = function() {
   const p = document.getElementById('mt-filters');
   const t = document.getElementById('mt-filters-toggle');
-  const show = p.style.display === 'none';
+  if (!p) return;
+  const show = p.style.display === 'none' || p.style.display === '';
   p.style.display = show ? 'block' : 'none';
   if (t) {
-    t.innerHTML = '⚙ Filters &amp; keywords ' + (show ? '▾' : '▸');
     t.setAttribute('aria-expanded', show ? 'true' : 'false');
+    t.classList.toggle('active', show);
   }
 };
 
-function setResumeStatus(has, name) {
-  const el = document.getElementById('mt-resume-status');
-  if (!el) return;
-  if (has) {
-    el.textContent = '✓ ' + (name || 'resume loaded');
-    el.className = 'mt-status ok';
-  } else {
-    el.textContent = 'No resume loaded';
-    el.className = 'mt-status';
+window.toggleFetchSettings = function() {
+  var p = document.getElementById('mt-fetch-settings');
+  var t = document.getElementById('mt-fts-toggle');
+  if (!p) return;
+  var show = p.style.display === 'none' || p.style.display === '';
+  p.style.display = show ? 'flex' : 'none';
+  if (t) {
+    t.setAttribute('aria-expanded', show ? 'true' : 'false');
+    t.classList.toggle('active', show);
   }
+};
+
+function renderFetchSettings() {
+  var box = document.getElementById('mt-fetch-settings');
+  if (!box || window._fetchSettingsRendered) return;
+  window._fetchSettingsRendered = true;
+
+  var sc = window._schedData || {};
+  var iv = sc.interval || 60;
+
+  box.innerHTML =
+    '<div class="set-row"><label class="set-lbl">Resume</label>' +
+      '<div style="display:flex;align-items:center;gap:8px;flex:1;">' +
+        '<select id="fts-resume-sel" class="fetch-inp" style="flex:1;" onchange="selectFetchResume(this.value)">' +
+          '<option value="">Loading…</option>' +
+        '</select>' +
+        '<button class="btn-ghost" style="font-size:12px;white-space:nowrap;" onclick="document.getElementById(\'mt-file\').click()">Upload new</button>' +
+        '<span class="mt-status" id="fts-resume-status"></span>' +
+      '</div></div>' +
+    '<div class="set-row"><label class="set-lbl">Search query</label>' +
+      '<input id="fts-query" class="fetch-inp ctrl-query" placeholder="Optional: override role search…"/></div>' +
+    '<div class="set-row"><label class="set-lbl">Auto-fetch</label>' +
+      '<label class="ctrl-check">' +
+        '<input type="checkbox" id="mt-sched"' + (sc.enabled ? ' checked' : '') + ' onchange="toggleScheduler()"/>' +
+        '<span>Run on a schedule</span>' +
+      '</label>' +
+      '<select id="mt-sched-interval" class="mt-select" onchange="toggleScheduler()">' +
+        '<option value="30"' + (iv === 30 ? ' selected' : '') + '>every 30 min</option>' +
+        '<option value="60"' + (iv === 60 ? ' selected' : '') + '>every 1 hr</option>' +
+        '<option value="180"' + (iv === 180 ? ' selected' : '') + '>every 3 hr</option>' +
+        '<option value="360"' + (iv === 360 ? ' selected' : '') + '>every 6 hr</option>' +
+      '</select>' +
+      '<span class="mt-status' + (sc.enabled ? ' ok' : '') + '" id="mt-sched-status">' +
+        (sc.enabled ? schedLabel(iv) : '&#9675; off') +
+      '</span>' +
+    '</div>';
+
+  loadFetchResumes();
 }
 
-// === Resume upload ===
+function loadFetchResumes() {
+  fetch('/api/resumes')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var sel = document.getElementById('fts-resume-sel');
+      if (!sel) return;
+      var resumes = d.resumes || [];
+      if (!resumes.length) {
+        sel.innerHTML = '<option value="">No resumes - upload in My Resumes</option>';
+        return;
+      }
+      sel.innerHTML = '<option value="">Select a resume…</option>' +
+        resumes.map(function(r) {
+          var selected = (r.id == window._activeFetchResumeId) ? ' selected' : '';
+          return '<option value="' + r.id + '"' + selected + '>' +
+            mtEsc(r.label || r.original_name || 'Untitled') + '</option>';
+        }).join('');
+    })
+    .catch(function() {});
+}
+
+window.selectFetchResume = function(id) {
+  if (!id) return;
+  var st = document.getElementById('fts-resume-status');
+  if (st) { st.textContent = 'Loading…'; st.className = 'mt-status'; }
+  window._activeFetchResumeId = id;
+  fetch('/api/resumes/' + id + '/use-for-matching', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (st) {
+        st.textContent = d.ok ? '✓ Ready' : '✕ Failed';
+        st.className = 'mt-status ' + (d.ok ? 'ok' : 'err');
+      }
+      if (d.ok) setResumeStatus(true, d.name || 'Resume');
+    })
+    .catch(function() { if (st) { st.textContent = '✕ Error'; st.className = 'mt-status err'; } });
+};
+
+function setResumeStatus(has, name) {
+  var ind = document.getElementById('mt-resume-ind');
+  if (ind) {
+    if (has) {
+      ind.textContent = '✓ ' + (name || 'Resume').split(' ')[0];
+      ind.className = 'mt-status ok';
+    } else {
+      ind.textContent = '';
+      ind.className = 'mt-status';
+    }
+  }
+  window._activeResumeName = has ? name : null;
+}
+
+// === Resume upload (triggered from fetch settings panel) ===
 function uploadMatchResume(file) {
   if (!file) return;
-  const status = document.getElementById('mt-resume-status');
-  status.textContent = 'Uploading…';
-  status.className = 'mt-status';
+  const poll = document.getElementById('mt-poll-status');
+  if (poll) { poll.textContent = 'Uploading…'; poll.className = 'mt-status'; }
 
   const fd = new FormData();
   fd.append('file', file);
@@ -291,7 +401,7 @@ function uploadMatchResume(file) {
     .then(r => r.json())
     .then(d => {
       if (!d.ok) throw new Error(d.error || 'upload failed');
-      status.textContent = 'Extracting resume…';
+      if (poll) poll.textContent = 'Extracting resume…';
       return fetch('/api/match/resume', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -303,16 +413,16 @@ function uploadMatchResume(file) {
       if (!d.ok) throw new Error(d.error || 'extraction failed');
       setResumeStatus(true, d.name + ' · ' + d.experience_years + 'y exp');
       if (typeof loadMatchState === 'function') loadMatchState();
-      const poll = document.getElementById('mt-poll-status');
       if (poll && d.rescored) {
         poll.textContent = '✓ re-scored ' + d.rescored + ' jobs against the new resume';
         poll.className = 'mt-status ok';
       }
       if (d.diff) renderResumeDiff(d.diff);
+      // Refresh resume list in fetch settings panel
+      loadFetchResumes();
     })
     .catch(e => {
-      status.textContent = '✕ ' + e.message;
-      status.className = 'mt-status err';
+      if (poll) { poll.textContent = '✕ ' + e.message; poll.className = 'mt-status err'; }
     });
 }
 
@@ -320,7 +430,8 @@ function uploadMatchResume(file) {
 window.runMatch = function() {
   const status = document.getElementById('mt-poll-status');
   const btn    = document.getElementById('mt-run-btn');
-  const query  = document.getElementById('mt-query').value.trim();
+  const queryEl = document.getElementById('fts-query');
+  const query  = queryEl ? queryEl.value.trim() : '';
   const entry  = document.getElementById('mt-entry');
   const entryOnly = entry ? entry.checked : true;
 
@@ -911,9 +1022,7 @@ function renderMatches(results, newIds) {
     badge.style.display = unreviewed > 0 ? '' : 'none';
   }
 
-  // Show sort row when there are any results
-  var sortRow = document.getElementById('sort-row');
-  if (sortRow) sortRow.style.display = results.length ? 'flex' : 'none';
+  // Sort row stays hidden until user toggles it via the Sort button
 
   // Update result count
   var countEl = document.getElementById('mt-result-count');

@@ -1,10 +1,8 @@
 // assets/js/ats.js
-// ATS Maker view - generate a complete ATS-optimised resume from a stored
-// resume and a pasted job description.
+// ATS Score view - check a resume against ATS keyword, section, and formatting requirements.
 
 var _atsInitDone = false;
 var _atsResumeId = null;  // currently selected resume id
-var _atsMergeAll = false; // include content from other resume slots
 
 var ATS_SLOT_LABELS = ['Base', 'Tailored 1', 'Tailored 2'];
 
@@ -45,8 +43,8 @@ function _atsBuildShell() {
         '</svg>' +
       '</div>' +
       '<div>' +
-        '<h1 class="az-hero-title">ATS <em>Analyzer</em></h1>' +
-        '<p class="az-hero-sub">Check your resume against ATS requirements: keyword coverage, section headings, and formatting</p>' +
+        '<h1 class="az-hero-title">ATS <em>Score</em></h1>' +
+        '<p class="az-hero-sub">Check whether your resume will pass ATS filters - exact keyword matches from the job description, required section headings, and formatting flags</p>' +
       '</div>' +
     '</div>' +
 
@@ -160,19 +158,6 @@ function _atsRenderPicker(resumes) {
   });
   html += '</div>';
 
-  if (multiSlot) {
-    html +=
-      '<div class="ats-merge-opt">' +
-        '<label class="ats-merge-label">' +
-          '<input type="checkbox" id="ats-merge-check" onchange="atsToggleMerge(this)"' +
-            (_atsMergeAll ? ' checked' : '') + '> ' +
-          '<span class="ats-merge-text">' +
-            '<strong>Merge all resume slots</strong> &mdash; pull skills, experience, and certifications ' +
-            'from every stored slot for a richer ATS output' +
-          '</span>' +
-        '</label>' +
-      '</div>';
-  }
 
   picker.innerHTML = html;
 
@@ -192,10 +177,6 @@ window.atsSelectResume = function(id, name) {
 
   _atsUpdateButtons();
   if (typeof toast === 'function') toast('Resume selected: ' + name, 'ok', 2000);
-};
-
-window.atsToggleMerge = function(cb) {
-  _atsMergeAll = cb.checked;
 };
 
 // === JD binding ===

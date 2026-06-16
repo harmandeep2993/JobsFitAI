@@ -205,16 +205,30 @@ def provider_catalog() -> list[dict]:
     """
     Return the selectable providers for the UI.
 
-    Each entry: {name, default_model, models[]}.
+    Each entry: {name, default_model, models[], needs_key, has_key, key_hint}.
     """
+    from src.utils.providers import groq as _groq_p
+    from src.utils.providers import openai as _openai_p
+
+    _meta = {
+        "openai": {"needs_key": True, "mod": _openai_p},
+        "groq": {"needs_key": True, "mod": _groq_p},
+        "ollama": {"needs_key": False, "mod": None},
+    }
+
     catalog = []
     for name in SUPPORTED_PROVIDERS:
         cfg = PROVIDER_CONFIGS.get(name, {})
+        meta = _meta.get(name, {})
+        mod = meta.get("mod")
         catalog.append(
             {
                 "name": name,
                 "default_model": cfg.get("model", ""),
                 "models": cfg.get("models", []),
+                "needs_key": meta.get("needs_key", False),
+                "has_key": mod.has_key() if mod else True,
+                "key_hint": mod.get_key_hint() if mod else "",
             }
         )
     return catalog

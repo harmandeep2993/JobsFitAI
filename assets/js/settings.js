@@ -21,6 +21,8 @@ function loadLlmSettings() {
       renderModelMenu();
       setVal('provider', window._sel.provider);
       setVal('model', window._sel.model);
+      updateKeyRow(window._sel.provider);
+      updateTopbar(d.current || {}, null);
     })
     .catch(() => {});
 }
@@ -63,8 +65,10 @@ function closeAllDD() {
   document.querySelectorAll('.dd.open').forEach(d => d.classList.remove('open'));
 }
 
-// Close menus when clicking anywhere outside a dropdown.
-document.addEventListener('click', closeAllDD);
+// Close menus when clicking outside a dropdown (but not inside the drawer).
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.dd')) closeAllDD();
+});
 
 // === Selection ===
 window.selectProvider = function(name) {
@@ -77,6 +81,7 @@ window.selectProvider = function(name) {
   setVal('model', window._sel.model);
   renderProviderMenu();
   renderModelMenu();
+  updateKeyRow(name);
 
   const custom = document.getElementById('set-model-custom');
   if (custom) custom.value = '';
@@ -137,14 +142,82 @@ window.applySettings = function() {
     });
 };
 
-// Reflect the new selection in the topbar chips.
+// Show/hide the API key row based on whether the provider needs a key.
+function updateKeyRow(providerName) {
+  var catalog  = window._llmCatalog || [];
+  var entry    = catalog.find(function(p) { return p.name === providerName; });
+  var needsKey = entry && entry.needs_key;
+  var hint     = (entry && entry.key_hint) || '';
+
+  var title   = document.getElementById('set-key-section-title');
+  var row     = document.getElementById('set-key-row');
+  var actions = document.getElementById('set-key-actions');
+  var hintEl  = document.getElementById('set-key-hint');
+  var lbl     = document.getElementById('set-key-lbl');
+  var input   = document.getElementById('set-api-key');
+  var kstatus = document.getElementById('set-key-status');
+
+  var show = needsKey ? '' : 'none';
+  if (title)   title.style.display   = show;
+  if (row)     row.style.display     = show;
+  if (actions) actions.style.display = show;
+  if (lbl)     lbl.textContent = (providerName || 'Provider') + ' key';
+  if (hintEl)  hintEl.textContent = hint ? ('Saved: ' + hint) : (needsKey ? 'No key saved yet' : '');
+  if (input) {
+    input.value = '';
+    input.placeholder = hint ? 'Enter new key to replace current' : 'Paste API key…';
+  }
+  if (kstatus) { kstatus.textContent = ''; kstatus.className = 'set-status'; }
+}
+
+window.saveApiKey = function() {
+  var input   = document.getElementById('set-api-key');
+  var status  = document.getElementById('set-key-status');
+  var btn     = document.getElementById('set-save-key');
+  var hintEl  = document.getElementById('set-key-hint');
+  var key     = input ? input.value.trim() : '';
+
+  if (!key) {
+    if (status) { status.textContent = 'Enter a key first'; status.className = 'set-status err'; }
+    return;
+  }
+  if (btn) btn.disabled = true;
+  if (status) { status.textContent = 'Saving…'; status.className = 'set-status'; }
+
+  fetch('/api/llm-settings/key', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ provider: window._sel.provider, api_key: key }),
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (btn) btn.disabled = false;
+      if (!d.ok) {
+        if (status) { status.textContent = '✕ ' + (d.error || 'failed'); status.className = 'set-status err'; }
+        return;
+      }
+      var entry = (window._llmCatalog || []).find(function(p) { return p.name === d.provider; });
+      if (entry) { entry.has_key = true; entry.key_hint = d.hint; }
+      if (hintEl) hintEl.textContent = d.hint ? ('Saved: ' + d.hint) : '';
+      if (input)  { input.value = ''; input.placeholder = 'Enter new key to replace current'; }
+      if (status) { status.textContent = '✓ Key saved'; status.className = 'set-status ok'; }
+    })
+    .catch(function(e) {
+      if (btn) btn.disabled = false;
+      if (status) { status.textContent = '✕ ' + e; status.className = 'set-status err'; }
+    });
+};
+
+// Reflect the current provider/model in the settings status bar.
 function updateTopbar(current, online) {
   const prov  = document.getElementById('tb-provider');
   const model = document.getElementById('tb-model');
   const bead  = document.getElementById('tb-bead');
-  if (prov)  prov.textContent  = current.provider + ' ' + (online ? 'online' : 'offline');
-  if (model) model.textContent = current.model;
-  if (bead)  bead.className     = 't-bead ' + (online ? 'bon' : 'boff');
+  const p = current.provider || '';
+  const m = current.model    || '';
+  if (prov)  prov.textContent = p || 'no provider';
+  if (model) model.textContent = m;
+  if (bead)  bead.className = 't-bead ' + (online === true ? 'bon' : online === false ? 'boff' : 'boff');
 }
 
 // === Test connection ===

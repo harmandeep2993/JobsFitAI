@@ -13,9 +13,11 @@ Responsibilities:
 import asyncio
 import csv
 import hashlib
+import hmac as _hmac
 import io
 import json as _json
 import os
+import secrets as _secrets
 import tempfile
 import time
 import uuid
@@ -28,6 +30,7 @@ from fastapi.responses import (
     FileResponse,
     HTMLResponse,
     JSONResponse,
+    RedirectResponse,
     StreamingResponse,
 )
 from fastapi.staticfiles import StaticFiles
@@ -109,6 +112,94 @@ async def _request_logger(request: Request, call_next):
         )
         return response
     return await call_next(request)
+
+
+# --- Auth (opt-in: only active when APP_PASSWORD is set in .env) ---
+
+_AUTH_ENABLED = bool(os.getenv("APP_PASSWORD", "").strip())
+_AUTH_USER = os.getenv("APP_USERNAME", "admin").strip()
+_AUTH_PASS = os.getenv("APP_PASSWORD", "").strip()
+_SESSION_SECRET = os.getenv("SESSION_SECRET") or _secrets.token_hex(32)
+_SESSION_COOKIE = "jfai_sess"
+_LOGIN_HTML = (Path(__file__).parent / "templates" / "login.html").read_text(
+    encoding="utf-8"
+)
+
+_OPEN_PATHS = {"/login", "/logout"}
+
+
+def _make_token() -> str:
+    sig = _hmac.new(_SESSION_SECRET.encode(), _AUTH_USER.encode(), "sha256").hexdigest()
+    return f"{_AUTH_USER}:{sig}"
+
+
+def _verify_token(token: str) -> bool:
+    if not token:
+        return False
+    try:
+        user, sig = token.rsplit(":", 1)
+        expected = _hmac.new(
+            _SESSION_SECRET.encode(), user.encode(), "sha256"
+        ).hexdigest()
+        return _hmac.compare_digest(sig, expected) and _hmac.compare_digest(
+            user, _AUTH_USER
+        )
+    except Exception:
+        return False
+
+
+@app.middleware("http")
+async def _auth_guard(request: Request, call_next):
+    if not _AUTH_ENABLED:
+        return await call_next(request)
+    path = request.url.path
+    if path in _OPEN_PATHS or path.startswith("/assets/"):
+        return await call_next(request)
+    if not _verify_token(request.cookies.get(_SESSION_COOKIE, "")):
+        if path.startswith("/api/") or path == "/health":
+            return JSONResponse(
+                {"ok": False, "error": "unauthenticated"}, status_code=401
+            )
+        return RedirectResponse("/login", status_code=302)
+    return await call_next(request)
+
+
+@app.get("/login")
+async def login_page(error: str = ""):
+    body = _LOGIN_HTML.replace(
+        "{ERROR_HTML}",
+        '<div class="lc-err">Invalid username or password.</div>' if error else "",
+    )
+    return HTMLResponse(body)
+
+
+@app.post("/login")
+async def login_submit(request: Request):
+    form = await request.form()
+    username = (form.get("username") or "").strip()
+    password = str(form.get("password") or "")
+    ok = _AUTH_ENABLED and (
+        _hmac.compare_digest(username, _AUTH_USER)
+        and _hmac.compare_digest(password, _AUTH_PASS)
+    )
+    if not ok:
+        return RedirectResponse("/login?error=1", status_code=302)
+    resp = RedirectResponse("/", status_code=302)
+    resp.set_cookie(
+        _SESSION_COOKIE,
+        _make_token(),
+        httponly=True,
+        samesite="lax",
+        max_age=60 * 60 * 24 * 30,
+    )
+    return resp
+
+
+@app.get("/logout")
+async def logout():
+    resp = RedirectResponse("/login", status_code=302)
+    resp.delete_cookie(_SESSION_COOKIE)
+    return resp
 
 
 # These mirror config.yaml validator block -- sourced at import so Pydantic
@@ -620,7 +711,7 @@ async def api_improve_resume(request: Request) -> JSONResponse:
     return JSONResponse(result)
 
 
-# --- ATS Analyzer ---
+# --- ATS Score ---
 
 
 @app.post("/api/ats/check")
@@ -752,6 +843,49 @@ async def api_set_llm_settings(request: Request) -> JSONResponse:
             "online": online,
         }
     )
+
+
+@app.post("/api/llm-settings/key")
+async def api_set_llm_key(request: Request) -> JSONResponse:
+    """Set the API key for a provider at runtime; persists to .env."""
+    body = await request.json()
+    provider = (body.get("provider") or "").strip()
+    api_key = (body.get("api_key") or "").strip()
+
+    if not provider:
+        return JSONResponse(
+            {"ok": False, "error": "provider required"}, status_code=400
+        )
+    if not api_key:
+        return JSONResponse({"ok": False, "error": "api_key required"}, status_code=400)
+
+    if provider == "openai":
+        from src.utils.providers import openai as _op
+
+        _op.set_api_key(api_key)
+        env_var = "OPENAI_API_KEY"
+        hint = _op.get_key_hint()
+    elif provider == "groq":
+        from src.utils.providers import groq as _gp
+
+        _gp.set_api_key(api_key)
+        env_var = "GROQ_API_KEY"
+        hint = _gp.get_key_hint()
+    else:
+        return JSONResponse(
+            {"ok": False, "error": f"key setting not supported for {provider}"},
+            status_code=400,
+        )
+
+    try:
+        from dotenv import set_key as _dotenv_set
+
+        _env_path = Path(__file__).parent / ".env"
+        _dotenv_set(str(_env_path), env_var, api_key, quote_mode="never")
+    except Exception as e:
+        logger.warning("Could not persist API key to .env: %s", e)
+
+    return JSONResponse({"ok": True, "provider": provider, "hint": hint})
 
 
 # --- Resume diff ---
