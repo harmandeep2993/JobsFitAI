@@ -50,8 +50,12 @@ def score_certifications(resume: dict, jd: dict) -> float:
     Returns:
         float: Certification score 0-100
     """
-    jd_certs = [c.strip() for c in jd.get("certifications", []) if c]
-    resume_certs = [c.strip() for c in resume.get("certifications", []) if c]
+    jd_certs = [
+        c.strip() for c in jd.get("certifications", []) if c and isinstance(c, str)
+    ]
+    resume_certs = [
+        c.strip() for c in resume.get("certifications", []) if c and isinstance(c, str)
+    ]
 
     logger.info("JD certifications : %s", jd_certs)
     logger.info("Resume certifications : %s", resume_certs)

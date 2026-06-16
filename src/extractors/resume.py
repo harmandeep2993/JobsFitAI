@@ -183,8 +183,22 @@ def _lowercase_comparison_fields(data: dict) -> dict:
     """Lowercase only list fields used for text comparison; preserve all display fields."""
     for key in _COMPARISON_LIST_FIELDS:
         val = data.get(key)
-        if isinstance(val, list):
-            data[key] = [v.lower().strip() if isinstance(v, str) else v for v in val]
+        if not isinstance(val, list):
+            continue
+        if key == "languages":
+            # Languages are dicts {language, proficiency} - keep as-is.
+            data[key] = [v for v in val if v]
+        else:
+            # skills / certifications must be strings; coerce dicts so scorers
+            # don't crash when the LLM pattern-matches the language dict format.
+            normalized = []
+            for v in val:
+                if isinstance(v, str):
+                    normalized.append(v.lower().strip())
+                elif isinstance(v, dict):
+                    name = v.get("name") or v.get("skill") or v.get("title") or str(v)
+                    normalized.append(str(name).lower().strip())
+            data[key] = [v for v in normalized if v]
     return data
 
 

@@ -153,16 +153,21 @@ def score_languages(resume: dict, jd: dict) -> tuple[float, list[str], list[str]
         weak_languages are languages present but below required proficiency.
     """
     raw_required = [e for e in jd.get("languages", []) if e]
+    # Filter out schema-template placeholders where language name is empty.
+    required_parsed = [p for p in (_parse_lang_entry(e) for e in raw_required) if p[0]]
 
-    if not raw_required:
+    if not required_parsed:
         logger.info(
             "No language requirements in JD - returning neutral %.1f",
             NO_REQUIREMENT_SCORE,
         )
         return NO_REQUIREMENT_SCORE, [], []
 
-    required_parsed = [_parse_lang_entry(e) for e in raw_required]
-    candidate_parsed = [_parse_lang_entry(e) for e in resume.get("languages", []) if e]
+    candidate_parsed = [
+        p
+        for p in (_parse_lang_entry(e) for e in resume.get("languages", []) if e)
+        if p[0]
+    ]
 
     # candidate lookup: language name -> proficiency level
     candidate_map: dict[str, int] = {}
