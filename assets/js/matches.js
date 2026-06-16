@@ -261,6 +261,16 @@ window.saveFilters = function() {
     .catch(() => { st.textContent = '✕ save error'; });
 };
 
+window.toggleSortRow = function() {
+  var row = document.getElementById('sort-row');
+  var btn = document.getElementById('mt-sort-toggle');
+  if (!row) return;
+  var show = row.style.display === 'none' || row.style.display === '';
+  row.style.display = show ? 'flex' : 'none';
+  if (btn) btn.setAttribute('aria-expanded', show ? 'true' : 'false');
+  if (btn) btn.classList.toggle('active', show);
+};
+
 window.toggleFilters = function() {
   const p = document.getElementById('mt-filters');
   const t = document.getElementById('mt-filters-toggle');
@@ -918,9 +928,7 @@ function renderMatches(results, newIds) {
     badge.style.display = unreviewed > 0 ? '' : 'none';
   }
 
-  // Show sort row when there are any results
-  var sortRow = document.getElementById('sort-row');
-  if (sortRow) sortRow.style.display = results.length ? 'flex' : 'none';
+  // Sort row stays hidden until user toggles it via the Sort button
 
   // Update result count
   var countEl = document.getElementById('mt-result-count');
