@@ -57,10 +57,10 @@ html, body {
 }
 
 .logo-name {
-  font-size: 14px;
-  font-weight: 700;
+  font-size: 17px;
+  font-weight: 800;
   color: var(--t1);
-  letter-spacing: -0.4px;
+  letter-spacing: -0.6px;
   white-space: nowrap;
 }
 .logo-name em { color: var(--accent); font-style: normal; }
