@@ -561,9 +561,6 @@
   white-space: nowrap;
   line-height: 1.5;
 }
-.tg { background: var(--green-bg); color: var(--green); border-color: var(--green-bd); }
-.tr { background: var(--red-bg);   color: var(--red);   border-color: var(--red-bd); }
-
 .rz-chip {
   display: inline-flex;
   padding: 2px 8px;

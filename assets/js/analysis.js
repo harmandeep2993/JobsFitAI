@@ -335,8 +335,8 @@ window.copyResults = function() {
   if (items.length) {
     lines.push('Breakdown:');
     items.forEach(function(item) {
-      var ttl = item.querySelector('.bd-item-ttl');
-      var pct = item.querySelector('.bd-item-pct');
+      var ttl = item.querySelector('.bd-item-lbl');
+      var pct = item.querySelector('.jt-score-val');
       if (ttl && pct) lines.push('  ' + ttl.textContent.trim() + ': ' + pct.textContent.trim());
     });
     lines.push('');
