@@ -5,18 +5,16 @@ Sentence-transformers embedding model loader.
 Loads the model once and reuses it across the application.
 """
 
-import contextlib
 import os
 from pathlib import Path
 
-# Quiet HuggingFace/transformers noise before they're imported below
-# (progress bars, advisory warnings, the model "LOAD REPORT").
+# Silence HuggingFace/transformers/tqdm noise before imports.
+# TQDM_DISABLE is checked per-instance at tqdm.__init__ time, so setting it
+# here suppresses all progress bars for the entire process lifetime.
 os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
 os.environ.setdefault("TRANSFORMERS_VERBOSITY", "error")
 os.environ.setdefault("TRANSFORMERS_NO_ADVISORY_WARNINGS", "1")
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
-# TQDM_DISABLE is checked by tqdm per-instance at __init__ time (not import time),
-# so setting it here silences all progress bars for this process.
 os.environ["TQDM_DISABLE"] = "1"
 
 from sentence_transformers import SentenceTransformer
@@ -43,60 +41,18 @@ MODEL_DIR = Path(__file__).parent.parent.parent / "data" / "models" / MODEL_SHOR
 _model = None
 
 
-@contextlib.contextmanager
-def _suppress_native_output():
-    """
-    Silence the tqdm weights bar and any native prints during model load.
-
-    Best-effort: redirect fd 1 & 2 to devnull to silence any remaining
-    native prints. tqdm is already disabled globally via TQDM_DISABLE=1 set
-    at module import. Catches OSError silently (e.g. WinError 1 on Windows
-    threadpools) and skips fd suppression without aborting the load.
-    """
-    saved_out = saved_err = devnull = None
-    try:
-        saved_out, saved_err = os.dup(1), os.dup(2)
-        devnull = os.open(os.devnull, os.O_WRONLY)
-        os.dup2(devnull, 1)
-        os.dup2(devnull, 2)
-    except OSError:
-        for fd in (devnull, saved_out, saved_err):
-            if fd is not None:
-                try:
-                    os.close(fd)
-                except OSError:
-                    pass
-        saved_out = saved_err = devnull = None
-
-    try:
-        yield
-    finally:
-        try:
-            if saved_out is not None:
-                os.dup2(saved_out, 1)
-            if saved_err is not None:
-                os.dup2(saved_err, 2)
-        except OSError:
-            pass
-        for fd in (devnull, saved_out, saved_err):
-            if fd is not None:
-                try:
-                    os.close(fd)
-                except OSError:
-                    pass
-
-
 def load_model() -> SentenceTransformer:
     """
-    Load the embedding model once (module-level singleton). Loading must never
-    fail just because output-suppression doesn't work in this environment, so
-    a failed suppressed load is retried plainly.
+    Load the embedding model once (module-level singleton).
+
+    On first call: loads from data/models/ if present, otherwise downloads
+    from HuggingFace and saves locally for future runs.
 
     Returns:
         SentenceTransformer: Loaded embedding model
 
     Raises:
-        RuntimeError: If the model genuinely fails to load
+        RuntimeError: If the model fails to load
     """
     global _model
 
@@ -109,8 +65,7 @@ def load_model() -> SentenceTransformer:
             logger.info("Downloading embedding model '%s' -> %s", MODEL_NAME, MODEL_DIR)
 
         try:
-            with _suppress_native_output():
-                _model = SentenceTransformer(source)
+            _model = SentenceTransformer(source)
             if source == MODEL_NAME:
                 MODEL_DIR.mkdir(parents=True, exist_ok=True)
                 _model.save(str(MODEL_DIR))

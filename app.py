@@ -355,7 +355,11 @@ async def api_resumes_recommend(request: Request) -> JSONResponse:
         return JSONResponse({"ok": True, "scores": [], "recommended_id": None})
 
     def _score():
-        jd_json = extract_jd(jd_text)
+        try:
+            jd_json = extract_jd(jd_text)
+        except Exception as e:
+            logger.warning("JD extraction failed in recommend: %s", e)
+            return None
         if not jd_json:
             return None
         results = []
