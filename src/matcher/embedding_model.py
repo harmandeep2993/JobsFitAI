@@ -7,6 +7,7 @@ Loads the model once and reuses it across the application.
 
 import contextlib
 import os
+from pathlib import Path
 
 # Quiet HuggingFace/transformers noise before they're imported below
 # (progress bars, advisory warnings, the model "LOAD REPORT").
@@ -29,10 +30,12 @@ from src.utils import get_logger
 logger = get_logger(__name__)
 
 # Multilingual model - supports 50+ languages including all European languages
-# Swap to paraphrase-multilingual-mpnet-base-v2 for better quality at cost of speed
-# MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
-
 MODEL_NAME = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+MODEL_SHORT = MODEL_NAME.split("/")[-1]
+
+# Local cache inside the project - loaded directly without any HF Hub lookup.
+# Falls back to downloading from HuggingFace on first run, then saves here.
+MODEL_DIR = Path(__file__).parent.parent.parent / "data" / "models" / MODEL_SHORT
 
 _model = None
 
@@ -105,15 +108,21 @@ def load_model() -> SentenceTransformer:
     global _model
 
     if _model is None:
-        logger.info("Loading embedding model: %s", MODEL_NAME)
+        if MODEL_DIR.exists():
+            source = str(MODEL_DIR)
+            logger.info("Loading embedding model from local cache: %s", MODEL_DIR)
+        else:
+            source = MODEL_NAME
+            logger.info("Downloading embedding model '%s' -> %s", MODEL_NAME, MODEL_DIR)
+
         try:
-            try:
-                with _suppress_native_output():
-                    _model = SentenceTransformer(MODEL_NAME)
-            except Exception:
-                # Suppression context interfered (e.g. WinError 1) - load plainly.
-                _model = SentenceTransformer(MODEL_NAME)
-            logger.info("Embedding model loaded successfully")
+            with _suppress_native_output():
+                _model = SentenceTransformer(source)
+            if source == MODEL_NAME:
+                MODEL_DIR.mkdir(parents=True, exist_ok=True)
+                _model.save(str(MODEL_DIR))
+                logger.info("Embedding model saved to %s", MODEL_DIR)
+            logger.info("Embedding model ready")
         except Exception as e:
             logger.error("Failed to load embedding model: %s", e)
             raise RuntimeError(f"Embedding model load failed: {e}") from e
