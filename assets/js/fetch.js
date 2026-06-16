@@ -1,5 +1,21 @@
 // Topbar navigation - switches views using .active class for CSS transitions
 
+window.toggleSettings = function() {
+  var drawer = document.getElementById('settings-drawer');
+  var backdrop = document.getElementById('settings-backdrop');
+  if (!drawer) return;
+  var isOpen = drawer.classList.contains('open');
+  drawer.classList.toggle('open', !isOpen);
+  if (backdrop) backdrop.classList.toggle('open', !isOpen);
+};
+
+window.closeSettings = function() {
+  var drawer = document.getElementById('settings-drawer');
+  var backdrop = document.getElementById('settings-backdrop');
+  if (drawer) drawer.classList.remove('open');
+  if (backdrop) backdrop.classList.remove('open');
+};
+
 const VIEW_TITLES = { analyzer: 'Analyzer', ats: 'ATS Maker', matches: 'Job Matches', history: 'History', settings: 'Settings' };
 
 window.showView = function(name) {

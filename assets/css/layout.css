@@ -226,6 +226,59 @@ html, body {
   overflow: hidden;
 }
 
+/* === Settings drawer === */
+.settings-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: rgba(0,0,0,0.15);
+}
+.settings-backdrop.open { display: block; }
+
+.settings-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 380px;
+  height: 100vh;
+  background: var(--bg-r);
+  border-left: 1px solid var(--bd);
+  box-shadow: var(--sha-lg);
+  z-index: 301;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform .22s ease;
+}
+.settings-drawer.open { transform: translateX(0); }
+
+.settings-drawer-hd {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--bd);
+  flex-shrink: 0;
+}
+.settings-drawer-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--t1);
+  letter-spacing: -0.3px;
+}
+.settings-drawer-sub {
+  font-size: 12px;
+  color: var(--t3);
+  margin-top: 2px;
+}
+
+.settings-drawer-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+
 /* === Main scroll === */
 #main-scroll {
   flex: 1;

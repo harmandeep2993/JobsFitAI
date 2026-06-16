@@ -1339,7 +1339,9 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 14px;
+  padding-bottom: 16px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--bd-s);
   font-size: 12.5px;
   font-family: 'DM Mono', monospace;
   color: var(--t2);
@@ -1408,7 +1410,7 @@
   border: 1px solid var(--bd);
   border-radius: var(--radius-s);
   box-shadow: var(--sha-m);
-  z-index: 200;
+  z-index: 400;
   overflow: hidden;
   display: none;
   animation: dd-open .12s ease;

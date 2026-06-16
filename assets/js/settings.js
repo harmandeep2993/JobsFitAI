@@ -64,8 +64,10 @@ function closeAllDD() {
   document.querySelectorAll('.dd.open').forEach(d => d.classList.remove('open'));
 }
 
-// Close menus when clicking anywhere outside a dropdown.
-document.addEventListener('click', closeAllDD);
+// Close menus when clicking outside a dropdown (but not inside the drawer).
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.dd')) closeAllDD();
+});
 
 // === Selection ===
 window.selectProvider = function(name) {

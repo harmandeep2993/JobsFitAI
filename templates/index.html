@@ -27,7 +27,7 @@
         <span class="run-label" id="tb-run-label">Running&hellip;</span>
       </div>
       <button class="theme-btn" id="themechange" title="Toggle theme">&#9728;</button>
-      <button class="theme-btn" id="nav-settings" onclick="showView('settings')" title="Settings">
+      <button class="theme-btn" id="btn-settings" onclick="toggleSettings()" title="Settings">
         <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
           <line x1="2" y1="4" x2="14" y2="4"/>
           <line x1="2" y1="8" x2="14" y2="8"/>
@@ -382,57 +382,59 @@
       </div><!-- /view-history -->
 
       <!-- ── Settings ───────────────────────────────────── -->
-      <div id="view-settings" class="view">
-        <div class="pg-title">LLM <em>Settings</em></div>
-        <div class="pg-sub">Choose the provider and model used for extraction, matching, and summaries</div>
-
-        <div class="divider"></div>
-
-        <div class="set-active-bar" id="set-active-bar">
-          <span class="t-bead boff" id="tb-bead"></span>
-          <span id="tb-provider" class="set-active-provider">loading&hellip;</span>
-          <span class="set-active-sep">&middot;</span>
-          <span id="tb-model" class="set-active-model"></span>
-        </div>
-
-        <div class="card">
-          <div class="set-row">
-            <label class="set-lbl">Provider</label>
-            <div class="dd" id="dd-provider">
-              <button class="dd-btn" type="button" onclick="ddToggle(event,'provider')">
-                <span class="dd-val" id="dd-provider-val">&mdash;</span>
-                <span class="dd-arrow">&#9660;</span>
-              </button>
-              <div class="dd-menu" id="dd-provider-menu"></div>
-            </div>
-          </div>
-          <div class="set-row">
-            <label class="set-lbl">Model</label>
-            <div class="dd" id="dd-model">
-              <button class="dd-btn" type="button" onclick="ddToggle(event,'model')">
-                <span class="dd-val" id="dd-model-val">&mdash;</span>
-                <span class="dd-arrow">&#9660;</span>
-              </button>
-              <div class="dd-menu" id="dd-model-menu"></div>
-            </div>
-          </div>
-          <div class="set-row">
-            <label class="set-lbl">Custom model</label>
-            <input id="set-model-custom" class="fetch-inp"
-              placeholder="Optional &mdash; type a model id to override the dropdown"/>
-          </div>
-          <div class="set-actions">
-            <button class="btn-primary" id="set-apply" onclick="applySettings()">Apply</button>
-            <button class="btn-ghost"   id="set-test"  onclick="testConnection()">Test connection</button>
-            <span class="set-status" id="set-status"></span>
-          </div>
-        </div>
-      </div><!-- /view-settings -->
-
     </main><!-- /main-scroll -->
   </div><!-- /workspace -->
 
 </div><!-- /app -->
+
+<!-- Settings drawer -->
+<div id="settings-backdrop" class="settings-backdrop" onclick="closeSettings()"></div>
+<aside id="settings-drawer" class="settings-drawer">
+  <div class="settings-drawer-hd">
+    <div>
+      <div class="settings-drawer-title">LLM Settings</div>
+      <div class="settings-drawer-sub">Provider and model for extraction, matching, summaries</div>
+    </div>
+    <button class="dt-close" onclick="closeSettings()">&#10005;</button>
+  </div>
+  <div class="settings-drawer-body">
+    <div class="set-active-bar" id="set-active-bar">
+      <span class="t-bead boff" id="tb-bead"></span>
+      <span id="tb-provider" class="set-active-provider">loading&hellip;</span>
+      <span class="set-active-sep">&middot;</span>
+      <span id="tb-model" class="set-active-model"></span>
+    </div>
+    <div class="set-row">
+      <label class="set-lbl">Provider</label>
+      <div class="dd" id="dd-provider">
+        <button class="dd-btn" type="button" onclick="ddToggle(event,'provider')">
+          <span class="dd-val" id="dd-provider-val">&mdash;</span>
+          <span class="dd-arrow">&#9660;</span>
+        </button>
+        <div class="dd-menu" id="dd-provider-menu"></div>
+      </div>
+    </div>
+    <div class="set-row">
+      <label class="set-lbl">Model</label>
+      <div class="dd" id="dd-model">
+        <button class="dd-btn" type="button" onclick="ddToggle(event,'model')">
+          <span class="dd-val" id="dd-model-val">&mdash;</span>
+          <span class="dd-arrow">&#9660;</span>
+        </button>
+        <div class="dd-menu" id="dd-model-menu"></div>
+      </div>
+    </div>
+    <div class="set-row">
+      <label class="set-lbl">Custom model</label>
+      <input id="set-model-custom" class="fetch-inp" placeholder="Optional - type a model id to override the dropdown"/>
+    </div>
+    <div class="set-actions">
+      <button class="btn-primary" id="set-apply" onclick="applySettings()">Apply</button>
+      <button class="btn-ghost"   id="set-test"  onclick="testConnection()">Test connection</button>
+      <span class="set-status" id="set-status"></span>
+    </div>
+  </div>
+</aside>
 
 <!-- detail modal -->
 <div id="detail-modal" class="modal-overlay" style="display:none;" onclick="closeDetail(event)">
@@ -492,13 +494,12 @@
 <script src="/assets/js/history.js"></script>
 
 <script>
-// Esc closes detail modal
+// Esc closes modals and settings drawer
 document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape') {
     var m = document.getElementById('detail-modal');
-    if (m && m.style.display !== 'none') {
-      m.style.display = 'none';
-    }
+    if (m && m.style.display !== 'none') { m.style.display = 'none'; return; }
+    if (typeof closeSettings === 'function') closeSettings();
   }
 });
 </script>
