@@ -47,16 +47,18 @@ def get_jd_prompt(jd_text: str) -> str:
     RULES:
     1. Return ONLY valid JSON. No markdown, no explanation, no extra text.
     2. JD may be in any language - extract and return ALL values in English.
-    3. required_skills: ALL skills, tools, technologies, competencies marked as required or essential. Split compound entries into individual items (e.g. "Python incl. Pydantic-AI, LangGraph" → ["python", "pydantic-ai", "langgraph"]).
-    4. preferred_skills: bonus, nice-to-have, or optional skills only.
-    5. responsibilities: split into individual action items. Translate to English.
-    6. experience_requirements: explicit statements only. Empty list if none stated.
-    7. education_requirements: explicit statements only. Empty list if none stated.
-    8. work_mode: remote|hybrid|on-site|not specified
-    9. employment_type: full-time|part-time|contract|internship|not specified
-    10. job_level: junior|mid-level|senior|lead|not specified
-    11. job_summary: 1-2 sentences describing the ROLE and KEY RESPONSIBILITIES only. Not the company intro. Write in English.
-    12. Missing fields → empty string, empty list, or 0.
+    3. required_skills: scan the ENTIRE JD - not just a "Requirements" section. Extract every skill, tool, technology, framework, platform, methodology, or domain competency that is stated as required or essential, or implied by responsibilities. Split compound entries into individual items (e.g. "Python incl. Pydantic-AI, LangGraph" -> ["python", "pydantic-ai", "langgraph"]).
+    4. preferred_skills: bonus, nice-to-have, or "would be a plus" skills only. Do not repeat items already in required_skills.
+    5. responsibilities: split into individual action items. Each item should be a single clear task or duty. Translate to English.
+    6. experience_requirements: explicit years or type statements only (e.g. "3+ years of Python", "experience in fintech"). Empty list if none stated.
+    7. education_requirements: explicit degree or field statements only (e.g. "Bachelor in Computer Science", "Master preferred"). Empty list if none stated.
+    8. languages: for each language extract BOTH the name into "language" AND the exact proficiency level stated into "proficiency" (use the form given: native, fluent, C1, B2, B1, intermediate, basic, or CEFR code). Leave proficiency as "" if not stated. Leave languages as [] if no language requirements exist.
+    9. certifications: extract all required or preferred professional certifications AND online credentials (Coursera, Udemy, edX, AWS, Google, Microsoft certificates, etc.) as plain strings.
+    10. work_mode: remote|hybrid|on-site|not specified
+    11. employment_type: full-time|part-time|contract|internship|not specified
+    12. job_level: junior|mid-level|senior|lead|principal|staff|not specified
+    13. job_summary: 1-2 sentences describing the ROLE and KEY RESPONSIBILITIES only. Not the company intro. Write in English.
+    14. Missing fields -> empty string, empty list.
 
     SCHEMA:
     {schema_text}

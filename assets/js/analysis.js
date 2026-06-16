@@ -156,7 +156,7 @@ var RES_PLACEHOLDER =
   '<rect x="10" y="5" width="4" height="16" rx="1"/>' +
   '<rect x="17" y="8" width="4" height="13" rx="1"/>' +
   '</svg>' +
-  '<p>Upload your resume and paste a job description,<br>then click <strong>Analyse Match</strong> to see your results</p>' +
+  '<p>Upload your resume and paste a job description,<br>then click <strong>Analyse</strong> to see your results</p>' +
   '</div>' +
   '</div>';
 
@@ -256,7 +256,8 @@ window.jfTab = function(el, panelId) {
   });
   el.classList.add('active');
   var panel = document.getElementById(panelId);
-  if (panel) panel.style.display = 'block';
+  // Clear inline display so CSS (grid for #jf-summary, block for others) takes over.
+  if (panel) panel.style.display = '';
 };
 
 // === Ring animations (sidebar score + breakdown rings) ===
@@ -334,8 +335,8 @@ window.copyResults = function() {
   if (items.length) {
     lines.push('Breakdown:');
     items.forEach(function(item) {
-      var ttl = item.querySelector('.bd-item-ttl');
-      var pct = item.querySelector('.bd-item-pct');
+      var ttl = item.querySelector('.bd-item-lbl');
+      var pct = item.querySelector('.jt-score-val');
       if (ttl && pct) lines.push('  ' + ttl.textContent.trim() + ': ' + pct.textContent.trim());
     });
     lines.push('');

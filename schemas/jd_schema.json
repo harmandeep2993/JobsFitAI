@@ -8,6 +8,8 @@
     "job_level": ""
   },
 
+  "job_summary": "",
+
   "required_skills": [],
   "preferred_skills": [],
 
@@ -16,8 +18,11 @@
   "experience_requirements": [],
   "education_requirements": [],
 
-  "languages": [],
-  "certifications": [],
-
-  "job_summary": ""
+  "languages": [
+    {
+      "language": "",
+      "proficiency": ""
+    }
+  ],
+  "certifications": []
 }

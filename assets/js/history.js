@@ -75,7 +75,6 @@ function _hvRenderAnalyser(entries) {
   }
   el.innerHTML = entries.map(function(e) {
     var tier = _hTierCls(e.score);
-    var slot = e.slot != null ? '<span class="hv-slot-badge">' + (e.slot + 1) + '</span>' : '';
     return (
       '<div class="hv-entry">' +
         '<div class="hv-entry-left">' +
@@ -88,7 +87,7 @@ function _hvRenderAnalyser(entries) {
         '<div class="hv-entry-body">' +
           '<div class="hv-entry-title">' + _hEsc(e.jd_snippet || 'Analysis') + '</div>' +
           '<div class="hv-entry-meta">' +
-            slot + _hEsc(e.resume_label || 'Resume') +
+            _hEsc(e.resume_label || 'Resume') +
             ' &middot; ' + _hAgo(e.scored_at) +
           '</div>' +
         '</div>' +
@@ -139,6 +138,8 @@ function _hvFetcherEntryFull(e, d) {
       '</span></div>'
     : '';
 
+  var runLabel = d.manual ? 'Manual run' : 'Fetcher run';
+  var manualBadge = d.manual ? ' <span class="hv-manual-badge">manual</span>' : '';
   return (
     '<div class="hv-entry hv-entry--fetch">' +
       '<div class="hv-entry-left">' +
@@ -149,7 +150,7 @@ function _hvFetcherEntryFull(e, d) {
         '</span>' +
       '</div>' +
       '<div class="hv-entry-body">' +
-        '<div class="hv-entry-title">Fetcher run &middot; <span class="hv-run-time">' + _hTime(e.created_at) + '</span></div>' +
+        '<div class="hv-entry-title">' + runLabel + manualBadge + ' &middot; <span class="hv-run-time">' + _hTime(e.created_at) + '</span></div>' +
         '<div class="hv-entry-meta">' + statParts.join(' &middot; ') + '</div>' +
         sources +
       '</div>' +
@@ -182,24 +183,26 @@ function _hvRenderFetcher(entries) {
   // Aggregate stats
   var totalRuns = parsed.length;
   var totalScored = parsed.reduce(function(s, x) { return s + (x.d.scored || 0); }, 0);
-  var totalFetched = parsed.reduce(function(s, x) { return s + (x.d.fetched || 0); }, 0);
+  // Sum 'new' (not 'fetched') - fetched re-counts seen jobs on every run.
+  var totalNew = parsed.reduce(function(s, x) { return s + (x.d.new || 0); }, 0);
   var lastRun = parsed[0] ? _hTime(parsed[0].e.created_at) : '-';
+  // total_seen from the latest run is the authoritative unique-job count.
   var lastSeen = parsed[0] && parsed[0].d.total_seen != null ? parsed[0].d.total_seen : null;
 
   var statsHtml =
     '<div class="hv-stats-bar">' +
       '<div class="hv-stat"><span class="hv-stat-val">' + totalRuns + '</span><span class="hv-stat-lbl">total runs</span></div>' +
       '<div class="hv-stat-div"></div>' +
-      '<div class="hv-stat"><span class="hv-stat-val">' + totalFetched + '</span><span class="hv-stat-lbl">fetched</span></div>' +
+      '<div class="hv-stat"><span class="hv-stat-val">' + totalNew + '</span><span class="hv-stat-lbl">new discovered</span></div>' +
       '<div class="hv-stat-div"></div>' +
       '<div class="hv-stat"><span class="hv-stat-val hv-stat-scored">' + totalScored + '</span><span class="hv-stat-lbl">scored</span></div>' +
       (lastSeen != null ? '<div class="hv-stat-div"></div><div class="hv-stat"><span class="hv-stat-val">' + lastSeen + '</span><span class="hv-stat-lbl">total seen</span></div>' : '') +
       '<div class="hv-stat-last">Last run: ' + lastRun + '</div>' +
     '</div>';
 
-  // Split: runs with results vs zero-result runs
-  var withResults = parsed.filter(function(x) { return (x.d.scored || 0) > 0; });
-  var zeroRuns = parsed.filter(function(x) { return (x.d.scored || 0) === 0; });
+  // Split: manual runs and scored runs are always visible; auto zero-result runs are hidden
+  var withResults = parsed.filter(function(x) { return (x.d.scored || 0) > 0 || x.d.manual; });
+  var zeroRuns = parsed.filter(function(x) { return (x.d.scored || 0) === 0 && !x.d.manual; });
 
   var resultsHtml = '';
   if (withResults.length) {

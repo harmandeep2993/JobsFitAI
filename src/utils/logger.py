@@ -38,6 +38,7 @@ DATE_FORMAT = "%H:%M:%S"
 # job_matcher, app, ...) log clean one-line INFO summaries and are NOT muted.
 # Set config logging.level to DEBUG to see all detail again.
 _QUIET_INTERNAL = [
+    "matcher",
     "skills",
     "responsibilities",
     "experiences",
@@ -48,7 +49,6 @@ _QUIET_INTERNAL = [
     "extract",
     "resume_prompt",
     "jd_prompt",
-    "router",
     "embedding_model",
     "config",
     "validator",

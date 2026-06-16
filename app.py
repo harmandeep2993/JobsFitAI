@@ -81,6 +81,10 @@ app.mount("/assets", StaticFiles(directory="assets"), name="assets")
 
 # --- Request logging middleware ---
 
+# High-frequency poll endpoints - logged at DEBUG to avoid console spam.
+# They're still captured in the file log at DEBUG level.
+_POLL_PATHS = {"/api/match/state", "/api/resumes", "/api/llm-ping"}
+
 
 @app.middleware("http")
 async def _request_logger(request: Request, call_next):
@@ -90,11 +94,12 @@ async def _request_logger(request: Request, call_next):
         req_id = uuid.uuid4().hex[:8]
         request.state.req_id = req_id
         method = request.method
-        logger.info("[%s] --> %s %s", req_id, method, path)
+        _log = logger.debug if path in _POLL_PATHS else logger.info
+        _log("[%s] --> %s %s", req_id, method, path)
         t0 = time.perf_counter()
         response = await call_next(request)
         duration_ms = round((time.perf_counter() - t0) * 1000)
-        logger.info(
+        _log(
             "[%s] <-- %s %s %s (%dms)",
             req_id,
             method,
@@ -318,12 +323,18 @@ async def api_resumes_use_for_matching(resume_id: str) -> JSONResponse:
         return JSONResponse(
             {"ok": False, "error": "not_extracted_yet"}, status_code=400
         )
+
+    # Same resume already active - scores in DB are correct, skip rescore.
+    if session.get_resume_id() == resume_id:
+        name = row.get("label") or row.get("original_name", "Resume")
+        logger.info("Resume '%s' already active - returning stored scores", name)
+        return JSONResponse({"ok": True, "rescored": 0, "cached": True})
+
     resume_json = _json.loads(extracted)
-    session.set_resume(
-        resume_json, row.get("label") or row.get("original_name", "Resume")
-    )
+    name = row.get("label") or row.get("original_name", "Resume")
+    session.set_resume(resume_json, name, resume_id=resume_id)
     rescored = await run_in_threadpool(rescore_all)
-    return JSONResponse({"ok": True, "rescored": rescored})
+    return JSONResponse({"ok": True, "rescored": rescored, "cached": False})
 
 
 @app.post("/api/resumes/recommend")
@@ -344,7 +355,11 @@ async def api_resumes_recommend(request: Request) -> JSONResponse:
         return JSONResponse({"ok": True, "scores": [], "recommended_id": None})
 
     def _score():
-        jd_json = extract_jd(jd_text)
+        try:
+            jd_json = extract_jd(jd_text)
+        except Exception as e:
+            logger.warning("JD extraction failed in recommend: %s", e)
+            return None
         if not jd_json:
             return None
         results = []
@@ -605,23 +620,19 @@ async def api_improve_resume(request: Request) -> JSONResponse:
     return JSONResponse(result)
 
 
-# --- ATS Maker ---
+# --- ATS Analyzer ---
 
 
-@app.post("/api/ats/optimise")
-async def api_ats_optimise(request: Request) -> JSONResponse:
+@app.post("/api/ats/check")
+async def api_ats_check(request: Request) -> JSONResponse:
     """
-    Full ATS resume generation pipeline.
+    Lightweight ATS scan - no LLM, no keyword injection.
 
-    Accepts {resume_id, jd}. Extracts raw resume text from the stored file,
-    checks keyword coverage and structural flags, then calls the LLM once to
-    produce a complete ATS-optimised resume (summary, experience, skills,
-    education) with exact JD keywords injected verbatim.
-
-    Returns {resume, coverage_before, coverage_after, section_flags,
-    formatting_flags, plain_text}.
+    Accepts {resume_id, jd?}. Returns section heading flags, formatting flags,
+    keyword coverage (if JD provided), and a composite ATS score.
     """
-    from src.services.ats import generate_ats_resume
+    from src.extractors.jd import extract_jd
+    from src.services.ats import ats_check
 
     body = await request.json()
     resume_id = (body.get("resume_id") or "").strip()
@@ -631,55 +642,6 @@ async def api_ats_optimise(request: Request) -> JSONResponse:
         return JSONResponse(
             {"ok": False, "error": "resume_id_required"}, status_code=400
         )
-    if len(jd_text) < 30:
-        return JSONResponse({"ok": False, "error": "jd_required"}, status_code=400)
-
-    record = resume_store.get("local", resume_id)
-    if not record:
-        return JSONResponse({"ok": False, "error": "resume_not_found"}, status_code=404)
-
-    # Extract raw text from file for exact string matching
-    resume_text = await run_in_threadpool(extract_all_text, record["file_path"])
-    if not resume_text:
-        return JSONResponse(
-            {"ok": False, "error": "could_not_read_resume"}, status_code=422
-        )
-
-    # Load cached extracted JSON (already done at upload time)
-    extracted_raw = record.get("extracted_json")
-    if extracted_raw:
-        try:
-            resume_json = _json.loads(extracted_raw)
-        except Exception:
-            resume_json = {}
-    else:
-        resume_json = await run_in_threadpool(extract_resume, resume_text)
-
-    jd_json = await run_in_threadpool(extract_jd, jd_text)
-
-    result = await run_in_threadpool(
-        generate_ats_resume, resume_text, resume_json, jd_json
-    )
-    return JSONResponse({"ok": True, **result})
-
-
-@app.post("/api/ats/check")
-async def api_ats_check(request: Request) -> JSONResponse:
-    """
-    Lightweight ATS scan - no LLM, no keyword injection.
-
-    Accepts {resume_id}. Returns section heading flags and formatting flags
-    only. Fast enough to run on every resume load.
-    """
-    from src.services.ats import ats_check
-
-    body = await request.json()
-    resume_id = (body.get("resume_id") or "").strip()
-
-    if not resume_id:
-        return JSONResponse(
-            {"ok": False, "error": "resume_id_required"}, status_code=400
-        )
 
     record = resume_store.get("local", resume_id)
     if not record:
@@ -691,7 +653,12 @@ async def api_ats_check(request: Request) -> JSONResponse:
             {"ok": False, "error": "could_not_read_resume"}, status_code=422
         )
 
-    result = await run_in_threadpool(ats_check, resume_text)
+    required_skills: list[str] | None = None
+    if jd_text and len(jd_text) >= 50:
+        jd_json = await run_in_threadpool(extract_jd, jd_text)
+        required_skills = jd_json.get("required_skills") or []
+
+    result = await run_in_threadpool(ats_check, resume_text, required_skills)
     return JSONResponse({"ok": True, **result})
 
 
@@ -916,12 +883,38 @@ async def api_match_run(request: Request) -> JSONResponse:
                 arbeitnow_limit=settings_store.get_arbeitnow_limit(),
                 bundesagentur_limit=settings_store.get_bundesagentur_limit(),
             )
-            discover_and_score(jobs, entry_only=entry_only)
+            discover_and_score(jobs, entry_only=entry_only, manual=True)
 
         try:
             await run_in_threadpool(_run)
         except Exception as e:
             logger.error("match run failed: %s", e)
+            # Log a minimal run entry so the Fetcher history always has a record,
+            # even when fetch_combined crashes before discover_and_score runs.
+            try:
+                import json as _j
+
+                event_store.log_event(
+                    "run",
+                    "",
+                    _j.dumps(
+                        {
+                            "fetched": 0,
+                            "new": 0,
+                            "recent": 0,
+                            "relevant": 0,
+                            "scored": 0,
+                            "adzuna": 0,
+                            "arbeitnow": 0,
+                            "bundesagentur": 0,
+                            "total_seen": 0,
+                            "manual": True,
+                            "error": str(e)[:120],
+                        }
+                    ),
+                )
+            except Exception:
+                pass
             end_run()
 
     asyncio.create_task(_bg())
@@ -1320,6 +1313,14 @@ async def _backfill_extractions() -> None:
 
 @app.on_event("startup")
 async def _start_scheduler() -> None:
+    import logging as _logging
+
+    # Uvicorn re-initialises its own loggers after our logger.py setup runs,
+    # restoring the access log to INFO. Re-silence it here so requests are not
+    # printed twice (our middleware already covers /api/* with richer context).
+    _logging.getLogger("uvicorn.access").setLevel(_logging.WARNING)
+    _logging.getLogger("uvicorn.access").propagate = False
+
     global _sched_last
     # Seed _sched_last from the last run event so server restarts don't
     # trigger an immediate re-fetch when the interval hasn't elapsed yet.
@@ -1346,7 +1347,7 @@ async def _start_scheduler() -> None:
 
 # --- Entry point ---
 
-PORT = 8080
+PORT = 8000
 
 
 def _port_in_use(port: int) -> bool:

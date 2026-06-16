@@ -8,6 +8,7 @@ Each job costs one JD-extraction LLM call; the resume is extracted once
 """
 
 import json as _json
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 
 from src.extractors.jd import extract_jd
@@ -21,6 +22,7 @@ from src.fetchers.enrich import fetch_full_description
 from src.matcher import match
 from src.services import event_store, match_store, relevance, role_filter, vector_store
 from src.utils import session
+from src.utils.config import MAX_AGE_DAYS
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -113,7 +115,7 @@ def fetch_combined(
     countries: list[str] | None = None,
     per_title: int = 5,
     arbeitnow_limit: int = 100,
-    bundesagentur_limit: int = 10,
+    bundesagentur_limit: int = 500,
 ) -> list[Job]:
     """
     Pull jobs from all sources across one or more countries, and merge.
@@ -135,20 +137,34 @@ def fetch_combined(
     arbeitnow: list[Job] = []
     bundesagentur: list[Job] = []
     if "de" in countries:
+        # Arbeitnow: word-union query is fine since it filters in Python afterwards
         terms = sorted({w for t in titles for w in t.split()})
-        query = " ".join(terms)
-
         arb_raw = fetch_arbeitnow_jobs(
-            query=query, location=location, limit=arbeitnow_limit
+            query=" ".join(terms), location=location, limit=arbeitnow_limit
         )
         arbeitnow = [j for j in arb_raw if role_filter.is_target_role(j.title, titles)]
 
-        ba_raw = fetch_bundesagentur_jobs(
-            query=query, location=location, limit=bundesagentur_limit
-        )
-        bundesagentur = [
-            j for j in ba_raw if role_filter.is_target_role(j.title, titles)
-        ]
+        # Bundesagentur: fetch all titles in parallel - each title is an
+        # independent API search so there is no shared state to protect.
+        seen_ba: set[str] = set()
+
+        def _ba_fetch(title: str) -> list[Job]:
+            return fetch_bundesagentur_jobs(
+                query=title, location=location, max_age_days=MAX_AGE_DAYS
+            )
+
+        with ThreadPoolExecutor(max_workers=min(6, len(titles))) as pool:
+            futures = {pool.submit(_ba_fetch, t): t for t in titles}
+            for fut in as_completed(futures):
+                try:
+                    for job in fut.result():
+                        if job.id not in seen_ba:
+                            seen_ba.add(job.id)
+                            bundesagentur.append(job)
+                except Exception as e:
+                    logger.warning(
+                        "BA fetch failed for title '%s': %s", futures[fut], e
+                    )
 
     merged, seen_ids, seen_content = [], set(), set()
     for job in adzuna + arbeitnow + bundesagentur:
@@ -186,6 +202,16 @@ def rescore_all() -> int:
         return 0
 
     rows = match_store.rows_with_jd()
+    if not rows:
+        return 0
+
+    resume_name = session.get_resume_name() or "resume"
+    logger.info(
+        "Rescoring %d stored jobs against '%s' (no LLM - cached JD only)",
+        len(rows),
+        resume_name,
+    )
+
     count = 0
     for row in rows:
         jd = row.get("jd")
@@ -198,11 +224,13 @@ def rescore_all() -> int:
         except Exception as e:
             logger.error("Re-score failed for %s: %s", row["id"], e)
 
-    logger.info("Re-scored %d stored jobs against the new resume", count)
+    logger.info("Rescore complete: %d/%d jobs updated", count, len(rows))
     return count
 
 
-def discover_and_score(jobs: list[Job], entry_only: bool = True) -> dict:
+def discover_and_score(
+    jobs: list[Job], entry_only: bool = True, manual: bool = False
+) -> dict:
     """
     Token-efficient funnel:
       skip already-seen -> recency -> cheap LLM relevance gate ->
@@ -299,10 +327,17 @@ def discover_and_score(jobs: list[Job], entry_only: bool = True) -> dict:
                 event_store.mark_seen(job, "jd_unavailable")
                 logger.debug("   jd-unavailable | %s", tag)
 
-        by_source = {}
+        logger.info(
+            "== Run complete: %d candidates, %d survivors, %d scored",
+            len(candidates),
+            len(survivors),
+            scored,
+        )
+    finally:
+        # Always log the run event - even if scoring was interrupted by an error.
+        by_source: dict[str, int] = {}
         for j in jobs:
             by_source[j.source] = by_source.get(j.source, 0) + 1
-
         run_detail = _json.dumps(
             {
                 "fetched": len(jobs),
@@ -314,16 +349,13 @@ def discover_and_score(jobs: list[Job], entry_only: bool = True) -> dict:
                 "arbeitnow": by_source.get("arbeitnow", 0),
                 "bundesagentur": by_source.get("bundesagentur", 0),
                 "total_seen": len(seen) + len(new_jobs),
+                "manual": manual,
             }
         )
-        event_store.log_event("run", "", run_detail)
-        logger.info(
-            "== Run complete: %d candidates, %d survivors, %d scored",
-            len(candidates),
-            len(survivors),
-            scored,
-        )
-    finally:
+        try:
+            event_store.log_event("run", "", run_detail)
+        except Exception as _log_err:
+            logger.warning("Could not log run event: %s", _log_err)
         _run_status.update({"running": False, "phase": "idle"})
 
     return {

@@ -363,9 +363,12 @@ window.runMatch = function() {
 };
 
 // Poll run progress and re-render; new jobs appear (highlighted) as scored.
-// Stops after MAX_POLL_ATTEMPTS to prevent infinite loops if backend stalls.
-var _pollAttempts = 0;
-var MAX_POLL_ATTEMPTS = 150; // 150 × 2 s = 5 minutes max
+// Stops only when the backend reports running=false or on a network error.
+// Stall detection: if scored count hasn't advanced in 10 min, shows a warning
+// but keeps polling so the backend's own finally-block can clear the flag.
+var _lastScoredCount  = -1;
+var _lastProgressMs   = 0;
+var _STALL_MS         = 10 * 60 * 1000; // 10 minutes
 
 function setTopbarRunning(running, label) {
   var dot = document.getElementById('tb-run-dot');
@@ -383,15 +386,6 @@ function pollRun() {
   const status = document.getElementById('mt-poll-status');
   const btn    = document.getElementById('mt-run-btn');
 
-  _pollAttempts++;
-  if (_pollAttempts > MAX_POLL_ATTEMPTS) {
-    if (btn) btn.disabled = false;
-    status.textContent = '✕ Timed out - run took too long. Try again.';
-    status.className = 'mt-status err';
-    setTopbarRunning(false);
-    return;
-  }
-
   fetch('/api/match/state')
     .then(r => r.json())
     .then(d => {
@@ -404,16 +398,28 @@ function pollRun() {
 
       const rs = d.run_status || {};
       if (rs.running) {
+        // Track scoring progress for stall detection.
+        var scored = rs.scored || 0;
+        if (scored > _lastScoredCount) {
+          _lastScoredCount = scored;
+          _lastProgressMs  = Date.now();
+        }
+        var stalled = _lastProgressMs > 0 && (Date.now() - _lastProgressMs) > _STALL_MS;
+
         var phaseText =
           rs.phase === 'fetching'    ? 'Fetching jobs…' :
           rs.phase === 'classifying' ? 'Filtering ' + (rs.total || 0) + ' jobs…' :
-          'Scoring ' + (rs.scored || 0) + '/' + (rs.total || 0) + '…';
-        status.className  = 'mt-status';
+          stalled ? 'Scoring ' + scored + '/' + (rs.total || 0) + '… (LLM slow - still running)' :
+          'Scoring ' + scored + '/' + (rs.total || 0) + '…';
+        status.className  = stalled ? 'mt-status warn' : 'mt-status';
         status.textContent = phaseText;
         setTopbarRunning(true, phaseText);
-        setTimeout(pollRun, 2000);
+        // Poll slower during fetching (BA pagination takes time) to avoid noise.
+        var pollDelay = rs.phase === 'fetching' ? 5000 : 2000;
+        setTimeout(pollRun, pollDelay);
       } else {
-        _pollAttempts = 0;
+        _lastScoredCount = -1;
+        _lastProgressMs  = 0;
         if (btn) btn.disabled = false;
         status.textContent = '✓ ' + newIds.size + ' new · ' +
                              (d.results || []).length + ' total · ' +
@@ -425,7 +431,8 @@ function pollRun() {
       }
     })
     .catch(() => {
-      _pollAttempts = 0;
+      _lastScoredCount = -1;
+      _lastProgressMs  = 0;
       if (btn) btn.disabled = false;
       status.textContent = '✕ Connection lost. Check server and try again.';
       status.className = 'mt-status err';
@@ -490,19 +497,18 @@ window.matchCardHTML = function(r, isNew) {
     skillsHTML = '<span class="jt-na-hint">Scoring…</span>';
   }
 
-  // Source badge
-  const srcNames = { adzuna: 'Adzuna', arbeitnow: 'Arbeitnow', bundesagentur: 'Bundesagentur' };
-  const srcCls   = { adzuna: 'hv-src-az', arbeitnow: 'hv-src-arb', bundesagentur: 'hv-src-ba' };
+  // Source badge - shown on the card in the company row
+  const srcNames   = { adzuna: 'Adzuna', arbeitnow: 'Arbeitnow', bundesagentur: 'Bundesagentur' };
+  const srcCardCls = { adzuna: 'jt-src-az', arbeitnow: 'jt-src-arb', bundesagentur: 'jt-src-ba' };
   const srcBadge = r.source
-    ? '<span class="hv-src-badge ' + (srcCls[r.source] || '') + '">' +
+    ? '<span class="jt-src-badge ' + (srcCardCls[r.source] || '') + '">' +
         (srcNames[r.source] || mtEsc(r.source)) + '</span>'
-    : null;
+    : '';
 
-  // Single meta line: date . lang . source badge
+  // Meta line: date and language only (source is now a card badge)
   const metaParts = [
     posted     ? posted        : null,
     r.language || null,
-    srcBadge   || null,
   ].filter(Boolean);
 
   // Footer actions
@@ -542,6 +548,7 @@ window.matchCardHTML = function(r, isNew) {
         (r.location ? '<div class="jt-loc">&#128205; ' + mtEsc(r.location) + '</div>' : '') +
         '<div class="jt-company-row">' +
           '<span class="jt-company">' + mtEsc(r.company || 'Unknown') + '</span>' +
+          srcBadge +
           (chips ? '<span class="jt-chips">' + chips + '</span>' : '') +
         '</div>' +
         (metaParts.length
@@ -831,6 +838,34 @@ function animateScores() {
   });
 }
 
+window.resetMtFilters = function() {
+  window._mtMinScore    = 0;
+  window._mtLang        = '';
+  window._mtShowNew     = false;
+  window._mtHideApplied = false;
+  window._mtMaxAge      = 'all';
+  window._mtSource      = 'all';
+
+  var langEl = document.getElementById('flt-lang');
+  if (langEl) langEl.value = '';
+
+  document.querySelectorAll('.sort-btn[data-score]').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.score === '0');
+  });
+  document.querySelectorAll('.sort-btn[data-age]').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.age === 'all');
+  });
+  document.querySelectorAll('.sort-btn[data-src]').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.src === 'all');
+  });
+  var newBtn = document.getElementById('mt-fn-btn');
+  if (newBtn) newBtn.classList.remove('active');
+  var appBtn = document.getElementById('mt-fa-btn');
+  if (appBtn) appBtn.classList.remove('active');
+
+  renderMatches(window._mtAllData, window._mtLastNewIds || new Set());
+};
+
 window.onLangFilter = function() {
   const el = document.getElementById('flt-lang');
   window._mtLang = el ? el.value : '';
@@ -854,16 +889,17 @@ function renderMatches(results, newIds) {
   const nowSec      = Date.now() / 1000;
 
   const filtered = results.filter(function(r) {
-    if (r.status === 'jd_unavailable') return true;
-    if ((r.score || 0) < minScore) return false;
+    // Source, language, age, new, applied filters apply to every job
+    if (source !== 'all' && (r.source || '') !== source) return false;
     if (lang && (r.language || '') !== lang) return false;
     if (showNew && !newIds.has(r.id)) return false;
     if (hideApplied && (r.applied || r.app_status)) return false;
-    if (source !== 'all' && (r.source || '') !== source) return false;
     if (maxAge !== 'all') {
       var ts = parseInt(r.posted_at, 10) || 0;
       if (ts && (nowSec - ts) > maxAge * 86400) return false;
     }
+    // Score filter skipped for unscored jobs so they remain visible
+    if (r.status !== 'jd_unavailable' && (r.score || 0) < minScore) return false;
     return true;
   });
 
@@ -888,10 +924,15 @@ function renderMatches(results, newIds) {
   }
 
   if (!filtered.length) {
-    const msg = results.length
-      ? 'No jobs match the current filters.'
-      : 'No matches yet. Load a resume and click Fetch &amp; Score.';
-    box.innerHTML = '<div class="fetch-empty">' + msg + '</div>';
+    if (results.length) {
+      box.innerHTML =
+        '<div class="fetch-empty">' +
+          'No jobs match the current filters.' +
+          '<button class="mt-reset-filters" onclick="resetMtFilters()">Clear filters</button>' +
+        '</div>';
+    } else {
+      box.innerHTML = '<div class="fetch-empty">No matches yet. Load a resume and click Fetch &amp; Score.</div>';
+    }
     return;
   }
 

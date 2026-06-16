@@ -194,7 +194,11 @@ def fetch_adzuna_jobs(
     if response is None:
         return []
 
-    data = response.json()
+    try:
+        data = response.json()
+    except ValueError as e:
+        logger.error("Adzuna JSON parse failed: %s", e)
+        return []
     raw_jobs = data.get("results", [])
     logger.info(
         "Adzuna returned %d of %d total jobs", len(raw_jobs), data.get("count", 0)

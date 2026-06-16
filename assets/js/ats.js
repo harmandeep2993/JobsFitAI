@@ -4,6 +4,7 @@
 
 var _atsInitDone = false;
 var _atsResumeId = null;  // currently selected resume id
+var _atsMergeAll = false; // include content from other resume slots
 
 var ATS_SLOT_LABELS = ['Base', 'Tailored 1', 'Tailored 2'];
 
@@ -44,8 +45,8 @@ function _atsBuildShell() {
         '</svg>' +
       '</div>' +
       '<div>' +
-        '<h1 class="az-hero-title">ATS <em>Maker</em></h1>' +
-        '<p class="az-hero-sub">Generate a complete ATS-optimised resume tailored to the job description</p>' +
+        '<h1 class="az-hero-title">ATS <em>Analyzer</em></h1>' +
+        '<p class="az-hero-sub">Check your resume against ATS requirements: keyword coverage, section headings, and formatting</p>' +
       '</div>' +
     '</div>' +
 
@@ -83,11 +84,8 @@ function _atsBuildShell() {
           '</textarea>' +
         '</div>' +
         '<div class="ats-cta">' +
-          '<button class="ats-scan-btn" id="ats-scan-btn" onclick="atCheck()" disabled>' +
-            'Quick Scan' +
-          '</button>' +
-          '<button class="ats-run-btn" id="ats-run-btn" onclick="atGenerate()" disabled>' +
-            'Generate ATS Resume' +
+          '<button class="ats-run-btn" id="ats-scan-btn" onclick="atCheck()" disabled>' +
+            'Analyse' +
             '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
               '<path d="M3 8h10M9 4l4 4-4 4"/>' +
             '</svg>' +
@@ -128,6 +126,7 @@ function _atsRenderPicker(resumes) {
   }
 
   var html = '<div class="az-rv-picker">';
+  var multiSlot = resumes.length > 1;
   resumes.forEach(function(r) {
     var ext = r.original_name.split('.').pop().toUpperCase();
     var slotLbl = ATS_SLOT_LABELS[r.slot] || ('Slot ' + (r.slot + 1));
@@ -143,9 +142,6 @@ function _atsRenderPicker(resumes) {
     }
     html += (
       '<div class="az-rv-card' + sel + '" onclick="atsSelectResume(\'' + _atsEscAttr(r.id) + '\',\'' + _atsEscAttr(r.original_name) + '\')">' +
-        '<div class="az-rv-card-left">' +
-          '<span class="az-rv-slot-num">' + (r.slot + 1) + '</span>' +
-        '</div>' +
         '<div class="az-rv-card-body">' +
           '<div class="az-rv-card-label">' + _atsEsc(slotLbl) + ' &middot; ' + _atsEsc(r.label) + '</div>' +
           '<div class="az-rv-card-name">' +
@@ -163,6 +159,20 @@ function _atsRenderPicker(resumes) {
     );
   });
   html += '</div>';
+
+  if (multiSlot) {
+    html +=
+      '<div class="ats-merge-opt">' +
+        '<label class="ats-merge-label">' +
+          '<input type="checkbox" id="ats-merge-check" onchange="atsToggleMerge(this)"' +
+            (_atsMergeAll ? ' checked' : '') + '> ' +
+          '<span class="ats-merge-text">' +
+            '<strong>Merge all resume slots</strong> &mdash; pull skills, experience, and certifications ' +
+            'from every stored slot for a richer ATS output' +
+          '</span>' +
+        '</label>' +
+      '</div>';
+  }
 
   picker.innerHTML = html;
 
@@ -182,6 +192,10 @@ window.atsSelectResume = function(id, name) {
 
   _atsUpdateButtons();
   if (typeof toast === 'function') toast('Resume selected: ' + name, 'ok', 2000);
+};
+
+window.atsToggleMerge = function(cb) {
+  _atsMergeAll = cb.checked;
 };
 
 // === JD binding ===
@@ -213,14 +227,8 @@ function _atsOnJDInput(ta) {
 }
 
 function _atsUpdateButtons() {
-  var jdEl = document.getElementById('ats-jd-input');
-  var jdLen = jdEl ? jdEl.value.trim().length : 0;
   var hasRes = !!_atsResumeId;
-
-  var runBtn = document.getElementById('ats-run-btn');
   var scanBtn = document.getElementById('ats-scan-btn');
-
-  if (runBtn)  runBtn.disabled  = !(hasRes && jdLen >= 50);
   if (scanBtn) scanBtn.disabled = !hasRes;
 }
 
@@ -230,64 +238,21 @@ window.atsClearJD = function() {
 };
 
 // === API calls ===
-window.atGenerate = function() {
-  var ta = document.getElementById('ats-jd-input');
-  var jd = ta ? ta.value.trim() : '';
-
-  if (!_atsResumeId) { if (typeof toast === 'function') toast('Select a resume first.', 'warn'); return; }
-  if (jd.length < 50) { if (typeof toast === 'function') toast('Paste a job description (at least 50 characters).', 'warn'); return; }
-
-  var results = document.getElementById('ats-results');
-  if (results) results.innerHTML = '<div class="ats-loading">Generating ATS-optimised resume&hellip; this may take a moment.</div>';
-
-  var runBtn = document.getElementById('ats-run-btn');
-  if (runBtn) { runBtn.disabled = true; runBtn.textContent = 'Generating…'; }
-
-  fetch('/api/ats/optimise', {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ resume_id: _atsResumeId, jd: jd }),
-  })
-    .then(function(r) { return r.json(); })
-    .then(function(d) {
-      if (!d.ok) {
-        if (results) results.innerHTML =
-          '<div class="ats-error">' + _atsEsc(d.error || 'Generation failed. Please try again.') + '</div>';
-        return;
-      }
-      atRenderResults(d);
-    })
-    .catch(function(e) {
-      if (results) results.innerHTML =
-        '<div class="ats-error">Request failed: ' + _atsEsc(String(e)) + '</div>';
-    })
-    .finally(function() {
-      var runBtn = document.getElementById('ats-run-btn');
-      if (runBtn) {
-        runBtn.disabled = false;
-        runBtn.innerHTML =
-          'Generate ATS Resume' +
-          '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-            '<path d="M3 8h10M9 4l4 4-4 4"/>' +
-          '</svg>';
-      }
-      _atsUpdateButtons();
-    });
-};
-
 window.atCheck = function() {
   if (!_atsResumeId) { if (typeof toast === 'function') toast('Select a resume first.', 'warn'); return; }
 
   var results = document.getElementById('ats-results');
-  if (results) results.innerHTML = '<div class="ats-loading">Scanning resume structure&hellip;</div>';
+  if (results) results.innerHTML = '<div class="ats-loading">Analysing resume&hellip;</div>';
 
   var scanBtn = document.getElementById('ats-scan-btn');
-  if (scanBtn) { scanBtn.disabled = true; scanBtn.textContent = 'Scanning…'; }
+  if (scanBtn) { scanBtn.disabled = true; scanBtn.textContent = 'Analysing…'; }
+
+  var jd = (document.getElementById('ats-jd-input') || {}).value || '';
 
   fetch('/api/ats/check', {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ resume_id: _atsResumeId }),
+    body:    JSON.stringify({ resume_id: _atsResumeId, jd: jd }),
   })
     .then(function(r) { return r.json(); })
     .then(function(d) {
@@ -303,319 +268,156 @@ window.atCheck = function() {
         '<div class="ats-error">Request failed: ' + _atsEsc(String(e)) + '</div>';
     })
     .finally(function() {
-      var scanBtn = document.getElementById('ats-scan-btn');
-      if (scanBtn) { scanBtn.disabled = false; scanBtn.textContent = 'Quick Scan'; }
       _atsUpdateButtons();
+      var scanBtn = document.getElementById('ats-scan-btn');
+      if (scanBtn) {
+        scanBtn.innerHTML =
+          'Analyse' +
+          '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+            '<path d="M3 8h10M9 4l4 4-4 4"/>' +
+          '</svg>';
+      }
     });
 };
 
-// === Generate results rendering ===
-window.atRenderResults = function(d) {
-  var results = document.getElementById('ats-results');
-  if (!results) return;
+// === ATS Score card (keyword coverage only) ===
+function _atsScoreCardHTML(atsScore) {
+  var hasJD = atsScore && atsScore.has_jd;
+  var s = (atsScore && atsScore.score != null) ? atsScore.score : null;
 
-  var html = '<div class="ats-results-inner">';
-
-  // Compact coverage stat at the top
-  if (d.coverage_before && d.coverage_after) {
-    html += _atsCoverageStatHTML(d.coverage_before, d.coverage_after);
+  if (!hasJD || s === null) {
+    return (
+      '<div class="ats-score-card ats-score-no-jd">' +
+        '<div class="ats-score-no-jd-icon">&#128269;</div>' +
+        '<div>' +
+          '<div class="ats-score-no-jd-title">Paste a JD to see your ATS keyword score</div>' +
+          '<div class="ats-score-no-jd-sub">ATS systems score by exact keyword matches - paste the job description above and re-run to see your score.</div>' +
+        '</div>' +
+      '</div>'
+    );
   }
 
-  // Full generated resume card (main output)
-  if (d.resume) {
-    html += _atsResumeHTML(d.resume, d.plain_text || '');
+  var tierCls   = s >= 80 ? 'sc-exc' : s >= 60 ? 'sc-good' : s >= 40 ? 'sc-partial' : 'sc-poor';
+  var tierColor = s >= 80 ? 'var(--green)' : s >= 60 ? 'var(--blue)' : s >= 40 ? 'var(--amber)' : 'var(--red)';
+  var r = 28, circ = +(2 * Math.PI * r).toFixed(2);
+  var offset = +(circ * (1 - s / 100)).toFixed(2);
+  var tierLbl = s >= 80 ? 'Excellent' : s >= 60 ? 'Good' : s >= 40 ? 'Needs work' : 'Poor';
+
+  var ring =
+    '<svg class="ats-score-ring" width="76" height="76" viewBox="0 0 76 76">' +
+      '<circle cx="38" cy="38" r="' + r + '" fill="none" stroke="var(--bd)" stroke-width="5"/>' +
+      '<circle cx="38" cy="38" r="' + r + '" fill="none" stroke="' + tierColor + '" stroke-width="5"' +
+        ' stroke-dasharray="' + circ + '" stroke-dashoffset="' + offset + '"' +
+        ' stroke-linecap="round" transform="rotate(-90 38 38)"/>' +
+    '</svg>' +
+    '<div class="ats-score-num ' + tierCls + '">' + s + '%</div>';
+
+  return (
+    '<div class="ats-score-card">' +
+      '<div class="ats-score-left">' +
+        '<div class="ats-score-ring-wrap">' + ring + '</div>' +
+        '<div class="ats-score-lbl">ATS Score</div>' +
+      '</div>' +
+      '<div class="ats-score-right">' +
+        '<div class="ats-score-title ' + tierCls + '">' + tierLbl + '</div>' +
+        '<div class="ats-score-desc">Your resume contains <strong>' + s + '%</strong> of the required keywords verbatim. ATS systems scan for exact strings - this is your actual keyword match rate.</div>' +
+      '</div>' +
+    '</div>'
+  );
+}
+
+// === Keyword capsules ===
+function _atsKeywordCapsulesHTML(coverage) {
+  if (!coverage || !coverage.total) return '';
+  var matched = coverage.matched || [];
+  var missing = coverage.missing || [];
+  var caps =
+    matched.map(function(s) { return '<span class="kw-cap kw-cap--hit">' + _atsEsc(s) + '</span>'; }).join('') +
+    missing.map(function(s) { return '<span class="kw-cap kw-cap--miss tr">' + _atsEsc(s) + '</span>'; }).join('');
+  return (
+    '<div class="ats-kw-block">' +
+      '<div class="ats-block-hd">Required Keywords &mdash; ' + matched.length + ' of ' + coverage.total + ' found verbatim</div>' +
+      '<div class="ats-kw-caps">' + caps + '</div>' +
+    '</div>'
+  );
+}
+
+// === Section checklist ===
+function _atsSectionChecklistHTML(secFlags) {
+  if (!secFlags || !secFlags.length) return '';
+  var found = secFlags.filter(function(f) { return f.found; }).length;
+  var rows = secFlags.map(function(f) {
+    return (
+      '<div class="ats-check-row' + (f.found ? '' : ' ats-check-fail') + '">' +
+        '<span class="ats-check-icon">' + (f.found ? '&#10003;' : '&#10007;') + '</span>' +
+        '<span class="ats-check-lbl">' + _atsEsc(f.name) + '</span>' +
+        (!f.found && f.suggestion ? '<span class="ats-check-hint">' + _atsEsc(f.suggestion) + '</span>' : '') +
+      '</div>'
+    );
+  }).join('');
+  return (
+    '<div class="ats-kw-block">' +
+      '<div class="ats-block-hd">Section Headings &mdash; ' + found + ' of ' + secFlags.length + ' detected</div>' +
+      '<div class="ats-check-list">' + rows + '</div>' +
+    '</div>'
+  );
+}
+
+// === Formatting checklist ===
+function _atsFormattingChecklistHTML(fmtFlags) {
+  if (!fmtFlags) return '';
+  if (!fmtFlags.length) {
+    return (
+      '<div class="ats-kw-block">' +
+        '<div class="ats-block-hd">Formatting</div>' +
+        '<div class="ats-check-list">' +
+          '<div class="ats-check-row">' +
+            '<span class="ats-check-icon">&#10003;</span>' +
+            '<span class="ats-check-lbl">No formatting issues detected</span>' +
+          '</div>' +
+        '</div>' +
+      '</div>'
+    );
   }
+  var rows = fmtFlags.map(function(f) {
+    return (
+      '<div class="ats-check-row ats-check-fail">' +
+        '<span class="ats-check-icon">&#9888;</span>' +
+        '<span class="ats-check-lbl">' + _atsEsc(f) + '</span>' +
+      '</div>'
+    );
+  }).join('');
+  return (
+    '<div class="ats-kw-block">' +
+      '<div class="ats-block-hd">Formatting &mdash; ' + fmtFlags.length + ' issue' + (fmtFlags.length > 1 ? 's' : '') + '</div>' +
+      '<div class="ats-check-list">' + rows + '</div>' +
+    '</div>'
+  );
+}
 
-  // Collapsible warnings - only if there are actual issues
-  var missingSections = (d.section_flags || []).filter(function(f) { return !f.found; });
-  var fmtFlags = d.formatting_flags || [];
-  if (missingSections.length || fmtFlags.length) {
-    html += _atsWarningsHTML(missingSections, fmtFlags);
-  }
-
-  html += '</div>';
-  results.innerHTML = html;
-};
-
-// === Quick Scan results rendering ===
+// === Results rendering ===
 window.atRenderCheckResults = function(d) {
   var results = document.getElementById('ats-results');
   if (!results) return;
 
   var html = '<div class="ats-results-inner">';
 
+  // ATS score (keyword coverage only)
+  html += _atsScoreCardHTML(d.ats_score || null);
+
+  // Keyword capsules when JD was provided
+  if (d.coverage && d.coverage.total) {
+    html += _atsKeywordCapsulesHTML(d.coverage);
+  }
+
+  // Section headings checklist
   if (d.section_flags && d.section_flags.length) {
-    html += _atsSectionFlagsHTML(d.section_flags);
+    html += _atsSectionChecklistHTML(d.section_flags);
   }
 
-  if (d.formatting_flags && d.formatting_flags.length) {
-    html += _atsFormattingFlagsHTML(d.formatting_flags);
-  }
-
-  if ((!d.section_flags || !d.section_flags.length) && (!d.formatting_flags || !d.formatting_flags.length)) {
-    html += '<div class="ats-all-ok">No structural or formatting issues found.</div>';
-  }
+  // Formatting checklist
+  html += _atsFormattingChecklistHTML(d.formatting_flags || []);
 
   html += '</div>';
   results.innerHTML = html;
-};
-
-// === Coverage stat (compact) ===
-function _atsCoverageStatHTML(before, after) {
-  var bPct = before.pct || 0;
-  var aPct = after.pct  || 0;
-  var gain = aPct - bPct;
-  var tierCls = aPct >= 80 ? 'sc-exc' : aPct >= 60 ? 'sc-good' : aPct >= 40 ? 'sc-partial' : 'sc-poor';
-  var gainHtml = gain > 0
-    ? '<span class="ats-cov-gain">+' + gain + '%</span>'
-    : '';
-
-  return (
-    '<div class="ats-cov-stat">' +
-      '<span class="ats-cov-stat-lbl">JD keyword coverage</span>' +
-      '<span class="ats-cov-before-val">' + bPct + '%</span>' +
-      '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-        '<path d="M3 8h10M9 4l4 4-4 4"/>' +
-      '</svg>' +
-      '<span class="ats-cov-after-val ' + tierCls + '">' + aPct + '%</span>' +
-      gainHtml +
-      '<span class="ats-cov-detail">' + after.matched.length + ' / ' + after.total + ' keywords matched</span>' +
-    '</div>'
-  );
-}
-
-// === Full resume card ===
-function _atsResumeHTML(resume, plainText) {
-  var copyBtn =
-    '<button class="ats-copy-resume-btn" onclick="atCopyResume(this)" data-text="' + _atsEscAttr(plainText) + '">' +
-      '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-        '<rect x="5" y="5" width="9" height="10" rx="1.5"/>' +
-        '<path d="M11 5V3.5A1.5 1.5 0 0 0 9.5 2h-6A1.5 1.5 0 0 0 2 3.5v8A1.5 1.5 0 0 0 3.5 13H5"/>' +
-      '</svg>' +
-      'Copy full resume' +
-    '</button>';
-
-  var toolbar =
-    '<div class="ats-resume-toolbar">' +
-      '<span class="ats-resume-label">ATS-Optimised Resume</span>' +
-      copyBtn +
-    '</div>';
-
-  var body = '<div class="ats-resume-body">';
-
-  // Professional Summary
-  if (resume.summary) {
-    body +=
-      '<div class="ats-resume-section">' +
-        '<div class="ats-resume-sh">Professional Summary</div>' +
-        '<p class="ats-resume-summary">' + _atsEsc(resume.summary) + '</p>' +
-      '</div>';
-  }
-
-  // Work Experience
-  if (resume.experience && resume.experience.length) {
-    body += '<div class="ats-resume-section"><div class="ats-resume-sh">Work Experience</div>';
-    (resume.experience || []).forEach(function(role) {
-      var headerParts = [role.title, role.company, role.dates].filter(Boolean).map(_atsEsc);
-      var header = headerParts.join(' <span class="ats-role-sep">|</span> ');
-      var bullets = (role.bullets || []).map(function(b) {
-        return '<li>' + _atsEsc(b) + '</li>';
-      }).join('');
-      body +=
-        '<div class="ats-resume-role">' +
-          (header ? '<div class="ats-role-hd">' + header + '</div>' : '') +
-          (bullets ? '<ul class="ats-role-bullets">' + bullets + '</ul>' : '') +
-        '</div>';
-    });
-    body += '</div>';
-  }
-
-  // Skills
-  if (resume.skills && resume.skills.length) {
-    body +=
-      '<div class="ats-resume-section">' +
-        '<div class="ats-resume-sh">Skills</div>' +
-        '<p class="ats-skills-text">' + resume.skills.map(_atsEsc).join(', ') + '</p>' +
-      '</div>';
-  }
-
-  // Education
-  if (resume.education && resume.education.length) {
-    body += '<div class="ats-resume-section"><div class="ats-resume-sh">Education</div>';
-    (resume.education || []).forEach(function(edu) {
-      var parts = [edu.degree, edu.institution, edu.year].filter(Boolean).map(_atsEsc);
-      if (parts.length) {
-        body += '<div class="ats-edu-entry">' + parts.join(' <span class="ats-role-sep">|</span> ') + '</div>';
-      }
-    });
-    body += '</div>';
-  }
-
-  body += '</div>'; // .ats-resume-body
-
-  return (
-    '<div class="ats-resume-card">' +
-      toolbar +
-      body +
-    '</div>'
-  );
-}
-
-// === Collapsible warnings ===
-function _atsWarningsHTML(missingSections, formattingFlags) {
-  var count = missingSections.length + formattingFlags.length;
-  var warnIcon =
-    '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-      '<path d="M8 1L1 14h14L8 1z"/>' +
-      '<line x1="8" y1="6" x2="8" y2="10"/>' +
-      '<circle cx="8" cy="12.5" r=".5" fill="currentColor"/>' +
-    '</svg>';
-
-  var rows = '';
-  missingSections.forEach(function(f) {
-    rows +=
-      '<div class="ats-flag-item ats-flag-warn">' +
-        warnIcon +
-        '<div class="ats-flag-body">' +
-          '<span class="ats-flag-name">Missing section: ' + _atsEsc(f.name) + '</span>' +
-          (f.suggestion ? '<span class="ats-flag-suggestion">' + _atsEsc(f.suggestion) + '</span>' : '') +
-        '</div>' +
-      '</div>';
-  });
-  formattingFlags.forEach(function(f) {
-    rows +=
-      '<div class="ats-flag-item ats-flag-warn">' +
-        warnIcon +
-        '<div class="ats-flag-body"><span class="ats-flag-name">' + _atsEsc(f) + '</span></div>' +
-      '</div>';
-  });
-
-  var chevron =
-    '<svg class="ats-warn-chevron" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-      '<path d="M4 6l4 4 4-4"/>' +
-    '</svg>';
-
-  return (
-    '<div class="ats-section ats-warnings-section">' +
-      '<div class="ats-section-hd ats-warn-toggle" onclick="atsToggleWarnings(this)">' +
-        warnIcon +
-        '<span>' + count + ' formatting warning' + (count !== 1 ? 's' : '') + ' detected in original resume</span>' +
-        chevron +
-      '</div>' +
-      '<div class="ats-warn-list">' + rows + '</div>' +
-    '</div>'
-  );
-}
-
-window.atsToggleWarnings = function(hd) {
-  var list = hd.parentElement && hd.parentElement.querySelector('.ats-warn-list');
-  if (!list) return;
-  var open = list.classList.toggle('ats-warn-list--open');
-  var chevron = hd.querySelector('.ats-warn-chevron');
-  if (chevron) chevron.style.transform = open ? 'rotate(180deg)' : '';
-};
-
-// === Section flags (used by Quick Scan) ===
-function _atsSectionFlagsHTML(flags) {
-  var rows = flags.map(function(f) {
-    if (f.found) {
-      return (
-        '<div class="ats-flag-item ats-flag-ok">' +
-          '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-            '<path d="M2 8l4 4 8-8"/>' +
-          '</svg>' +
-          '<span class="ats-flag-name">' + _atsEsc(f.name) + '</span>' +
-        '</div>'
-      );
-    }
-    var suggestion = f.suggestion
-      ? '<span class="ats-flag-suggestion">' + _atsEsc(f.suggestion) + '</span>'
-      : '';
-    return (
-      '<div class="ats-flag-item ats-flag-warn">' +
-        '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-          '<path d="M8 1L1 14h14L8 1z"/>' +
-          '<line x1="8" y1="6" x2="8" y2="10"/>' +
-          '<circle cx="8" cy="12.5" r=".5" fill="currentColor"/>' +
-        '</svg>' +
-        '<div class="ats-flag-body">' +
-          '<span class="ats-flag-name">' + _atsEsc(f.name) + '</span>' +
-          suggestion +
-        '</div>' +
-      '</div>'
-    );
-  }).join('');
-
-  return (
-    '<div class="ats-section">' +
-      '<div class="ats-section-hd">' +
-        '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-          '<rect x="2" y="2" width="12" height="12" rx="2"/>' +
-          '<line x1="5" y1="8" x2="11" y2="8"/>' +
-          '<line x1="8" y1="5" x2="8" y2="11"/>' +
-        '</svg>' +
-        '<span>Resume Sections</span>' +
-      '</div>' +
-      '<div class="ats-flag-list">' + rows + '</div>' +
-    '</div>'
-  );
-}
-
-// === Formatting flags (used by Quick Scan) ===
-function _atsFormattingFlagsHTML(flags) {
-  var rows = flags.map(function(f) {
-    return (
-      '<div class="ats-flag-item ats-flag-warn">' +
-        '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-          '<path d="M8 1L1 14h14L8 1z"/>' +
-          '<line x1="8" y1="6" x2="8" y2="10"/>' +
-          '<circle cx="8" cy="12.5" r=".5" fill="currentColor"/>' +
-        '</svg>' +
-        '<div class="ats-flag-body">' +
-          '<span class="ats-flag-name">' + _atsEsc(f) + '</span>' +
-        '</div>' +
-      '</div>'
-    );
-  }).join('');
-
-  return (
-    '<div class="ats-section">' +
-      '<div class="ats-section-hd">' +
-        '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-          '<line x1="3" y1="5" x2="13" y2="5"/>' +
-          '<line x1="3" y1="8" x2="13" y2="8"/>' +
-          '<line x1="3" y1="11" x2="9" y2="11"/>' +
-        '</svg>' +
-        '<span>Formatting Issues</span>' +
-      '</div>' +
-      '<div class="ats-flag-list">' + rows + '</div>' +
-    '</div>'
-  );
-}
-
-// === Copy ===
-window.atCopyResume = function(btn) {
-  var text = btn.getAttribute('data-text') || '';
-  if (!text) {
-    if (typeof toast === 'function') toast('No resume content to copy.', 'warn');
-    return;
-  }
-  var origHtml = btn.innerHTML;
-  if (navigator.clipboard) {
-    navigator.clipboard.writeText(text).then(function() {
-      btn.textContent = 'Copied!';
-      setTimeout(function() { btn.innerHTML = origHtml; }, 1400);
-    }).catch(function() {
-      if (typeof toast === 'function') toast('Could not copy - please copy manually.', 'warn');
-    });
-  } else {
-    var ta = document.createElement('textarea');
-    ta.value = text;
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    document.body.removeChild(ta);
-    btn.textContent = 'Copied!';
-    setTimeout(function() { btn.innerHTML = origHtml; }, 1400);
-  }
 };

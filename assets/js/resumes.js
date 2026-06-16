@@ -42,7 +42,6 @@ function _rvRenderSlots(resumes) {
 function _rvEmptySlot(slot, meta) {
   return (
     '<div class="rv-slot rv-slot-empty" onclick="rvPickFile(' + slot + ')">' +
-      '<div class="rv-slot-num">' + (slot + 1) + '</div>' +
       '<div class="rv-slot-body">' +
         '<div class="rv-slot-label">' + meta.label + '</div>' +
         '<div class="rv-slot-hint">' + meta.hint + '</div>' +
@@ -62,7 +61,6 @@ function _rvFilledSlot(r, meta) {
   var ext = r.original_name.split('.').pop().toUpperCase();
   return (
     '<div class="rv-slot rv-slot-filled">' +
-      '<div class="rv-slot-num">' + (r.slot + 1) + '</div>' +
       '<div class="rv-slot-body">' +
         '<div class="rv-slot-label-row">' +
           '<span class="rv-slot-label" id="rv-lbl-' + r.id + '" title="Click to rename" onclick="rvEditLabel(\'' + r.id + '\')">' +
@@ -112,26 +110,14 @@ function _rvRenderPicker(resumes) {
   resumes.forEach(function(r) {
     var ext = r.original_name.split('.').pop().toUpperCase();
     var sel = (window._resumeId === r.id) ? ' selected' : '';
-    var hist = '';
-    if (r.last_score != null) {
-      var tierCls = r.last_score >= 80 ? 'sc-exc' : r.last_score >= 60 ? 'sc-good' : r.last_score >= 40 ? 'sc-partial' : 'sc-poor';
-      hist = '<div class="az-rv-card-hist">' +
-             '<span class="az-rv-hist-score ' + tierCls + '">' + r.last_score + '%</span>' +
-             '<span class="az-rv-hist-jd">' + _esc((r.last_jd || '').slice(0, 55)) + '…</span>' +
-             '</div>';
-    }
     html += (
       '<div class="az-rv-card' + sel + '" onclick="rvSelect(\'' + r.id + '\',\'' + _esc(r.original_name) + '\')">' +
-        '<div class="az-rv-card-left">' +
-          '<span class="az-rv-slot-num">' + (r.slot + 1) + '</span>' +
-        '</div>' +
         '<div class="az-rv-card-body">' +
           '<div class="az-rv-card-label">' + _esc(r.label) + '</div>' +
           '<div class="az-rv-card-name">' +
             '<span class="rv-ext-badge">' + ext + '</span>' +
             _esc(r.original_name) +
           '</div>' +
-          hist +
         '</div>' +
         '<div class="az-rv-card-check">' +
           '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +

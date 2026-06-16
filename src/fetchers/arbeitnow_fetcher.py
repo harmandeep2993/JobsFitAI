@@ -93,7 +93,11 @@ def fetch_arbeitnow_jobs(
             logger.error("Arbeitnow request failed (page %d): %s", page, e)
             break
 
-        raw_jobs = response.json().get("data", [])
+        try:
+            raw_jobs = response.json().get("data", [])
+        except ValueError as e:
+            logger.error("Arbeitnow JSON parse failed (page %d): %s", page, e)
+            break
         if not raw_jobs:
             break
 

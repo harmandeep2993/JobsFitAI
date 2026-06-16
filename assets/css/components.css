@@ -105,8 +105,9 @@
   color: var(--t2);
   font-family: 'DM Mono', monospace;
 }
-.mt-status.ok  { color: var(--green); }
-.mt-status.err { color: var(--red); }
+.mt-status.ok   { color: var(--green); }
+.mt-status.err  { color: var(--red); }
+.mt-status.warn { color: var(--amber); }
 
 .set-status {
   font-size: 12px;
@@ -560,9 +561,6 @@
   white-space: nowrap;
   line-height: 1.5;
 }
-.tg { background: var(--green-bg); color: var(--green); border-color: var(--green-bd); }
-.tr { background: var(--red-bg);   color: var(--red);   border-color: var(--red-bd); }
-
 .rz-chip {
   display: inline-flex;
   padding: 2px 8px;
@@ -1083,12 +1081,19 @@
 .hv-fetch-badge--zero { color: var(--t3); background: var(--bg-c); }
 .hv-entry--fetch .hv-entry-body { gap: 3px; display: flex; flex-direction: column; }
 .hv-run-time { font-weight: 400; color: var(--t3); font-size: 12px; }
+.hv-manual-badge { font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 4px; background: var(--accent-xl); color: var(--accent); vertical-align: middle; }
 .hv-entry-sources { margin-top: 2px; }
 .hv-src-row { display: flex; gap: 5px; flex-wrap: wrap; }
 .hv-src-badge { font-size: 10.5px; font-weight: 600; padding: 1px 6px; border-radius: 4px; }
 .hv-src-az  { background: var(--blue-bg);   color: var(--blue);   }
 .hv-src-arb { background: var(--green-bg);  color: var(--green);  }
 .hv-src-ba  { background: var(--amber-bg);  color: var(--amber);  }
+
+/* Source badge on job cards - more prominent than history variant */
+.jt-src-badge { font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 99px; letter-spacing: 0.02em; flex-shrink: 0; }
+.jt-src-az    { background: var(--blue-bg);   color: var(--blue);   border: 1px solid var(--blue-bd);  }
+.jt-src-arb   { background: var(--green-bg);  color: var(--green);  border: 1px solid var(--green-bd); }
+.jt-src-ba    { background: var(--amber-bg);  color: var(--amber);  border: 1px solid var(--amber-bd); }
 
 /* Application status badges (history + job cards) */
 .hv-app-status { font-size: 10.5px; font-weight: 600; padding: 1px 6px; border-radius: 4px; margin-right: 4px; }
@@ -1384,7 +1389,25 @@
   text-align: center;
   font-size: 13px;
   color: var(--t3);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
 }
+
+.mt-reset-filters {
+  padding: 5px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-xl);
+  border: 1px solid var(--accent-s);
+  border-radius: var(--radius-s);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background .1s, border-color .1s;
+}
+.mt-reset-filters:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
 
 .mt-resume-row { display: flex; align-items: center; gap: 10px; }
 
@@ -1486,28 +1509,29 @@
   flex-shrink: 0;
 }
 
-/* Numbered badge */
-.az-pnum {
-  width: 20px;
-  height: 20px;
-  border-radius: 5px;
-  background: var(--accent);
-  color: #fff;
-  font-size: 10px;
-  font-weight: 800;
-  font-family: 'DM Mono', monospace;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  letter-spacing: -0.3px;
-}
-
 /* Panel label */
 .az-plbl {
   font-size: 12px;
   font-weight: 600;
   color: var(--t1);
+}
+.az-plbl-accent {
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
+}
+.az-pnum {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  flex-shrink: 0;
 }
 
 /* Panel action button */
@@ -1638,12 +1662,22 @@
 .az-panel-hd .jd-counter.warn  { color: var(--amber); }
 .az-panel-hd .jd-counter.limit { color: var(--red); }
 
-/* CTA row */
-.az-cta {
+/* JD panel footer (Ctrl+Enter hint + Analyse button) */
+.az-jd-foot {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--bd-s);
+  background: var(--bg-c);
+  flex-shrink: 0;
+}
+
+.az-shortcut {
+  font-size: 11px;
+  color: var(--t3);
+  font-family: 'DM Mono', monospace;
+  margin-right: auto;
 }
 
 .az-analyse-btn {

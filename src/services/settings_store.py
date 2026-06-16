@@ -166,7 +166,7 @@ def set_arbeitnow_limit(n: int) -> None:
 
 
 def get_bundesagentur_limit() -> int:
-    return int(_get("bundesagentur_limit", 10))
+    return int(_get("bundesagentur_limit", 50))
 
 
 def set_bundesagentur_limit(n: int) -> None:

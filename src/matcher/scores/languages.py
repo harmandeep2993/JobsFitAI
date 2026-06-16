@@ -2,21 +2,17 @@
 """
 Language scoring for JOBsFitAI.
 
-Compares candidate languages against JD required languages.
-
-Handles:
-    - Native/variant language names (deutsch→german, français→french)
-      using langcodes library - no manual mapping needed
-    - Proficiency levels (CEFR: a1-c2, fluent, conversational, etc.)
-    - Partial credit for language present at insufficient level
-    - All world languages supported via langcodes
+Compares candidate languages against JD required languages, including
+proficiency levels from both sides.
 
 Scoring per required language:
-    100 - language present at acceptable level (B1+) or level unspecified
-     50 - language present but below B1
+    100 - language present AND candidate level >= JD required level
+    100 - language present, level unspecified on either side (benefit of doubt)
+     50 - language present but candidate level < JD required level (weak point)
       0 - language missing entirely
 
 Final score = average of per-language scores.
+Weak languages (score=50) are collected so callers can surface them as gaps.
 """
 
 import langcodes
@@ -56,7 +52,6 @@ PROFICIENCY_LEVELS = {
     "intermediate": 3,
     "conversational": 3,
     "konversation": 3,
-    "learning b2": 3,
     # A2 - elementary
     "a2": 2,
     "elementary": 2,
@@ -69,14 +64,26 @@ PROFICIENCY_LEVELS = {
     "starter": 1,
 }
 
-# Minimum proficiency level considered acceptable - B1 / conversational
-MIN_ACCEPTABLE_LEVEL = 3
-
 # Neutral score when JD has no language requirements
 NO_REQUIREMENT_SCORE = 60.0
 
-# Partial credit for language present but below minimum level
-PARTIAL_CREDIT_SCORE = 50.0
+# Partial credit when language matches but proficiency is below what JD requires
+WEAK_MATCH_SCORE = 50.0
+
+# Human-readable label per numeric proficiency level (used in logs and gap strings)
+_LEVEL_LABEL: dict[int, str] = {
+    6: "native",
+    5: "fluent",
+    4: "professional",
+    3: "intermediate",
+    2: "basic",
+    1: "beginner",
+    0: "unspecified",
+}
+
+
+def _label(level: int) -> str:
+    return _LEVEL_LABEL.get(level, str(level))
 
 
 # ---------------------------------------------------------------------------
@@ -86,73 +93,60 @@ PARTIAL_CREDIT_SCORE = 50.0
 
 def _extract_level(text: str) -> int:
     """
-    Extract proficiency level from a language string.
+    Extract proficiency level from a text string.
     Checks longest keywords first to avoid partial matches.
-
-    Args:
-        text (str): Raw language string (already lowercased)
-
-    Returns:
-        int: Proficiency level 0-6. 0 means not specified.
+    Returns 0 if no level found.
     """
     sorted_keywords = sorted(PROFICIENCY_LEVELS.keys(), key=len, reverse=True)
-
     for keyword in sorted_keywords:
         if keyword in text:
             return PROFICIENCY_LEVELS[keyword]
-
     return 0
 
 
 def _normalize_language(text: str) -> tuple[str, int]:
     """
-    Parse a raw language string into canonical English name
-    and numeric proficiency level.
-
-    Uses langcodes library to normalize language names -
-    handles native names, ISO codes, and English names
-    for all world languages automatically.
-
-    Examples:
-        "german (c1)"              → ("german", 5)
-        "english (professional)"   → ("english", 4)
-        "français (courant)"       → ("french", 3)
-        "deutsch (b2)"             → ("german", 4)
-        "conversational german"    → ("german", 3)
-        "german"                   → ("german", 0)
-
-    Args:
-        text (str): Raw language string from resume or JD
-
-    Returns:
-        tuple[str, int]: (canonical_english_name, proficiency_level)
-                         level 0 means not specified
+    Parse a raw language string into (canonical_english_name, proficiency_level).
+    Level 0 means not specified.
     """
     text = text.lower().strip()
     level = _extract_level(text)
 
-    # Extract language name - part before parenthesis or comma
     lang_part = text.split("(")[0].split(",")[0].strip()
-
-    # Remove proficiency keywords from lang_part
-    # e.g. "conversational german" -> "german"
     for keyword in PROFICIENCY_LEVELS:
         lang_part = lang_part.replace(keyword, "").strip()
 
     if not lang_part:
-        logger.warning("Could not extract language name from: '%s'", text)
         return text, level
 
-    # Normalize using langcodes
     try:
         lang = langcodes.find(lang_part)
-        canonical = lang.display_name().lower()
-        logger.debug("Normalized '%s' → '%s' (level %d)", text, canonical, level)
-        return canonical, level
-
+        return lang.display_name().lower(), level
     except Exception:
         logger.warning("langcodes could not normalize '%s' - using as-is", lang_part)
         return lang_part, level
+
+
+def _parse_lang_entry(entry) -> tuple[str, int]:
+    """
+    Handle both formats:
+      - dict: {"language": "german", "proficiency": "B1"}  (new schema)
+      - str:  "german (B1)"                                 (legacy)
+
+    Returns (canonical_name, proficiency_level).
+    """
+    if isinstance(entry, dict):
+        lang_str = (entry.get("language") or "").strip()
+        prof_str = (entry.get("proficiency") or "").lower().strip()
+        if not lang_str:
+            return "", 0
+        level = _extract_level(prof_str)
+        try:
+            canonical = langcodes.find(lang_str.lower()).display_name().lower()
+        except Exception:
+            canonical = lang_str.lower()
+        return canonical, level
+    return _normalize_language(str(entry))
 
 
 # ---------------------------------------------------------------------------
@@ -160,85 +154,91 @@ def _normalize_language(text: str) -> tuple[str, int]:
 # ---------------------------------------------------------------------------
 
 
-def score_languages(resume: dict, jd: dict) -> float:
+def score_languages(resume: dict, jd: dict) -> tuple[float, list[str], list[str]]:
     """
-    Match candidate languages against JD required languages.
+    Match candidate languages against JD required languages with proficiency.
 
     Per-language scoring:
-        100 - present at B1+ or level unspecified (benefit of doubt)
-         50 - present but below B1
-          0 - missing entirely
-
-    Final score = average of per-language scores.
-
-    Args:
-        resume (dict): Extracted resume data
-        jd (dict): Extracted JD data
+        100 - candidate level >= JD required level (or either side unspecified)
+         50 - language present but candidate level < JD required level
+          0 - language missing from resume
 
     Returns:
-        float: Language score 0-100
+        (score, matched_languages, weak_languages)
+        weak_languages are languages present but below required proficiency.
     """
-    required_raw = [lang for lang in jd.get("languages", []) if lang]
+    raw_required = [e for e in jd.get("languages", []) if e]
+    # Filter out schema-template placeholders where language name is empty.
+    required_parsed = [p for p in (_parse_lang_entry(e) for e in raw_required) if p[0]]
 
-    # --- Edge case: no language requirements ---
-    if not required_raw:
+    if not required_parsed:
         logger.info(
             "No language requirements in JD - returning neutral %.1f",
             NO_REQUIREMENT_SCORE,
         )
-        return NO_REQUIREMENT_SCORE
+        return NO_REQUIREMENT_SCORE, [], []
 
-    # --- Parse required and candidate languages ---
-    required_parsed = [_normalize_language(lang) for lang in required_raw]
     candidate_parsed = [
-        _normalize_language(lang) for lang in resume.get("languages", []) if lang
+        p
+        for p in (_parse_lang_entry(e) for e in resume.get("languages", []) if e)
+        if p[0]
     ]
 
-    # Candidate lookup - language name -> proficiency level
-    candidate_map = {lang: level for lang, level in candidate_parsed}
+    # candidate lookup: language name -> proficiency level
+    candidate_map: dict[str, int] = {}
+    for lang, level in candidate_parsed:
+        if lang:
+            candidate_map[lang] = level
 
-    logger.info("Required languages : %s", required_parsed)
-    logger.info("Candidate languages : %s", candidate_map)
+    req_readable = [(lang, _label(lvl)) for lang, lvl in required_parsed]
+    cand_readable = {lang: _label(lvl) for lang, lvl in candidate_parsed}
+    logger.info("Required  : %s", req_readable)
+    logger.info("Candidate : %s", cand_readable)
 
-    # --- Score each required language ---
-    per_language_scores = []
+    per_scores: list[float] = []
+    matched: list[str] = []
+    weak: list[str] = []
 
-    for req_lang, _ in required_parsed:
+    for req_lang, req_level in required_parsed:
         if req_lang not in candidate_map:
-            logger.warning("Required language '%s' missing from resume", req_lang)
-            per_language_scores.append(0.0)
+            logger.debug("Required language '%s' missing from resume", req_lang)
+            per_scores.append(0.0)
             continue
 
-        candidate_level = candidate_map[req_lang]
+        cand_level = candidate_map[req_lang]
 
-        if candidate_level == 0:
-            # Level unspecified - benefit of doubt
+        if req_level == 0 or cand_level == 0:
+            # Either side unspecified - benefit of doubt, full score
             logger.info(
-                "Language '%s' present, level unspecified - full score", req_lang
-            )
-            per_language_scores.append(100.0)
-
-        elif candidate_level >= MIN_ACCEPTABLE_LEVEL:
-            # Meets minimum level requirement
-            logger.info(
-                "Language '%s' at level %d - meets requirement",
+                "Language '%s': proficiency unspecified on %s - full score",
                 req_lang,
-                candidate_level,
+                "JD" if req_level == 0 else "resume",
             )
-            per_language_scores.append(100.0)
+            per_scores.append(100.0)
+            matched.append(req_lang)
+
+        elif cand_level >= req_level:
+            logger.info(
+                "Language '%s': %s >= required %s - full score",
+                req_lang,
+                _label(cand_level),
+                _label(req_level),
+            )
+            per_scores.append(100.0)
+            matched.append(req_lang)
 
         else:
-            # Present but below minimum
-            logger.warning(
-                "Language '%s' at level %d - below minimum %d, partial credit",
+            logger.debug(
+                "Language '%s': have %s, need %s - weak match",
                 req_lang,
-                candidate_level,
-                MIN_ACCEPTABLE_LEVEL,
+                _label(cand_level),
+                _label(req_level),
             )
-            per_language_scores.append(PARTIAL_CREDIT_SCORE)
+            per_scores.append(WEAK_MATCH_SCORE)
+            weak.append(
+                f"{req_lang} (have: {_label(cand_level)}, need: {_label(req_level)})"
+            )
 
-    # --- Final score ---
-    score = round(sum(per_language_scores) / len(per_language_scores), 1)
-
-    logger.info("Language score: %s", score)
-    return score
+    score = round(sum(per_scores) / len(per_scores), 1)
+    logger.info("Language score: %.1f  matched=%s  weak=%s", score, matched, weak)
+    return score, matched, weak

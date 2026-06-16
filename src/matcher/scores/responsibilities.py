@@ -66,8 +66,10 @@ def score_responsibilities(resume: dict, jd: dict) -> float:
     jd_bullets = jd.get("responsibilities", [])
 
     # --- Clean both lists ---
-    resume_bullets = [b.strip() for b in resume_bullets if b.strip()]
-    jd_bullets = [b.strip() for b in jd_bullets if b.strip()]
+    resume_bullets = [
+        b.strip() for b in resume_bullets if isinstance(b, str) and b.strip()
+    ]
+    jd_bullets = [b.strip() for b in jd_bullets if isinstance(b, str) and b.strip()]
 
     logger.info("Resume bullets collected : %d", len(resume_bullets))
     logger.info("JD bullets collected : %d", len(jd_bullets))
