@@ -48,7 +48,6 @@ _QUIET_INTERNAL = [
     "extract",
     "resume_prompt",
     "jd_prompt",
-    "router",
     "embedding_model",
     "config",
     "validator",
