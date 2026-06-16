@@ -2,11 +2,10 @@
 """
 LLM relevance gate for the Job Matches funnel.
 
-A single cheap call per new job - it sees only the title and a short
-snippet - decides whether the posting is a relevant AI/ML/Data role and
-whether it's entry-level. Running this BEFORE the full-JD extraction means
-we never spend the expensive extraction/scoring tokens on irrelevant or
-senior jobs.
+Classifies jobs by title only - snippets are unreliable (BA posts metadata,
+Adzuna posts company intros in the first N chars). The title alone reliably
+signals relevance (AI/ML/Data vs unrelated) and seniority (Senior/Lead in
+title). Batch size 30 titles per LLM call keeps cost low.
 """
 
 from src.utils.logger import get_logger
@@ -14,41 +13,36 @@ from src.utils.router import call_llm, parse_json_response
 
 logger = get_logger(__name__)
 
-_PROMPT = """You screen job postings for an ENTRY-LEVEL candidate targeting AI / Machine Learning / Data roles (e.g. machine learning engineer, AI engineer, data scientist, NLP/LLM/GenAI engineer, MLOps, computer vision, data analyst, analytics engineer, applied scientist - including junior/graduate/trainee/working-student versions).
+_PROMPT = """Screen a job title for an entry-level AI/ML/Data candidate.
 
-Decide two things from the title and snippet:
-- relevant: true only if it is an AI/ML/Data role (NOT sales, marketing, finance, accounting, HR, civil/mechanical engineering, consulting, support, etc.).
-- entry_level: true by DEFAULT. Set it false ONLY when the role is clearly senior - i.e. the title contains senior / sr. / lead / principal / staff / head / director / manager / architect, OR the text explicitly requires 3+ years of experience. A plain role with no seniority wording (e.g. "Data Scientist", "ML Engineer") IS entry_level=true.
+relevant=true: AI, ML, Data Science, NLP, LLM, GenAI, MLOps, Computer Vision, Data Analyst, Analytics Engineer, Applied Scientist (incl. junior/graduate/trainee). NOT sales, marketing, finance, HR, civil/mechanical engineering, general software dev unrelated to AI.
+entry_level=true by DEFAULT. false ONLY if title contains: senior/sr/lead/principal/staff/head/director/manager/architect.
 
-Return ONLY JSON, no prose: {{"relevant": true/false, "entry_level": true/false, "reason": "<=8 words"}}
+Return ONLY JSON: {{"relevant": true/false, "entry_level": true/false, "reason": "<=8 words"}}
 
 TITLE: {title}
-SNIPPET: {snippet}
 JSON:"""
 
 
-_BATCH_PROMPT = """You screen job postings for an ENTRY-LEVEL candidate targeting AI / Machine Learning / Data roles (machine learning engineer, AI engineer, data scientist, NLP/LLM/GenAI engineer, MLOps, computer vision, data analyst, analytics engineer, applied scientist - incl. junior/graduate/trainee).
+_BATCH_PROMPT = """Screen job titles for an entry-level AI/ML/Data candidate.
 
-For EACH numbered job decide:
-- relevant: true ONLY if it is an AI/ML/Data role (NOT sales, marketing, finance, accounting, HR, civil/mechanical engineering, consulting, support, etc.).
-- entry_level: true by DEFAULT; false ONLY if clearly senior (title has senior/sr/lead/principal/staff/head/director/manager/architect, OR the text requires 3+ years).
+relevant=true: AI, ML, Data Science, NLP, LLM, GenAI, MLOps, Computer Vision, Data Analyst, Analytics Engineer, Applied Scientist roles (incl. junior/graduate/trainee/working-student). NOT sales, marketing, finance, HR, civil/mechanical engineering, general software dev unrelated to AI.
+entry_level=true by DEFAULT. false ONLY if title contains: senior/sr/lead/principal/staff/head/director/manager/architect.
 
-Return ONLY a JSON array, one object per job, in order:
-[{{"n":1,"relevant":true,"entry_level":true}}, ...]
+Return ONLY a JSON array: [{{"n":1,"relevant":true,"entry_level":true}}, ...]
 
-JOBS ({count}):
+TITLES ({count}):
 {jobs}
 
 JSON:"""
 
-_BATCH_SIZE = 25
+_BATCH_SIZE = 30
 
 
 def _classify_chunk(chunk: list) -> dict:
     lines = []
     for n, j in enumerate(chunk, 1):
-        snip = (j.description or "")[:200].replace("\n", " ")
-        lines.append(f"{n}. TITLE: {j.title} | SNIPPET: {snip}")
+        lines.append(f"{n}. {j.title}")
     prompt = _BATCH_PROMPT.format(count=len(chunk), jobs="\n".join(lines))
 
     out: dict = {}
@@ -100,14 +94,14 @@ def classify_batch(jobs: list) -> dict:
     return verdicts
 
 
-def classify(title: str, snippet: str) -> dict:
+def classify(title: str, snippet: str = "") -> dict:
     """
     Return {"relevant": bool, "entry_level": bool, "reason": str}.
 
     On any failure, fails OPEN (relevant=True, entry_level=True) so a flaky
     LLM call doesn't silently drop a job - the scorer still runs.
     """
-    prompt = _PROMPT.format(title=title or "", snippet=(snippet or "")[:600])
+    prompt = _PROMPT.format(title=title or "")
     try:
         _r = call_llm(prompt)
         data = parse_json_response(_r.text) if (_r and _r.text) else None
