@@ -44,7 +44,7 @@ function _atsBuildShell() {
       '</div>' +
       '<div>' +
         '<h1 class="az-hero-title">ATS <em>Score</em></h1>' +
-        '<p class="az-hero-sub">Check your resume against ATS requirements: keyword coverage, section headings, and formatting</p>' +
+        '<p class="az-hero-sub">Check whether your resume will pass ATS filters - exact keyword matches from the job description, required section headings, and formatting flags</p>' +
       '</div>' +
     '</div>' +
 
