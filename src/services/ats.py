@@ -1,6 +1,6 @@
 # src/services/ats.py
 """
-ATS Analyzer service.
+ATS Score service.
 
 Checks a resume against a job description using only deterministic
 string matching - no LLM required. Reports keyword coverage (the only

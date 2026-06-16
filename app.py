@@ -620,7 +620,7 @@ async def api_improve_resume(request: Request) -> JSONResponse:
     return JSONResponse(result)
 
 
-# --- ATS Analyzer ---
+# --- ATS Score ---
 
 
 @app.post("/api/ats/check")
