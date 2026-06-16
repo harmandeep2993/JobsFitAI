@@ -959,31 +959,32 @@ def _render_keywords_panel(matched_req, missing_req, matched_pref, missing_pref)
     tier = score_tier(kw_pct)
     grd = prog_grad(kw_pct)
 
-    def _section(title, items, tag_css):
-        if not items:
+    def _skills_block(title, matched, missing, miss_css="tr"):
+        if not matched and not missing:
             return ""
         tags = "".join(
-            f'<span class="tag {tag_css}">{safe_html(s)}</span>' for s in items
+            f'<span class="kw-cap kw-cap--hit">{safe_html(s)}</span>' for s in matched
+        ) + "".join(
+            f'<span class="kw-cap kw-cap--miss {miss_css}">{safe_html(s)}</span>'
+            for s in missing
         )
         return (
-            f'<div class="kw-section-hd">{title}</div><div class="kw-tags">{tags}</div>'
+            f'<div class="kw-section-hd">{title}</div>'
+            f'<div class="kw-tags">{tags}</div>'
         )
 
     coverage = (
         f'<div class="kw-coverage">'
         f'<div class="kw-coverage-hd">'
-        f'<span class="kw-coverage-lbl">Overall keyword coverage</span>'
-        f'<span class="kw-coverage-pct {tier}">{kw_pct}%</span>'
+        f'<span class="kw-coverage-lbl">Keyword Coverage</span>'
+        f'<span class="kw-coverage-pct {tier}">{kw_covered} of {kw_total} matched</span>'
         f"</div>"
         f'<div class="bd-bar"><div class="bd-bar-fill" style="width:{kw_pct}%;background:{grd};"></div></div>'
         f"</div>"
     )
-    sections = (
-        _section("Required - matched", matched_req, "tg")
-        + _section("Required - missing", missing_req, "tr")
-        + _section("Preferred - matched", matched_pref, "tg")
-        + _section("Preferred - missing", missing_pref, "ta")
-    )
+    sections = _skills_block(
+        "Required Skills", matched_req, missing_req, "tr"
+    ) + _skills_block("Preferred Skills", matched_pref, missing_pref, "ta")
     return (
         f'<div id="jf-keywords" class="jf-panel" style="display:none;">'
         f'<div class="kw-panel"><div class="kw-card">{coverage}{sections}</div></div>'

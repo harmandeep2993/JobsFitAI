@@ -70,6 +70,21 @@ NO_REQUIREMENT_SCORE = 60.0
 # Partial credit when language matches but proficiency is below what JD requires
 WEAK_MATCH_SCORE = 50.0
 
+# Human-readable label per numeric proficiency level (used in logs and gap strings)
+_LEVEL_LABEL: dict[int, str] = {
+    6: "native",
+    5: "fluent",
+    4: "professional",
+    3: "intermediate",
+    2: "basic",
+    1: "beginner",
+    0: "unspecified",
+}
+
+
+def _label(level: int) -> str:
+    return _LEVEL_LABEL.get(level, str(level))
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -175,8 +190,10 @@ def score_languages(resume: dict, jd: dict) -> tuple[float, list[str], list[str]
         if lang:
             candidate_map[lang] = level
 
-    logger.info("Required  : %s", required_parsed)
-    logger.info("Candidate : %s", candidate_map)
+    req_readable = [(lang, _label(lvl)) for lang, lvl in required_parsed]
+    cand_readable = {lang: _label(lvl) for lang, lvl in candidate_parsed}
+    logger.info("Required  : %s", req_readable)
+    logger.info("Candidate : %s", cand_readable)
 
     per_scores: list[float] = []
     matched: list[str] = []
@@ -193,7 +210,7 @@ def score_languages(resume: dict, jd: dict) -> tuple[float, list[str], list[str]
         if req_level == 0 or cand_level == 0:
             # Either side unspecified - benefit of doubt, full score
             logger.info(
-                "Language '%s': level unspecified on %s - full score",
+                "Language '%s': proficiency unspecified on %s - full score",
                 req_lang,
                 "JD" if req_level == 0 else "resume",
             )
@@ -202,24 +219,24 @@ def score_languages(resume: dict, jd: dict) -> tuple[float, list[str], list[str]
 
         elif cand_level >= req_level:
             logger.info(
-                "Language '%s': candidate %d >= required %d - full score",
+                "Language '%s': %s >= required %s - full score",
                 req_lang,
-                cand_level,
-                req_level,
+                _label(cand_level),
+                _label(req_level),
             )
             per_scores.append(100.0)
             matched.append(req_lang)
 
         else:
             logger.debug(
-                "Language '%s': candidate level %d < required %d - weak match",
+                "Language '%s': have %s, need %s - weak match",
                 req_lang,
-                cand_level,
-                req_level,
+                _label(cand_level),
+                _label(req_level),
             )
             per_scores.append(WEAK_MATCH_SCORE)
             weak.append(
-                f"{req_lang} (have: level {cand_level}, need: level {req_level})"
+                f"{req_lang} (have: {_label(cand_level)}, need: {_label(req_level)})"
             )
 
     score = round(sum(per_scores) / len(per_scores), 1)

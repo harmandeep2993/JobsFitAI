@@ -89,7 +89,16 @@ def call(prompt, model: str | None = None):
                 OPENAI_URL, headers=headers, json=payload, timeout=LLM_TIMEOUT
             )
             if response.status_code == 200:
-                return response.json()["choices"][0]["message"]["content"].strip()
+                data = response.json()
+                choice = data["choices"][0]
+                finish_reason = choice.get("finish_reason", "unknown")
+                content = choice["message"]["content"].strip()
+                if finish_reason == "length":
+                    logger.warning(
+                        "[OpenAI] Response truncated at token limit (%d chars) - increase max_output_tokens",
+                        len(content),
+                    )
+                return content
 
             if response.status_code in (429, 500, 502, 503, 504) and attempt < 3:
                 wait = float(response.headers.get("retry-after", 2 * (attempt + 1)))

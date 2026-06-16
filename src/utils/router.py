@@ -306,10 +306,79 @@ def call_llm(prompt: str) -> "LLMResult | None":
     )
 
 
+def _repair_truncated_json(text: str) -> dict | list | None:
+    """Try to close unclosed JSON brackets for truncated LLM responses.
+
+    Walks the string respecting string literals (including escape sequences),
+    builds a stack of expected closing brackets, and attempts a parse.
+    Handles two truncation modes:
+      - Mid-bracket: response ends between items (most common)
+      - Mid-string:  response ends inside a quoted value
+
+    Returns a parsed object on success, None on failure.
+    """
+    stack = []
+    in_string = False
+    escape_next = False
+    last_safe_pos = 0  # last position we were outside a string at bracket depth 0
+
+    for i, char in enumerate(text):
+        if escape_next:
+            escape_next = False
+            continue
+        if char == "\\" and in_string:
+            escape_next = True
+            continue
+        if char == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if char == "{":
+            stack.append("}")
+        elif char == "[":
+            stack.append("]")
+        elif char in "}]" and stack and stack[-1] == char:
+            stack.pop()
+        if not in_string:
+            last_safe_pos = i
+
+    if not stack and not in_string:
+        return None  # already balanced - repair not needed
+
+    closers = "".join(reversed(stack))
+
+    if not in_string:
+        # Truncated between items - strip trailing comma and close
+        repaired = text.rstrip(" \t\n\r,") + closers
+        try:
+            return json.loads(repaired)
+        except json.JSONDecodeError:
+            return None
+
+    # Truncated inside a string - two strategies:
+    # 1. Close the open string then close brackets (may produce partial value)
+    repaired1 = text.rstrip(" \t\n\r") + '"' + closers
+    try:
+        return json.loads(repaired1)
+    except json.JSONDecodeError:
+        pass
+
+    # 2. Roll back to the last position outside a string and close there
+    if last_safe_pos > 0:
+        repaired2 = text[:last_safe_pos].rstrip(" \t\n\r,") + closers
+        try:
+            return json.loads(repaired2)
+        except json.JSONDecodeError:
+            pass
+
+    return None
+
+
 def parse_json_response(response_text: str) -> dict | list | None:
     """
     Safely parse JSON from LLM response.
-    Handles markdown fences and extra text around JSON.
+    Handles markdown fences, extra text around JSON, and truncated output.
 
     Args:
         response_text (str): Raw LLM response
@@ -324,6 +393,10 @@ def parse_json_response(response_text: str) -> dict | list | None:
     # Strip markdown code fences
     clean = re.sub(r"```(?:json)?", "", response_text).strip()
     clean = re.sub(r"```", "", clean).strip()
+
+    # Strip trailing commas before } or ] - common LLM output flaw that
+    # Python's json module rejects but JS (and most LLMs) treat as valid.
+    clean = re.sub(r",(\s*[}\]])", r"\1", clean)
 
     # Try direct parse first
     try:
@@ -347,6 +420,18 @@ def parse_json_response(response_text: str) -> dict | list | None:
     except json.JSONDecodeError:
         pass
 
-    logger.warning("Could not parse JSON from LLM response")
-    logger.warning("Preview: %s", response_text[:200])
+    # Last resort: repair truncated JSON by closing unclosed brackets
+    repaired = _repair_truncated_json(clean)
+    if repaired is not None:
+        logger.warning(
+            "JSON repaired (truncated response %d chars) - some fields may be empty",
+            len(response_text),
+        )
+        return repaired
+
+    logger.warning(
+        "Could not parse JSON from LLM response (%d chars)", len(response_text)
+    )
+    logger.warning("Head: %s", response_text[:200])
+    logger.warning("Tail: %s", response_text[-200:])
     return None

@@ -75,7 +75,6 @@ function _hvRenderAnalyser(entries) {
   }
   el.innerHTML = entries.map(function(e) {
     var tier = _hTierCls(e.score);
-    var slot = e.slot != null ? '<span class="hv-slot-badge">' + (e.slot + 1) + '</span>' : '';
     return (
       '<div class="hv-entry">' +
         '<div class="hv-entry-left">' +
@@ -88,7 +87,7 @@ function _hvRenderAnalyser(entries) {
         '<div class="hv-entry-body">' +
           '<div class="hv-entry-title">' + _hEsc(e.jd_snippet || 'Analysis') + '</div>' +
           '<div class="hv-entry-meta">' +
-            slot + _hEsc(e.resume_label || 'Resume') +
+            _hEsc(e.resume_label || 'Resume') +
             ' &middot; ' + _hAgo(e.scored_at) +
           '</div>' +
         '</div>' +

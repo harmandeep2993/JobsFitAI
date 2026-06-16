@@ -33,7 +33,7 @@
           <path d="M8 1L2 4v4c0 3.3 2.5 5.8 6 7 3.5-1.2 6-3.7 6-7V4L8 1z"/>
           <polyline points="5,8.5 7,10.5 11,5.5"/>
         </svg>
-        <span>ATS Maker</span>
+        <span>ATS Analyzer</span>
       </div>
       <div class="sb-item" id="nav-matches" onclick="showView('matches')">
         <svg class="sb-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
@@ -168,26 +168,24 @@
               <textarea id="jd-input" class="jd-box"
                 placeholder="Paste the full job description here&hellip;"></textarea>
             </div>
+            <div class="az-jd-foot">
+              <span class="az-shortcut">Ctrl+Enter</span>
+              <button class="btn-primary az-analyse-btn" id="analyse-btn">
+                Analyse
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M3 8h10M9 4l4 4-4 4"/>
+                </svg>
+              </button>
+            </div>
           </div>
 
         </div><!-- /az-workspace -->
-
-        <!-- CTA ────────────────────────────────────────── -->
-        <div class="az-cta">
-          <span class="az-shortcut">Ctrl+Enter</span>
-          <button class="btn-primary az-analyse-btn" id="analyse-btn">
-            Analyse Match
-            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M3 8h10M9 4l4 4-4 4"/>
-            </svg>
-          </button>
-        </div>
 
         <div id="spinner" style="display:none;"></div>
 
         <div class="divider"></div>
         <div id="jf-results">
-          <div class="res-placeholder">
+          <div class="nb-card res-placeholder">
             <div class="tab-row">
               <div class="tab-item active">Summary</div>
               <div class="tab-item">Breakdown</div>
@@ -200,7 +198,7 @@
                 <rect x="10" y="5" width="4" height="16" rx="1"/>
                 <rect x="17" y="8" width="4" height="13" rx="1"/>
               </svg>
-              <p>Upload your resume and paste a job description,<br>then click <strong>Analyse Match</strong> to see your results</p>
+              <p>Upload your resume and paste a job description,<br>then click <strong>Analyse</strong> to see your results</p>
             </div>
           </div>
         </div>

@@ -717,13 +717,15 @@ async def api_ats_check(request: Request) -> JSONResponse:
     """
     Lightweight ATS scan - no LLM, no keyword injection.
 
-    Accepts {resume_id}. Returns section heading flags and formatting flags
-    only. Fast enough to run on every resume load.
+    Accepts {resume_id, jd?}. Returns section heading flags, formatting flags,
+    keyword coverage (if JD provided), and a composite ATS score.
     """
+    from src.extractors.jd import extract_jd
     from src.services.ats import ats_check
 
     body = await request.json()
     resume_id = (body.get("resume_id") or "").strip()
+    jd_text = (body.get("jd") or "").strip()
 
     if not resume_id:
         return JSONResponse(
@@ -740,7 +742,12 @@ async def api_ats_check(request: Request) -> JSONResponse:
             {"ok": False, "error": "could_not_read_resume"}, status_code=422
         )
 
-    result = await run_in_threadpool(ats_check, resume_text)
+    required_skills: list[str] | None = None
+    if jd_text and len(jd_text) >= 50:
+        jd_json = await run_in_threadpool(extract_jd, jd_text)
+        required_skills = jd_json.get("required_skills") or []
+
+    result = await run_in_threadpool(ats_check, resume_text, required_skills)
     return JSONResponse({"ok": True, **result})
 
 

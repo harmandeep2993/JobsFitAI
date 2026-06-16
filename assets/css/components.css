@@ -1512,28 +1512,29 @@
   flex-shrink: 0;
 }
 
-/* Numbered badge */
-.az-pnum {
-  width: 20px;
-  height: 20px;
-  border-radius: 5px;
-  background: var(--accent);
-  color: #fff;
-  font-size: 10px;
-  font-weight: 800;
-  font-family: 'DM Mono', monospace;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  letter-spacing: -0.3px;
-}
-
 /* Panel label */
 .az-plbl {
   font-size: 12px;
   font-weight: 600;
   color: var(--t1);
+}
+.az-plbl-accent {
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
+}
+.az-pnum {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  flex-shrink: 0;
 }
 
 /* Panel action button */
@@ -1664,12 +1665,22 @@
 .az-panel-hd .jd-counter.warn  { color: var(--amber); }
 .az-panel-hd .jd-counter.limit { color: var(--red); }
 
-/* CTA row */
-.az-cta {
+/* JD panel footer (Ctrl+Enter hint + Analyse button) */
+.az-jd-foot {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--bd-s);
+  background: var(--bg-c);
+  flex-shrink: 0;
+}
+
+.az-shortcut {
+  font-size: 11px;
+  color: var(--t3);
+  font-family: 'DM Mono', monospace;
+  margin-right: auto;
 }
 
 .az-analyse-btn {

@@ -78,6 +78,26 @@ _EXPECTED_SECTIONS = [
 ]
 
 
+def ats_score(
+    coverage_pct: int | None,
+    sec_flags: list[dict],
+    fmt_flags: list[str],
+) -> dict:
+    """
+    ATS score = keyword coverage % only (0-100).
+
+    Real ATS systems score on exact keyword matches. Sections and formatting
+    are pass/fail gates - missing sections or bad formatting causes parsing
+    failures, not point deductions. We report them separately as checklists.
+
+    Returns score=None when no JD is provided (cannot score without keywords).
+    """
+    return {
+        "score": coverage_pct,
+        "has_jd": coverage_pct is not None,
+    }
+
+
 def exact_coverage(resume_text: str, required_skills: list[str]) -> dict:
     """
     Count how many required skills appear VERBATIM in the resume text.
@@ -434,6 +454,10 @@ def generate_ats_resume(
         cov_after["total"],
     )
 
+    score_before = ats_score(cov_before["pct"], sec_flags, fmt_flags)
+    # After generation formatting issues are resolved, so fmt_flags = []
+    score_after = ats_score(cov_after["pct"], sec_flags, [])
+
     return {
         "resume": generated,
         "coverage_before": cov_before,
@@ -441,16 +465,25 @@ def generate_ats_resume(
         "section_flags": sec_flags,
         "formatting_flags": fmt_flags,
         "plain_text": plain_text,
+        "ats_score_before": score_before,
+        "ats_score_after": score_after,
     }
 
 
-def ats_check(resume_text: str) -> dict:
+def ats_check(resume_text: str, required_skills: list[str] | None = None) -> dict:
     """
     Lightweight scan - no LLM, no resume generation.
-    Returns section flags and formatting flags only.
-    Used by POST /api/ats/check for a quick structural scan.
+    Returns section flags, formatting flags, and a composite ATS score.
+    When required_skills is provided (JD was pasted), keyword coverage is
+    included in the score calculation.
     """
+    sec_flags = section_flags(resume_text)
+    fmt_flags = formatting_flags(resume_text)
+    coverage = exact_coverage(resume_text, required_skills) if required_skills else None
+    score = ats_score(coverage["pct"] if coverage else None, sec_flags, fmt_flags)
     return {
-        "section_flags": section_flags(resume_text),
-        "formatting_flags": formatting_flags(resume_text),
+        "section_flags": sec_flags,
+        "formatting_flags": fmt_flags,
+        "coverage": coverage,
+        "ats_score": score,
     }
