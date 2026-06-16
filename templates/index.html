@@ -213,57 +213,65 @@
             <h1 class="az-hero-title">Job <em>Fetcher</em></h1>
             <p class="az-hero-sub">Pull live job listings from Adzuna, Arbeitnow and Bundesagentur, filter for entry-level roles, and score each one against your resume</p>
           </div>
-          <div class="mt-stats" id="mt-stats"></div>
         </div>
 
-        <!-- Controls card -->
-        <div class="ctrl-card">
-          <input type="file" id="mt-file" accept=".pdf,.docx" style="display:none;"/>
+        <!-- Controls card: stats left, controls right -->
+        <div class="ctrl-card ctrl-split">
 
-          <!-- Row 1: resume pill + query input + primary action -->
-          <div class="ctrl-row">
-            <button class="ctrl-resume-pill" id="mt-upload-btn" onclick="document.getElementById('mt-file').click()">
-              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
-                <path d="M3 10h10M8 2v8M5 5l3-3 3 3"/>
-              </svg>
-              <span id="mt-resume-status">Load resume</span>
-            </button>
-            <button class="btn-ghost ctrl-view-btn" id="mt-resume-btn" style="display:none;" onclick="openResume()">View</button>
-            <input id="mt-query" class="fetch-inp ctrl-query" placeholder="Optional: override search role…"/>
-            <button class="btn-primary" id="mt-run-btn" onclick="runMatch()">
-              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <circle cx="8" cy="8" r="6"/>
-                <path d="M6.5 5.5l4 2.5-4 2.5V5.5z" fill="currentColor" stroke="none"/>
-              </svg>
-              Fetch &amp; Score
-            </button>
+          <!-- Left: live stats -->
+          <div class="ctrl-half ctrl-half--stats">
+            <div class="mt-stats" id="mt-stats"></div>
           </div>
 
-          <div class="ctrl-divider"></div>
+          <!-- Right: controls -->
+          <div class="ctrl-half ctrl-half--controls">
+            <input type="file" id="mt-file" accept=".pdf,.docx" style="display:none;"/>
 
-          <!-- Row 2: secondary actions -->
-          <div class="ctrl-row">
-            <div class="ctrl-right">
-              <span class="mt-status" id="mt-poll-status"></span>
-              <button class="mt-toggle" id="mt-sort-toggle" aria-expanded="false" onclick="toggleSortRow()">
-                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <path d="M4 3v10M4 13l-2-2M4 13l2-2"/>
-                  <path d="M12 13V3M12 3l-2 2M12 3l2 2"/>
+            <!-- Row 1: resume pill + query input + primary action -->
+            <div class="ctrl-row">
+              <button class="ctrl-resume-pill" id="mt-upload-btn" onclick="document.getElementById('mt-file').click()">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+                  <path d="M3 10h10M8 2v8M5 5l3-3 3 3"/>
                 </svg>
-                Sort
+                <span id="mt-resume-status">Load resume</span>
               </button>
-              <button class="mt-toggle" id="mt-filters-toggle" aria-expanded="false" aria-controls="mt-filters" onclick="toggleFilters()">
-                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <path d="M2 4h12M4 8h8M6 12h4"/>
+              <button class="btn-ghost ctrl-view-btn" id="mt-resume-btn" style="display:none;" onclick="openResume()">View</button>
+              <input id="mt-query" class="fetch-inp ctrl-query" placeholder="Optional: override search role…"/>
+              <button class="btn-primary" id="mt-run-btn" onclick="runMatch()">
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <circle cx="8" cy="8" r="6"/>
+                  <path d="M6.5 5.5l4 2.5-4 2.5V5.5z" fill="currentColor" stroke="none"/>
                 </svg>
-                Filters
+                Fetch &amp; Score
               </button>
-              <a class="btn-ghost" href="/api/match/export" download>&#8595; CSV</a>
-              <button class="mt-clear" onclick="clearAllMatches()">Clear all</button>
             </div>
-          </div>
 
-          <div class="mt-filters" id="mt-filters" style="display:none;"></div>
+            <div class="ctrl-divider"></div>
+
+            <!-- Row 2: secondary actions -->
+            <div class="ctrl-row">
+              <div class="ctrl-right">
+                <span class="mt-status" id="mt-poll-status"></span>
+                <button class="mt-toggle" id="mt-sort-toggle" aria-expanded="false" onclick="toggleSortRow()">
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M4 3v10M4 13l-2-2M4 13l2-2"/>
+                    <path d="M12 13V3M12 3l-2 2M12 3l2 2"/>
+                  </svg>
+                  Sort
+                </button>
+                <button class="mt-toggle" id="mt-filters-toggle" aria-expanded="false" aria-controls="mt-filters" onclick="toggleFilters()">
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M2 4h12M4 8h8M6 12h4"/>
+                  </svg>
+                  Filters
+                </button>
+                <a class="btn-ghost" href="/api/match/export" download>&#8595; CSV</a>
+                <button class="mt-clear" onclick="clearAllMatches()">Clear all</button>
+              </div>
+            </div>
+
+            <div class="mt-filters" id="mt-filters" style="display:none;"></div>
+          </div>
         </div>
 
         <!-- Filter bar (sticky) -->
