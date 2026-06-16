@@ -21,6 +21,7 @@ from src.fetchers.enrich import fetch_full_description
 from src.matcher import match
 from src.services import event_store, match_store, relevance, role_filter, vector_store
 from src.utils import session
+from src.utils.config import MAX_AGE_DAYS
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -113,7 +114,7 @@ def fetch_combined(
     countries: list[str] | None = None,
     per_title: int = 5,
     arbeitnow_limit: int = 100,
-    bundesagentur_limit: int = 10,
+    bundesagentur_limit: int = 500,
 ) -> list[Job]:
     """
     Pull jobs from all sources across one or more countries, and merge.
@@ -144,23 +145,16 @@ def fetch_combined(
 
         # Bundesagentur: search each title separately so the API's own keyword
         # matching works on a clean phrase rather than a sorted word-soup.
-        # Fetch up to 25 per title (independent of how many titles there are);
-        # the total is capped at bundesagentur_limit across all titles.
-        # Skip is_target_role here - the API already filtered by keyword and the
-        # LLM relevance gate makes the final call.
+        # No per-title cap - fetch all jobs within max_age_days for every title;
+        # the LLM relevance gate and seen_jobs dedup filter the rest.
         seen_ba: set[str] = set()
-        per_title_ba = min(bundesagentur_limit, 25)
-        for title in titles[:4]:
+        for title in titles:
             for job in fetch_bundesagentur_jobs(
-                query=title, location=location, limit=per_title_ba
+                query=title, location=location, max_age_days=MAX_AGE_DAYS
             ):
                 if job.id not in seen_ba:
                     seen_ba.add(job.id)
                     bundesagentur.append(job)
-                    if len(bundesagentur) >= bundesagentur_limit:
-                        break
-            if len(bundesagentur) >= bundesagentur_limit:
-                break
 
     merged, seen_ids, seen_content = [], set(), set()
     for job in adzuna + arbeitnow + bundesagentur:
