@@ -134,28 +134,31 @@
 
 .mf-hero-body { flex: 1; }
 
-/* === Compact stats strip === */
+/* === Stats bar (single horizontal row above ctrl-card) === */
 .mt-stats {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  width: 100%;
+  display: flex;
+  background: var(--bg-r);
+  border: 1px solid var(--bd);
+  border-radius: var(--radius);
+  box-shadow: var(--sha-s);
+  overflow: hidden;
+  margin-bottom: 12px;
 }
 
 .mf-stat {
+  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
-  padding: 14px 10px;
+  gap: 2px;
+  padding: 10px 16px;
   border-right: 1px solid var(--bd-s);
-  border-bottom: 1px solid var(--bd-s);
 }
-.mf-stat:nth-child(2n)   { border-right: none; }
-.mf-stat:nth-last-child(-n+2) { border-bottom: none; }
+.mf-stat:last-child { border-right: none; }
 
 .mf-stat-n {
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 800;
   font-family: 'DM Mono', monospace;
   color: var(--t1);
@@ -187,28 +190,6 @@
   margin-bottom: 16px;
 }
 
-.ctrl-split {
-  flex-direction: row;
-  padding: 0;
-  gap: 0;
-  overflow: hidden;
-}
-
-.ctrl-half { display: flex; flex-direction: column; }
-
-.ctrl-half--stats {
-  flex: 0 0 46%;
-  border-right: 1px solid var(--bd-s);
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-}
-
-.ctrl-half--controls {
-  flex: 1;
-  padding: 16px 20px;
-  gap: 12px;
-}
 
 .ctrl-row {
   display: flex;
@@ -217,43 +198,7 @@
   flex-wrap: wrap;
 }
 
-/* Resume pill button */
-.ctrl-resume-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 7px 13px;
-  background: var(--bg-c);
-  border: 1px solid var(--bd);
-  border-radius: var(--radius-s);
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--t2);
-  cursor: pointer;
-  transition: border-color .12s, color .12s, background .12s;
-  font-family: inherit;
-  white-space: nowrap;
-  max-width: 260px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.ctrl-resume-pill:hover { border-color: var(--t3); color: var(--t1); }
-.ctrl-resume-pill--loaded {
-  border-color: var(--green-bd);
-  background: var(--green-bg);
-  color: var(--green);
-}
-.ctrl-resume-pill--loaded:hover { border-color: var(--green); }
-
-/* Small "View" button beside the resume pill */
-.ctrl-view-btn {
-  padding: 5px 10px;
-  font-size: 12px;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-/* Query input takes remaining space */
+/* Query input inside fetch settings panel */
 .ctrl-query {
   flex: 1;
   min-width: 140px;
@@ -322,7 +267,8 @@
 .mt-toggle:hover { color: var(--accent); }
 .mt-toggle.active { color: var(--accent); font-weight: 600; }
 
-.mt-filters {
+.mt-filters,
+#mt-fetch-settings {
   padding: 14px 0 2px;
   display: flex;
   flex-direction: column;
