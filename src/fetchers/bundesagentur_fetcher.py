@@ -106,13 +106,14 @@ def fetch_bundesagentur_jobs(
     Returns:
         list[Job]: Normalized jobs with full descriptions. Empty list on failure.
     """
-    params = {
+    params: dict = {
         "was": query,
-        "wo": location,
         "angebotsart": _ANGEBOTSART,
         "page": 1,
         "size": min(limit, 100),
     }
+    if location:
+        params["wo"] = location
 
     try:
         resp = requests.get(
