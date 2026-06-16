@@ -105,8 +105,9 @@
   color: var(--t2);
   font-family: 'DM Mono', monospace;
 }
-.mt-status.ok  { color: var(--green); }
-.mt-status.err { color: var(--red); }
+.mt-status.ok   { color: var(--green); }
+.mt-status.err  { color: var(--red); }
+.mt-status.warn { color: var(--amber); }
 
 .set-status {
   font-size: 12px;

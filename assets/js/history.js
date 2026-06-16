@@ -184,15 +184,17 @@ function _hvRenderFetcher(entries) {
   // Aggregate stats
   var totalRuns = parsed.length;
   var totalScored = parsed.reduce(function(s, x) { return s + (x.d.scored || 0); }, 0);
-  var totalFetched = parsed.reduce(function(s, x) { return s + (x.d.fetched || 0); }, 0);
+  // Sum 'new' (not 'fetched') - fetched re-counts seen jobs on every run.
+  var totalNew = parsed.reduce(function(s, x) { return s + (x.d.new || 0); }, 0);
   var lastRun = parsed[0] ? _hTime(parsed[0].e.created_at) : '-';
+  // total_seen from the latest run is the authoritative unique-job count.
   var lastSeen = parsed[0] && parsed[0].d.total_seen != null ? parsed[0].d.total_seen : null;
 
   var statsHtml =
     '<div class="hv-stats-bar">' +
       '<div class="hv-stat"><span class="hv-stat-val">' + totalRuns + '</span><span class="hv-stat-lbl">total runs</span></div>' +
       '<div class="hv-stat-div"></div>' +
-      '<div class="hv-stat"><span class="hv-stat-val">' + totalFetched + '</span><span class="hv-stat-lbl">fetched</span></div>' +
+      '<div class="hv-stat"><span class="hv-stat-val">' + totalNew + '</span><span class="hv-stat-lbl">new discovered</span></div>' +
       '<div class="hv-stat-div"></div>' +
       '<div class="hv-stat"><span class="hv-stat-val hv-stat-scored">' + totalScored + '</span><span class="hv-stat-lbl">scored</span></div>' +
       (lastSeen != null ? '<div class="hv-stat-div"></div><div class="hv-stat"><span class="hv-stat-val">' + lastSeen + '</span><span class="hv-stat-lbl">total seen</span></div>' : '') +

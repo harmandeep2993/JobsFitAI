@@ -363,9 +363,12 @@ window.runMatch = function() {
 };
 
 // Poll run progress and re-render; new jobs appear (highlighted) as scored.
-// Stops after MAX_POLL_ATTEMPTS to prevent infinite loops if backend stalls.
-var _pollAttempts = 0;
-var MAX_POLL_ATTEMPTS = 600; // 600 × 2 s = 20 minutes max
+// Stops only when the backend reports running=false or on a network error.
+// Stall detection: if scored count hasn't advanced in 10 min, shows a warning
+// but keeps polling so the backend's own finally-block can clear the flag.
+var _lastScoredCount  = -1;
+var _lastProgressMs   = 0;
+var _STALL_MS         = 10 * 60 * 1000; // 10 minutes
 
 function setTopbarRunning(running, label) {
   var dot = document.getElementById('tb-run-dot');
@@ -383,15 +386,6 @@ function pollRun() {
   const status = document.getElementById('mt-poll-status');
   const btn    = document.getElementById('mt-run-btn');
 
-  _pollAttempts++;
-  if (_pollAttempts > MAX_POLL_ATTEMPTS) {
-    if (btn) btn.disabled = false;
-    status.textContent = '✕ Timed out - run took too long. Try again.';
-    status.className = 'mt-status err';
-    setTopbarRunning(false);
-    return;
-  }
-
   fetch('/api/match/state')
     .then(r => r.json())
     .then(d => {
@@ -404,18 +398,28 @@ function pollRun() {
 
       const rs = d.run_status || {};
       if (rs.running) {
+        // Track scoring progress for stall detection.
+        var scored = rs.scored || 0;
+        if (scored > _lastScoredCount) {
+          _lastScoredCount = scored;
+          _lastProgressMs  = Date.now();
+        }
+        var stalled = _lastProgressMs > 0 && (Date.now() - _lastProgressMs) > _STALL_MS;
+
         var phaseText =
           rs.phase === 'fetching'    ? 'Fetching jobs…' :
           rs.phase === 'classifying' ? 'Filtering ' + (rs.total || 0) + ' jobs…' :
-          'Scoring ' + (rs.scored || 0) + '/' + (rs.total || 0) + '…';
-        status.className  = 'mt-status';
+          stalled ? 'Scoring ' + scored + '/' + (rs.total || 0) + '… (LLM slow - still running)' :
+          'Scoring ' + scored + '/' + (rs.total || 0) + '…';
+        status.className  = stalled ? 'mt-status warn' : 'mt-status';
         status.textContent = phaseText;
         setTopbarRunning(true, phaseText);
         // Poll slower during fetching (BA pagination takes time) to avoid noise.
         var pollDelay = rs.phase === 'fetching' ? 5000 : 2000;
         setTimeout(pollRun, pollDelay);
       } else {
-        _pollAttempts = 0;
+        _lastScoredCount = -1;
+        _lastProgressMs  = 0;
         if (btn) btn.disabled = false;
         status.textContent = '✓ ' + newIds.size + ' new · ' +
                              (d.results || []).length + ' total · ' +
@@ -427,7 +431,8 @@ function pollRun() {
       }
     })
     .catch(() => {
-      _pollAttempts = 0;
+      _lastScoredCount = -1;
+      _lastProgressMs  = 0;
       if (btn) btn.disabled = false;
       status.textContent = '✕ Connection lost. Check server and try again.';
       status.className = 'mt-status err';
