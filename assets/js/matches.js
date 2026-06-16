@@ -156,17 +156,24 @@ window.toggleScheduler = function() {
     .catch(() => { st.textContent = '✕'; });
 };
 
-// Live metrics bar.
+// Live metrics strip (compact single row).
 function renderStats(s) {
   const box = document.getElementById('mt-stats');
   if (!box || !s) return;
-  const cards = [
-    ['Seen', s.seen], ['Scored', s.scored], ['Good 60+', s.good], ['Applied', s.applied],
+  const items = [
+    { label: 'Seen',     val: s.seen,    cls: '' },
+    { label: 'Scored',   val: s.scored,  cls: '' },
+    { label: 'Good 60+', val: s.good,    cls: 'mf-stat--good' },
+    { label: 'Applied',  val: s.applied, cls: 'mf-stat--applied' },
   ];
-  box.innerHTML = cards.map(([k, v]) =>
-    '<div class="stat"><div class="stat-n">' + (v || 0) + '</div>' +
-    '<div class="stat-l">' + k + '</div></div>'
-  ).join('');
+  box.innerHTML = items.map(function(it) {
+    return (
+      '<div class="mf-stat ' + it.cls + '">' +
+        '<span class="mf-stat-n">' + (it.val || 0) + '</span>' +
+        '<span class="mf-stat-l">' + it.label + '</span>' +
+      '</div>'
+    );
+  }).join('');
 }
 
 // Editable filter panel - built once so polling doesn't clobber edits.
@@ -266,14 +273,15 @@ window.toggleFilters = function() {
 };
 
 function setResumeStatus(has, name) {
-  const el = document.getElementById('mt-resume-status');
+  const el  = document.getElementById('mt-resume-status');
+  const btn = document.getElementById('mt-upload-btn');
   if (!el) return;
   if (has) {
-    el.textContent = '✓ ' + (name || 'resume loaded');
-    el.className = 'mt-status ok';
+    el.textContent = name || 'Resume loaded';
+    if (btn) btn.classList.add('ctrl-resume-pill--loaded');
   } else {
-    el.textContent = 'No resume loaded';
-    el.className = 'mt-status';
+    el.textContent = 'Load resume';
+    if (btn) btn.classList.remove('ctrl-resume-pill--loaded');
   }
 }
 
@@ -281,8 +289,7 @@ function setResumeStatus(has, name) {
 function uploadMatchResume(file) {
   if (!file) return;
   const status = document.getElementById('mt-resume-status');
-  status.textContent = 'Uploading…';
-  status.className = 'mt-status';
+  if (status) status.textContent = 'Uploading...';
 
   const fd = new FormData();
   fd.append('file', file);

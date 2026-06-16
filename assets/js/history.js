@@ -173,7 +173,7 @@ function _hvRenderFetcher(entries) {
   var el = document.getElementById('hv-fetcher');
   if (!el) return;
   if (!entries.length) {
-    el.innerHTML = '<p class="hv-empty">No fetcher runs yet. Go to Job Matches and click Run.</p>';
+    el.innerHTML = '<p class="hv-empty">No fetcher runs yet. Go to Job Fetcher and click Fetch &amp; Score.</p>';
     return;
   }
 

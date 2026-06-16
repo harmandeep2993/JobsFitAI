@@ -40,7 +40,7 @@
           <rect x="2" y="5" width="12" height="9" rx="1.5"/>
           <path d="M5 5V3.5A1.5 1.5 0 016.5 2h3A1.5 1.5 0 0111 3.5V5"/>
         </svg>
-        <span>Job Finder</span>
+        <span>Job Fetcher</span>
         <span class="sb-badge" id="sb-badge-matches"></span>
       </div>
       <div class="sb-item" id="nav-resumes" onclick="showView('resumes')">
@@ -207,47 +207,50 @@
       <!-- ── ATS Maker ─────────────────────────────────── -->
       <div id="view-ats" class="view"></div>
 
-      <!-- ── Job Finder ─────────────────────────────────── -->
+      <!-- ── Job Fetcher ──────────────────────────────────── -->
       <div id="view-matches" class="view">
-        <div class="pg-title">Job <em>Scout</em></div>
-        <div class="pg-sub">Fetch jobs from Adzuna, Arbeitnow and Bundesagentur and score each against your resume</div>
 
-        <div class="divider"></div>
+        <!-- Header: title + compact stats strip -->
+        <div class="mf-header">
+          <div>
+            <div class="pg-title">Job <em>Fetcher</em></div>
+            <div class="pg-sub">Auto-fetch and score jobs from Adzuna, Arbeitnow and Bundesagentur</div>
+          </div>
+          <div class="mt-stats" id="mt-stats"></div>
+        </div>
 
-        <div class="mt-stats" id="mt-stats"></div>
-
+        <!-- Controls card -->
         <div class="ctrl-card">
           <input type="file" id="mt-file" accept=".pdf,.docx" style="display:none;"/>
 
-          <!-- resume + run row -->
+          <!-- Row 1: resume pill + query input + primary action -->
           <div class="ctrl-row">
-            <button class="btn-ghost" id="mt-upload-btn"
-              onclick="document.getElementById('mt-file').click()">
-              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
-                <path d="M2 14h12M8 2v9M5 5l3-3 3 3"/>
+            <button class="ctrl-resume-pill" id="mt-upload-btn" onclick="document.getElementById('mt-file').click()">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+                <path d="M3 10h10M8 2v8M5 5l3-3 3 3"/>
               </svg>
-              Load Resume
+              <span id="mt-resume-status">Load resume</span>
             </button>
-            <span class="mt-status" id="mt-resume-status">No resume loaded</span>
-            <div class="ctrl-right">
-              <button class="btn-ghost" id="mt-resume-btn" style="display:none;" onclick="openResume()">View Resume</button>
-            </div>
+            <button class="btn-ghost ctrl-view-btn" id="mt-resume-btn" style="display:none;" onclick="openResume()">View</button>
+            <input id="mt-query" class="fetch-inp ctrl-query" placeholder="Optional: override search role…"/>
+            <button class="btn-primary" id="mt-run-btn" onclick="runMatch()">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="8" cy="8" r="6"/>
+                <path d="M6.5 5.5l4 2.5-4 2.5V5.5z" fill="currentColor" stroke="none"/>
+              </svg>
+              Fetch &amp; Score
+            </button>
           </div>
 
           <div class="ctrl-divider"></div>
 
-          <!-- fetch row -->
-          <div class="ctrl-row">
-            <input id="mt-query" class="fetch-inp" placeholder="Optional: search one role (default = saved titles)"/>
-            <button class="btn-primary" id="mt-run-btn" onclick="runMatch()">Fetch &amp; Score</button>
-          </div>
-
-          <!-- options row -->
+          <!-- Row 2: options + secondary actions -->
           <div class="ctrl-row">
             <label class="ctrl-check">
               <input type="checkbox" id="mt-entry" checked/>
               Entry-level only
             </label>
+            <span class="ctrl-sep"></span>
             <label class="ctrl-check">
               <input type="checkbox" id="mt-sched" onchange="toggleScheduler()"/>
               Auto-fetch
@@ -261,57 +264,75 @@
             <span class="mt-status" id="mt-sched-status"></span>
             <div class="ctrl-right">
               <span class="mt-status" id="mt-poll-status"></span>
+              <button class="mt-toggle" id="mt-filters-toggle" aria-expanded="false" aria-controls="mt-filters" onclick="toggleFilters()">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M2 4h12M4 8h8M6 12h4"/>
+                </svg>
+                Filters
+              </button>
               <a class="btn-ghost" href="/api/match/export" download>&#8595; CSV</a>
               <button class="mt-clear" onclick="clearAllMatches()">Clear all</button>
             </div>
           </div>
 
-          <!-- lang filter + search settings -->
-          <div class="ctrl-row">
-            <span style="font-size:12px;color:var(--t2);font-weight:500;">Lang</span>
-            <select id="flt-lang" class="mt-select" onchange="onLangFilter()">
+          <div class="mt-filters" id="mt-filters" style="display:none;"></div>
+        </div>
+
+        <!-- Filter bar (sticky) -->
+        <div class="sort-row" id="sort-row" style="display:none;">
+          <!-- Sort group -->
+          <div class="filter-group">
+            <span class="sort-lbl">Sort</span>
+            <button class="sort-btn active" data-sort="score"   onclick="setSort('score')">Score</button>
+            <button class="sort-btn"        data-sort="fetched" onclick="setSort('fetched')">Recent</button>
+          </div>
+          <span class="sort-sep"></span>
+          <!-- Match score group -->
+          <div class="filter-group">
+            <span class="sort-lbl">Match</span>
+            <button class="sort-btn active" data-score="0"  onclick="setMtScore(0)">All</button>
+            <button class="sort-btn"        data-score="40" onclick="setMtScore(40)">40+</button>
+            <button class="sort-btn"        data-score="60" onclick="setMtScore(60)">60+</button>
+            <button class="sort-btn"        data-score="80" onclick="setMtScore(80)">80+</button>
+          </div>
+          <span class="sort-sep"></span>
+          <!-- Source group -->
+          <div class="filter-group">
+            <span class="sort-lbl">Source</span>
+            <button class="sort-btn active" data-src="all"           onclick="setMtSource('all')">All</button>
+            <button class="sort-btn"        data-src="adzuna"        onclick="setMtSource('adzuna')">Adzuna</button>
+            <button class="sort-btn"        data-src="arbeitnow"     onclick="setMtSource('arbeitnow')">Arbeitnow</button>
+            <button class="sort-btn"        data-src="bundesagentur" onclick="setMtSource('bundesagentur')">BA</button>
+          </div>
+          <span class="sort-sep"></span>
+          <!-- Age + lang group -->
+          <div class="filter-group">
+            <span class="sort-lbl">Age</span>
+            <button class="sort-btn active" data-age="all" onclick="setMtAge('all')">All</button>
+            <button class="sort-btn"        data-age="1"   onclick="setMtAge(1)">Today</button>
+            <button class="sort-btn"        data-age="7"   onclick="setMtAge(7)">7d</button>
+            <button class="sort-btn"        data-age="14"  onclick="setMtAge(14)">14d</button>
+          </div>
+          <span class="sort-sep"></span>
+          <!-- Lang + quick toggles -->
+          <div class="filter-group">
+            <span class="sort-lbl">Lang</span>
+            <select id="flt-lang" class="mt-select mt-select--xs" onchange="onLangFilter()">
               <option value="">All</option>
               <option value="en">EN</option>
               <option value="de">DE</option>
             </select>
-            <button class="mt-toggle" id="mt-filters-toggle" aria-expanded="false"
-              aria-controls="mt-filters" onclick="toggleFilters()">Search settings &#9656;</button>
           </div>
-
-          <div class="mt-filters" id="mt-filters" style="display:none;"></div>
-        </div>
-
-        <!-- sort + filter controls -->
-        <div class="sort-row" id="sort-row" style="display:none;">
-          <span class="sort-lbl">Sort</span>
-          <button class="sort-btn active" data-sort="score"   onclick="setSort('score')">Score &#8595;</button>
-          <button class="sort-btn"        data-sort="fetched" onclick="setSort('fetched')">Fetched</button>
           <span class="sort-sep"></span>
-          <span class="sort-lbl">Score</span>
-          <button class="sort-btn active" data-score="0"  onclick="setMtScore(0)">All</button>
-          <button class="sort-btn"        data-score="40" onclick="setMtScore(40)">40+</button>
-          <button class="sort-btn"        data-score="60" onclick="setMtScore(60)">60+</button>
-          <button class="sort-btn"        data-score="80" onclick="setMtScore(80)">80+</button>
-          <span class="sort-sep"></span>
-          <span class="sort-lbl">Source</span>
-          <button class="sort-btn active" data-src="all"            onclick="setMtSource('all')">All</button>
-          <button class="sort-btn"        data-src="adzuna"         onclick="setMtSource('adzuna')">Adzuna</button>
-          <button class="sort-btn"        data-src="arbeitnow"      onclick="setMtSource('arbeitnow')">Arbeitnow</button>
-          <button class="sort-btn"        data-src="bundesagentur"  onclick="setMtSource('bundesagentur')">Bundesagentur</button>
-          <span class="sort-sep"></span>
-          <span class="sort-lbl">Published</span>
-          <button class="sort-btn active" data-age="all" onclick="setMtAge('all')">All</button>
-          <button class="sort-btn"        data-age="1"   onclick="setMtAge(1)">Today</button>
-          <button class="sort-btn"        data-age="7"   onclick="setMtAge(7)">7 days</button>
-          <button class="sort-btn"        data-age="14"  onclick="setMtAge(14)">14 days</button>
-          <span class="sort-sep"></span>
-          <button class="sort-btn" id="mt-fn-btn" onclick="toggleMtNew()">&#10024; New</button>
-          <button class="sort-btn" id="mt-fa-btn" onclick="toggleMtApplied()">Hide applied</button>
+          <div class="filter-group">
+            <button class="sort-btn" id="mt-fn-btn" onclick="toggleMtNew()">New</button>
+            <button class="sort-btn" id="mt-fa-btn" onclick="toggleMtApplied()">Hide applied</button>
+          </div>
           <span class="sort-count" id="mt-result-count"></span>
         </div>
 
         <div class="fetch-results" id="mt-results"></div>
-      </div><!-- /view-scout -->
+      </div><!-- /view-fetcher -->
 
       <!-- ── My Resumes ────────────────────────────────── -->
       <div id="view-resumes" class="view">
