@@ -26,11 +26,6 @@
         <span class="run-pulse"></span>
         <span class="run-label" id="tb-run-label">Running&hellip;</span>
       </div>
-      <div class="t-chip">
-        <span class="t-bead boff" id="tb-bead"></span>
-        <span id="tb-provider">loading&hellip;</span>
-      </div>
-      <div class="t-chip" id="tb-model"></div>
       <button class="theme-btn" id="themechange" title="Toggle theme">&#9728;</button>
       <button class="theme-btn" id="nav-settings" onclick="showView('settings')" title="Settings">
         <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
@@ -393,6 +388,13 @@
 
         <div class="divider"></div>
 
+        <div class="set-active-bar" id="set-active-bar">
+          <span class="t-bead boff" id="tb-bead"></span>
+          <span id="tb-provider" class="set-active-provider">loading&hellip;</span>
+          <span class="set-active-sep">&middot;</span>
+          <span id="tb-model" class="set-active-model"></span>
+        </div>
+
         <div class="card">
           <div class="set-row">
             <label class="set-lbl">Provider</label>
@@ -490,23 +492,6 @@
 <script src="/assets/js/history.js"></script>
 
 <script>
-(function initTopbar() {
-  fetch('/api/llm-settings')
-    .then(r => r.json())
-    .then(d => {
-      if (!d.ok) return;
-      var p = (d.current && d.current.provider) || '';
-      var m = (d.current && d.current.model)    || '';
-      var pEl = document.getElementById('tb-provider');
-      var mEl = document.getElementById('tb-model');
-      var bEl = document.getElementById('tb-bead');
-      if (pEl) pEl.textContent = p || 'no provider';
-      if (mEl) mEl.textContent = m || '';
-      if (bEl) bEl.className   = p ? 't-bead bon' : 't-bead boff';
-    })
-    .catch(function() {});
-})();
-
 // Esc closes detail modal
 document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape') {

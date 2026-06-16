@@ -21,6 +21,7 @@ function loadLlmSettings() {
       renderModelMenu();
       setVal('provider', window._sel.provider);
       setVal('model', window._sel.model);
+      updateTopbar(d.current || {}, null);
     })
     .catch(() => {});
 }
@@ -137,14 +138,16 @@ window.applySettings = function() {
     });
 };
 
-// Reflect the new selection in the topbar chips.
+// Reflect the current provider/model in the settings status bar.
 function updateTopbar(current, online) {
   const prov  = document.getElementById('tb-provider');
   const model = document.getElementById('tb-model');
   const bead  = document.getElementById('tb-bead');
-  if (prov)  prov.textContent  = current.provider + ' ' + (online ? 'online' : 'offline');
-  if (model) model.textContent = current.model;
-  if (bead)  bead.className     = 't-bead ' + (online ? 'bon' : 'boff');
+  const p = current.provider || '';
+  const m = current.model    || '';
+  if (prov)  prov.textContent = p || 'no provider';
+  if (model) model.textContent = m;
+  if (bead)  bead.className = 't-bead ' + (online === true ? 'bon' : online === false ? 'boff' : 'boff');
 }
 
 // === Test connection ===

@@ -1335,6 +1335,19 @@
 .ht-apply.on    { border-color: var(--green-bd); background: var(--green-bg); color: var(--green); font-weight: 600; }
 
 /* === Settings view === */
+.set-active-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  font-size: 12.5px;
+  font-family: 'DM Mono', monospace;
+  color: var(--t2);
+}
+.set-active-sep { color: var(--t3); }
+.set-active-provider { color: var(--t1); font-weight: 500; }
+.set-active-model { color: var(--t2); }
+
 .set-row {
   display: flex;
   align-items: center;
