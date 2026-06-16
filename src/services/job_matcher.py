@@ -202,6 +202,16 @@ def rescore_all() -> int:
         return 0
 
     rows = match_store.rows_with_jd()
+    if not rows:
+        return 0
+
+    resume_name = session.get_resume_name() or "resume"
+    logger.info(
+        "Rescoring %d stored jobs against '%s' (no LLM - cached JD only)",
+        len(rows),
+        resume_name,
+    )
+
     count = 0
     for row in rows:
         jd = row.get("jd")
@@ -214,7 +224,7 @@ def rescore_all() -> int:
         except Exception as e:
             logger.error("Re-score failed for %s: %s", row["id"], e)
 
-    logger.info("Re-scored %d stored jobs against the new resume", count)
+    logger.info("Rescore complete: %d/%d jobs updated", count, len(rows))
     return count
 
 

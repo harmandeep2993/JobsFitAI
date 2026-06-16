@@ -40,6 +40,7 @@ _state = {
 _resume = {
     "json": None,
     "name": "",
+    "id": None,  # resume_id from the resumes table; None for legacy temp uploads
     "loaded": False,
 }
 
@@ -104,10 +105,16 @@ def get_settings() -> dict:
     return {"provider": get_provider(), "model": get_model()}
 
 
-def set_resume(resume_json: dict, name: str = "") -> None:
+def get_resume_id() -> str | None:
+    """Return the resume_id of the currently active resume, or None."""
+    return _resume["id"]
+
+
+def set_resume(resume_json: dict, name: str = "", resume_id: str | None = None) -> None:
     """Store the extracted resume (in memory + persisted) for reuse."""
     _resume["json"] = resume_json
     _resume["name"] = name or ""
+    _resume["id"] = resume_id
     _resume["loaded"] = True
 
     try:

@@ -318,12 +318,18 @@ async def api_resumes_use_for_matching(resume_id: str) -> JSONResponse:
         return JSONResponse(
             {"ok": False, "error": "not_extracted_yet"}, status_code=400
         )
+
+    # Same resume already active - scores in DB are correct, skip rescore.
+    if session.get_resume_id() == resume_id:
+        name = row.get("label") or row.get("original_name", "Resume")
+        logger.info("Resume '%s' already active - returning stored scores", name)
+        return JSONResponse({"ok": True, "rescored": 0, "cached": True})
+
     resume_json = _json.loads(extracted)
-    session.set_resume(
-        resume_json, row.get("label") or row.get("original_name", "Resume")
-    )
+    name = row.get("label") or row.get("original_name", "Resume")
+    session.set_resume(resume_json, name, resume_id=resume_id)
     rescored = await run_in_threadpool(rescore_all)
-    return JSONResponse({"ok": True, "rescored": rescored})
+    return JSONResponse({"ok": True, "rescored": rescored, "cached": False})
 
 
 @app.post("/api/resumes/recommend")
