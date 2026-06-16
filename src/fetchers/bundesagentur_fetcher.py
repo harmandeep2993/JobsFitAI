@@ -6,16 +6,16 @@ Uses the public Jobborse API - no signup required; the key is publicly
 documented by the BA themselves. Covers Germany only.
 
 Flow (per official docs v2.1):
-  1. Search via /pc/v6/jobs (page=1-indexed) with veroeffentlichtseit to
-     restrict to recent postings. Paginates until all results are collected.
-  2. For jobs hosted on BA itself: fetch full description via
-     /pc/v4/jobdetails/{base64(referenznummer)}
-  3. For jobs with externeURL: description comes from _enrich() scraping
-     the external posting; the detail call returns an empty description.
+  1. Search via /pc/v6/jobs with veroeffentlichtseit to restrict to recent
+     postings. Paginates until all results collected.
+  2. Collect all raw list entries first (fast list requests only).
+  3. For BA-hosted jobs (no externeURL): fetch descriptions in parallel
+     via /pc/v4/jobdetails/{base64(referenznummer)}.
+  4. For jobs with externeURL: _enrich() scrapes the third-party page.
 """
 
 import base64
-import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import requests
 
@@ -28,6 +28,7 @@ _BASE = "https://rest.arbeitsagentur.de/jobboerse/jobsuche-service"
 _HEADERS = {"X-API-Key": "jobboerse-jobsuche", "User-Agent": "JobFitAI/1.0"}
 _JOB_URL = "https://www.arbeitsagentur.de/jobsuche/jobdetail/{}"
 _PAGE_SIZE = 100  # API maximum per page
+_DETAIL_WORKERS = 8  # parallel detail calls
 
 # angebotsart=1 = permanent Arbeitsstelle (excludes internships, apprenticeships)
 _ANGEBOTSART = 1
@@ -42,8 +43,7 @@ def _fetch_detail(refnr: str) -> str:
     """
     Fetch the full job description from the BA detail endpoint.
 
-    Returns plain text description, or empty string if unavailable
-    (external jobs redirect to third-party sites and return no description).
+    Returns plain text description, or empty string if unavailable.
     """
     encoded = _encode_refnr(refnr)
     try:
@@ -53,12 +53,26 @@ def _fetch_detail(refnr: str) -> str:
             timeout=15,
         )
         resp.raise_for_status()
-        data = resp.json()
-        raw = data.get("stellenangebotsBeschreibung") or ""
+        raw = resp.json().get("stellenangebotsBeschreibung") or ""
         return _clean_html(raw)
     except (requests.RequestException, ValueError) as e:
         logger.warning("BA detail fetch failed for %s: %s", refnr, e)
         return ""
+
+
+def _fetch_details_parallel(refnrs: list[str]) -> dict[str, str]:
+    """Fetch descriptions for multiple BA-hosted refnrs concurrently."""
+    results: dict[str, str] = {}
+    with ThreadPoolExecutor(max_workers=_DETAIL_WORKERS) as pool:
+        futures = {pool.submit(_fetch_detail, r): r for r in refnrs}
+        for fut in as_completed(futures):
+            refnr = futures[fut]
+            try:
+                results[refnr] = fut.result()
+            except Exception as e:
+                logger.warning("BA detail worker failed for %s: %s", refnr, e)
+                results[refnr] = ""
+    return results
 
 
 def _parse_job(raw: dict, description: str) -> Job:
@@ -67,7 +81,6 @@ def _parse_job(raw: dict, description: str) -> Job:
     title = (raw.get("stellenangebotsTitel") or "").strip()
     company = (raw.get("firma") or "").strip()
 
-    # Location: take first stellenlokationen entry
     locs = raw.get("stellenlokationen") or []
     location = ""
     if locs:
@@ -75,7 +88,6 @@ def _parse_job(raw: dict, description: str) -> Job:
         location = (adr.get("ort") or "").strip()
 
     posted_at = _iso_to_epoch(raw.get("datumErsteVeroeffentlichung") or "")
-    # externeURL is already in the list response for externally-hosted jobs
     externe_url = (raw.get("externeURL") or "").strip()
     url = externe_url or _JOB_URL.format(refnr)
 
@@ -101,8 +113,9 @@ def fetch_bundesagentur_jobs(
     """
     Fetch permanent job postings from the Bundesagentur fur Arbeit Jobborse API.
 
-    Paginates through all results for the query published within max_age_days.
-    Only age filters applied server-side; no arbitrary per-title cap.
+    Paginates through all results published within max_age_days. BA-hosted
+    descriptions are fetched in parallel; external jobs are left empty for
+    _enrich() to scrape.
 
     Args:
         query (str):        Job title / keywords (was parameter).
@@ -122,10 +135,10 @@ def fetch_bundesagentur_jobs(
     if location:
         base_params["wo"] = location
 
-    jobs: list[Job] = []
+    # Phase 1: collect all raw list entries via pagination (fast, no detail calls)
+    raw_entries: list[dict] = []
     page = 1
-
-    while len(jobs) < limit:
+    while len(raw_entries) < limit:
         params = {**base_params, "page": page}
         try:
             resp = requests.get(
@@ -151,27 +164,38 @@ def fetch_bundesagentur_jobs(
             )
 
         for raw in raw_jobs:
-            if len(jobs) >= limit:
+            if len(raw_entries) >= limit:
                 break
-            refnr = raw.get("referenznummer") or ""
-            if not refnr:
-                continue
+            if raw.get("referenznummer"):
+                raw_entries.append(raw)
 
-            externe_url = (raw.get("externeURL") or "").strip()
-            if externe_url:
-                # External job - description lives on the third-party site.
-                # Skip detail call (it returns empty); _enrich() will scrape it.
-                description = ""
-            else:
-                description = _fetch_detail(refnr)
-                time.sleep(0.2)  # gentle throttle between detail calls
-
-            jobs.append(_parse_job(raw, description))
-
-        # Stop when we've seen all results or got a short page
-        if len(raw_jobs) < _PAGE_SIZE or len(jobs) >= total:
+        if len(raw_jobs) < _PAGE_SIZE or len(raw_entries) >= total:
             break
         page += 1
+
+    # Phase 2: fetch descriptions in parallel for BA-hosted jobs only
+    hosted_refnrs = [
+        r["referenznummer"]
+        for r in raw_entries
+        if not (r.get("externeURL") or "").strip()
+    ]
+    if hosted_refnrs:
+        logger.info(
+            "Bundesagentur '%s': fetching %d BA-hosted descriptions in parallel",
+            query,
+            len(hosted_refnrs),
+        )
+        descriptions = _fetch_details_parallel(hosted_refnrs)
+    else:
+        descriptions = {}
+
+    # Phase 3: build Job objects
+    jobs: list[Job] = []
+    for raw in raw_entries:
+        refnr = raw["referenznummer"]
+        externe_url = (raw.get("externeURL") or "").strip()
+        description = "" if externe_url else descriptions.get(refnr, "")
+        jobs.append(_parse_job(raw, description))
 
     logger.info(
         "Bundesagentur '%s': collected %d jobs (%d with descriptions)",

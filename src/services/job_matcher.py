@@ -8,6 +8,7 @@ Each job costs one JD-extraction LLM call; the resume is extracted once
 """
 
 import json as _json
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 
 from src.extractors.jd import extract_jd
@@ -143,18 +144,27 @@ def fetch_combined(
         )
         arbeitnow = [j for j in arb_raw if role_filter.is_target_role(j.title, titles)]
 
-        # Bundesagentur: search each title separately so the API's own keyword
-        # matching works on a clean phrase rather than a sorted word-soup.
-        # No per-title cap - fetch all jobs within max_age_days for every title;
-        # the LLM relevance gate and seen_jobs dedup filter the rest.
+        # Bundesagentur: fetch all titles in parallel - each title is an
+        # independent API search so there is no shared state to protect.
         seen_ba: set[str] = set()
-        for title in titles:
-            for job in fetch_bundesagentur_jobs(
+
+        def _ba_fetch(title: str) -> list[Job]:
+            return fetch_bundesagentur_jobs(
                 query=title, location=location, max_age_days=MAX_AGE_DAYS
-            ):
-                if job.id not in seen_ba:
-                    seen_ba.add(job.id)
-                    bundesagentur.append(job)
+            )
+
+        with ThreadPoolExecutor(max_workers=min(6, len(titles))) as pool:
+            futures = {pool.submit(_ba_fetch, t): t for t in titles}
+            for fut in as_completed(futures):
+                try:
+                    for job in fut.result():
+                        if job.id not in seen_ba:
+                            seen_ba.add(job.id)
+                            bundesagentur.append(job)
+                except Exception as e:
+                    logger.warning(
+                        "BA fetch failed for title '%s': %s", futures[fut], e
+                    )
 
     merged, seen_ids, seen_content = [], set(), set()
     for job in adzuna + arbeitnow + bundesagentur:
