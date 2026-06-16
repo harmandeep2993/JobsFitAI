@@ -237,6 +237,14 @@ def call_llm(prompt: str) -> "LLMResult | None":
     text, primary_attempts = _call_with_retry(provider, prompt, model)
 
     if text is not None:
+        logger.info(
+            "LLM: %s/%s -> %d chars (%d attempt%s)",
+            provider_name,
+            model,
+            len(text),
+            primary_attempts,
+            "s" if primary_attempts != 1 else "",
+        )
         return LLMResult(
             text=text,
             provider_used=provider_name,
@@ -273,13 +281,12 @@ def call_llm(prompt: str) -> "LLMResult | None":
 
     if groq_text is not None:
         logger.info(
-            "Groq fallback succeeded after %d total attempts (primary: %d, groq: %d)",
+            "LLM: groq/%s -> %d chars [fallback, %d total attempt%s]",
+            _GROQ_FALLBACK_MODEL,
+            len(groq_text),
             total_attempts,
-            primary_attempts,
-            groq_attempts,
+            "s" if total_attempts != 1 else "",
         )
-        # degraded=True because we had to fall back -- callers can log or alert
-        # on this if they want to track primary-provider health.
         return LLMResult(
             text=groq_text,
             provider_used="groq",
