@@ -204,23 +204,27 @@ def _lowercase_comparison_fields(data: dict) -> dict:
 
 _RESUME_FIELD_TYPES: dict = {
     "candidate": dict,
+    "summary": str,
     "experience_entries": list,
     "projects": list,
     "education": list,
     "skills": list,
     "languages": list,
     "certifications": list,
+    "awards": list,
     "meta": dict,
 }
 
 _RESUME_DEFAULTS: dict = {
     "candidate": {},
+    "summary": "",
     "experience_entries": [],
     "projects": [],
     "education": [],
     "skills": [],
     "languages": [],
     "certifications": [],
+    "awards": [],
     "meta": {},
 }
 

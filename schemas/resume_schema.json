@@ -5,9 +5,10 @@
     "location": ""
   },
 
+  "summary": "",
+
   "experience_entries": [
     {
-      "id": 1,
       "title": "",
       "company": "",
       "location": "",
@@ -20,16 +21,15 @@
 
   "education": [
     {
-      "id": 1,
       "degree": "",
       "field": "",
-      "institution": ""
+      "institution": "",
+      "year": ""
     }
   ],
 
-    "projects": [
+  "projects": [
     {
-      "id": 1,
       "title": "",
       "description": "",
       "technologies": []
@@ -38,7 +38,6 @@
 
   "languages": [
     {
-      "id": 1,
       "language": "",
       "proficiency": ""
     }
@@ -46,9 +45,9 @@
 
   "skills": [],
   "certifications": [],
+  "awards": [],
 
   "meta": {
-    "total_experience_years": 0,
-    "relevant_experience_years": 0
+    "total_experience_years": 0
   }
 }
