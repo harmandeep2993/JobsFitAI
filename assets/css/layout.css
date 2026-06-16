@@ -289,7 +289,7 @@ html, body {
 
 .view {
   display: none;
-  padding: 28px 28px 60px;
+  padding: 30px 28px 60px;
   min-height: 100%;
   animation: vfadeIn .18s ease;
 }
