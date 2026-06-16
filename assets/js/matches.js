@@ -365,7 +365,7 @@ window.runMatch = function() {
 // Poll run progress and re-render; new jobs appear (highlighted) as scored.
 // Stops after MAX_POLL_ATTEMPTS to prevent infinite loops if backend stalls.
 var _pollAttempts = 0;
-var MAX_POLL_ATTEMPTS = 150; // 150 × 2 s = 5 minutes max
+var MAX_POLL_ATTEMPTS = 600; // 600 × 2 s = 20 minutes max
 
 function setTopbarRunning(running, label) {
   var dot = document.getElementById('tb-run-dot');
@@ -411,7 +411,9 @@ function pollRun() {
         status.className  = 'mt-status';
         status.textContent = phaseText;
         setTopbarRunning(true, phaseText);
-        setTimeout(pollRun, 2000);
+        // Poll slower during fetching (BA pagination takes time) to avoid noise.
+        var pollDelay = rs.phase === 'fetching' ? 5000 : 2000;
+        setTimeout(pollRun, pollDelay);
       } else {
         _pollAttempts = 0;
         if (btn) btn.disabled = false;
