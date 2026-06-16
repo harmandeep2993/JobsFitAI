@@ -12,6 +12,8 @@ extras
 dump
 uv.lock
 logs
+server.log
+server.err
 prompts.skillwise_prompt.py
 .claude
 CLAUDE.md
