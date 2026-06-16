@@ -144,10 +144,12 @@ def fetch_combined(
 
         # Bundesagentur: search each title separately so the API's own keyword
         # matching works on a clean phrase rather than a sorted word-soup.
+        # Fetch up to 25 per title (independent of how many titles there are);
+        # the total is capped at bundesagentur_limit across all titles.
         # Skip is_target_role here - the API already filtered by keyword and the
         # LLM relevance gate makes the final call.
         seen_ba: set[str] = set()
-        per_title_ba = max(1, bundesagentur_limit // max(len(titles), 1))
+        per_title_ba = min(bundesagentur_limit, 25)
         for title in titles[:4]:
             for job in fetch_bundesagentur_jobs(
                 query=title, location=location, limit=per_title_ba
