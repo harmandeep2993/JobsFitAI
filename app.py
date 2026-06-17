@@ -128,6 +128,11 @@ _LOGIN_HTML = (Path(__file__).parent / "templates" / "login.html").read_text(
 _OPEN_PATHS = {"/login", "/logout"}
 
 
+# Stateless session tokens: no database needed.
+# Token = "username:HMAC(secret, username)" stored in a cookie.
+# _make_token() creates one on login; _verify_token() checks it on every request.
+# If SESSION_SECRET changes (or server restarts without a fixed secret), all existing
+# tokens become invalid and users are logged out - that is intentional.
 def _make_token() -> str:
     sig = _hmac.new(_SESSION_SECRET.encode(), _AUTH_USER.encode(), "sha256").hexdigest()
     return f"{_AUTH_USER}:{sig}"
@@ -138,6 +143,8 @@ def _verify_token(token: str) -> bool:
         return False
     try:
         user, sig = token.rsplit(":", 1)
+        # compare_digest prevents timing attacks - always takes the same time
+        # regardless of where the strings differ.
         expected = _hmac.new(
             _SESSION_SECRET.encode(), user.encode(), "sha256"
         ).hexdigest()
@@ -1481,7 +1488,7 @@ async def _start_scheduler() -> None:
 
 # --- Entry point ---
 
-PORT = 8000
+PORT = 8080
 
 
 def _port_in_use(port: int) -> bool:
