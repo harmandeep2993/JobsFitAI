@@ -78,8 +78,12 @@ from src.utils.router import check_llm
 
 app = FastAPI(title="JobsFitAI")
 
+# templates/ and assets/ live one level up, at the repo root (sibling of backend/),
+# since the frontend hasn't been split out into its own project yet.
+_ROOT_DIR = Path(__file__).parent.parent
+
 # Static assets
-app.mount("/assets", StaticFiles(directory="assets"), name="assets")
+app.mount("/assets", StaticFiles(directory=str(_ROOT_DIR / "assets")), name="assets")
 
 
 # --- Request logging middleware ---
@@ -121,9 +125,7 @@ _AUTH_USER = os.getenv("APP_USERNAME", "admin").strip()
 _AUTH_PASS = os.getenv("APP_PASSWORD", "").strip()
 _SESSION_SECRET = os.getenv("SESSION_SECRET") or _secrets.token_hex(32)
 _SESSION_COOKIE = "jfai_sess"
-_LOGIN_HTML = (Path(__file__).parent / "templates" / "login.html").read_text(
-    encoding="utf-8"
-)
+_LOGIN_HTML = (_ROOT_DIR / "templates" / "login.html").read_text(encoding="utf-8")
 
 _OPEN_PATHS = {"/login", "/logout"}
 
@@ -220,7 +222,7 @@ MAX_FILE_MB: int = MAX_FILE_SIZE_MB
 
 @app.get("/")
 async def index() -> HTMLResponse:
-    with open("templates/index.html", encoding="utf-8") as f:
+    with open(_ROOT_DIR / "templates" / "index.html", encoding="utf-8") as f:
         return HTMLResponse(f.read())
 
 

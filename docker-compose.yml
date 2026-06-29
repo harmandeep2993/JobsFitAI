@@ -4,9 +4,9 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - ./data:/app/data
-      - ./resumes:/app/resumes
-      - ./logs:/app/logs
+      - ./backend/data:/app/backend/data
+      - ./backend/resumes:/app/backend/resumes
+      - ./backend/logs:/app/backend/logs
     env_file:
-      - .env
+      - ./backend/.env
     restart: unless-stopped
