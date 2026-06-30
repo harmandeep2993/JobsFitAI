@@ -18,14 +18,14 @@ const TABS = {
   settings: Settings,
 }
 
-export default function AppShell({ dark, onToggleDark }) {
+export default function AppShell() {
   const [tab, setTab] = useState('analyzer')
   const TabContent = TABS[tab] || Analyzer
 
   return (
     <ToastProvider>
       <div className="min-h-screen bg-bg text-t1">
-        <TopBar dark={dark} onToggleDark={onToggleDark} />
+        <TopBar />
         <Sidebar active={tab} onChange={setTab} />
         <main
           style={{

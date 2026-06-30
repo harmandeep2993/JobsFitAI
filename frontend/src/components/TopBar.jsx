@@ -1,6 +1,6 @@
 import { getUser, logout } from '../lib/auth.js'
 
-export default function TopBar({ dark, onToggleDark }) {
+export default function TopBar() {
   const user = getUser()
 
   return (
@@ -8,7 +8,6 @@ export default function TopBar({ dark, onToggleDark }) {
       className="fixed top-0 left-0 right-0 z-50 flex items-center px-4 border-b border-border bg-surface/90 backdrop-blur-md"
       style={{ height: 'var(--topbar-h)' }}
     >
-      {/* Brand - aligned with sidebar width */}
       <div
         className="flex items-center gap-2.5 flex-shrink-0"
         style={{ width: 'var(--sidebar-w)', paddingRight: '16px' }}
@@ -31,26 +30,6 @@ export default function TopBar({ dark, onToggleDark }) {
             {user.email}
           </span>
         )}
-
-        {/* Theme toggle */}
-        <button
-          onClick={onToggleDark}
-          className="w-8 h-8 flex items-center justify-center rounded-sm text-t3 hover:text-t1 hover:bg-hover transition-colors"
-          title="Toggle theme"
-        >
-          {dark ? (
-            <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="10" cy="10" r="4"/>
-              <path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.9 4.9l1.4 1.4M13.7 13.7l1.4 1.4M4.9 15.1l1.4-1.4M13.7 6.3l1.4-1.4"/>
-            </svg>
-          ) : (
-            <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M17.5 12.5A7.5 7.5 0 017.5 2.5a7.5 7.5 0 100 15 7.5 7.5 0 0010-5z"/>
-            </svg>
-          )}
-        </button>
-
-        {/* Sign out */}
         <button
           onClick={logout}
           className="h-8 px-3 text-[12.5px] font-medium text-t2 hover:text-t1 hover:bg-hover rounded-sm transition-colors"
