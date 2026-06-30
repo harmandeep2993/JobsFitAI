@@ -230,6 +230,37 @@ def init() -> None:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS user_settings (
+                user_id TEXT NOT NULL,
+                key     TEXT NOT NULL,
+                value   TEXT,
+                PRIMARY KEY (user_id, key)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS user_resume (
+                user_id    TEXT PRIMARY KEY,
+                name       TEXT,
+                json       TEXT,
+                created_at TEXT
+            )
+            """
+        )
+        # Add user_id to shared tables for per-user scoping.
+        # These columns may already exist on an existing database - ignore the error.
+        for _stmt in [
+            "ALTER TABLE matches   ADD COLUMN user_id TEXT NOT NULL DEFAULT 'local'",
+            "ALTER TABLE events    ADD COLUMN user_id TEXT NOT NULL DEFAULT 'local'",
+            "ALTER TABLE seen_jobs ADD COLUMN user_id TEXT NOT NULL DEFAULT 'local'",
+        ]:
+            try:
+                conn.execute(_stmt)
+            except Exception:
+                pass
 
     mode = f"Turso ({_TURSO_URL})" if _USE_TURSO else f"SQLite ({DB_PATH})"
     logger.info("Database ready - %s", mode)

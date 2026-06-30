@@ -154,15 +154,19 @@ async def api_resumes_use_for_matching(
             {"ok": False, "error": "not_extracted_yet"}, status_code=400
         )
 
-    if session.get_resume_id() == resume_id:
+    if session.get_resume_id(user_id) == resume_id:
         name = row.get("label") or row.get("original_name", "Resume")
-        logger.info("Resume '%s' already active - returning stored scores", name)
+        logger.info(
+            "Resume '%s' already active for user %s - returning stored scores",
+            name,
+            user_id,
+        )
         return JSONResponse({"ok": True, "rescored": 0, "cached": True})
 
     resume_json = _json.loads(extracted)
     name = row.get("label") or row.get("original_name", "Resume")
-    session.set_resume(resume_json, name, resume_id=resume_id)
-    rescored = await run_in_threadpool(rescore_all)
+    session.set_resume(user_id, resume_json, name, resume_id=resume_id)
+    rescored = await run_in_threadpool(rescore_all, user_id)
     return JSONResponse({"ok": True, "rescored": rescored, "cached": False})
 
 

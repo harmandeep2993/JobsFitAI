@@ -1,18 +1,22 @@
 # api/routes/job_matches.py
 """
 /api/match/* endpoints - job fetch, score, and state.
+
+All routes are scoped to the authenticated user via get_current_user.
 """
 
 import asyncio
 import csv
 import io
+import json
 import os
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, StreamingResponse
 
+from api.routes.auth import get_current_user
 from core.config import MAX_AGE_DAYS, SEARCH_PER_TITLE
 from core.logger import get_logger
 from core import state
@@ -91,8 +95,12 @@ def _resume_diff(old: dict, new: dict) -> dict:
 
 
 @router.post("/resume")
-async def api_match_resume(body: MatchResumeRequest) -> JSONResponse:
-    """Parse + extract an uploaded resume and store it for matching."""
+async def api_match_resume(
+    body: MatchResumeRequest,
+    current_user: dict = Depends(get_current_user),
+) -> JSONResponse:
+    """Parse + extract an uploaded resume and store it for this user's matching session."""
+    user_id = current_user["id"]
     tmp = (body.tmp or "").strip()
     name = (body.name or "resume").strip()
 
@@ -110,14 +118,16 @@ async def api_match_resume(body: MatchResumeRequest) -> JSONResponse:
     if not resume_json:
         raise HTTPException(status_code=422, detail="could not parse resume")
 
-    prev_resume = state.get_resume()
+    prev_resume = state.get_resume(user_id)
     diff = _resume_diff(prev_resume, resume_json) if prev_resume else None
 
-    state.set_resume(resume_json, name)
+    state.set_resume(user_id, resume_json, name)
 
-    rescored = await run_in_threadpool(rescore_all)
+    rescored = await run_in_threadpool(rescore_all, user_id)
     if rescored:
-        event_store.log_event("rescore", "", f"{rescored} jobs re-scored vs {name}")
+        event_store.log_event(
+            user_id, "rescore", "", f"{rescored} jobs re-scored vs {name}"
+        )
 
     years = resume_json.get("meta", {}).get("total_experience_years", 0)
     return JSONResponse(
@@ -136,27 +146,33 @@ async def api_match_run(
     query: str = Query(default=""),
     entry_only: str = Query(default="true"),
     location: str = Query(default=""),
+    current_user: dict = Depends(get_current_user),
 ) -> JSONResponse:
-    """
-    Kick off a background job-fetch-and-score run.
+    """Kick off a background job-fetch-and-score run for this user.
 
     Returns immediately with {started: true} and runs the pipeline in a
-    background task. Only one run can be active at a time.
+    background task. Only one run per user can be active at a time.
     """
-    if not state.has_resume():
+    user_id = current_user["id"]
+
+    if not state.has_resume(user_id):
         return JSONResponse(
-            {"ok": False, "error": "no_resume", "results": match_store.get_all()},
+            {
+                "ok": False,
+                "error": "no_resume",
+                "results": match_store.get_all(user_id),
+            },
             status_code=400,
         )
 
-    if not begin_run():
+    if not begin_run(user_id):
         return JSONResponse({"ok": True, "started": False, "already_running": True})
 
     query = query.strip()
     entry_only_flag = entry_only.lower() != "false"
-    titles = [query] if query else settings_store.get_titles()
-    location = location.strip() or settings_store.get_location()
-    countries = settings_store.get_countries()
+    titles = [query] if query else settings_store.get_titles(user_id)
+    location = location.strip() or settings_store.get_location(user_id)
+    countries = settings_store.get_countries(user_id)
 
     async def _bg() -> None:
         def _run() -> None:
@@ -165,22 +181,23 @@ async def api_match_run(
                 location=location,
                 countries=countries,
                 per_title=SEARCH_PER_TITLE,
-                arbeitnow_limit=settings_store.get_arbeitnow_limit(),
-                bundesagentur_limit=settings_store.get_bundesagentur_limit(),
+                arbeitnow_limit=settings_store.get_arbeitnow_limit(user_id),
+                bundesagentur_limit=settings_store.get_bundesagentur_limit(user_id),
             )
-            discover_and_score(jobs, entry_only=entry_only_flag, manual=True)
+            discover_and_score(
+                jobs, user_id=user_id, entry_only=entry_only_flag, manual=True
+            )
 
         try:
             await run_in_threadpool(_run)
         except Exception as e:
-            logger.error("match run failed: %s", e)
+            logger.error("match run failed for user %s: %s", user_id, e)
             try:
-                import json as _j
-
                 event_store.log_event(
+                    user_id,
                     "run",
                     "",
-                    _j.dumps(
+                    json.dumps(
                         {
                             "fetched": 0,
                             "new": 0,
@@ -196,82 +213,95 @@ async def api_match_run(
                         }
                     ),
                 )
-            except Exception:
-                pass
-            end_run()
+            except Exception as log_err:
+                logger.warning("Could not log error run event: %s", log_err)
+            end_run(user_id)
 
     asyncio.create_task(_bg())
     return JSONResponse({"ok": True, "started": True})
 
 
 @router.get("/state")
-async def api_match_state() -> JSONResponse:
+async def api_match_state(
+    current_user: dict = Depends(get_current_user),
+) -> JSONResponse:
     """Full state snapshot polled by the frontend while a run is active."""
+    user_id = current_user["id"]
     return JSONResponse(
         {
             "ok": True,
-            "has_resume": state.has_resume(),
-            "resume_name": state.get_resume_name(),
+            "has_resume": state.has_resume(user_id),
+            "resume_name": state.get_resume_name(user_id),
             "filters": {
-                "target_titles": settings_store.get_titles(),
-                "countries": settings_store.country_names(),
-                "location": settings_store.get_location(),
+                "target_titles": settings_store.get_titles(user_id),
+                "countries": settings_store.country_names(user_id),
+                "location": settings_store.get_location(user_id),
                 "max_age_days": MAX_AGE_DAYS,
-                "entry_only": settings_store.get_entry_only(),
-                "arbeitnow_limit": settings_store.get_arbeitnow_limit(),
-                "bundesagentur_limit": settings_store.get_bundesagentur_limit(),
+                "entry_only": settings_store.get_entry_only(user_id),
+                "arbeitnow_limit": settings_store.get_arbeitnow_limit(user_id),
+                "bundesagentur_limit": settings_store.get_bundesagentur_limit(user_id),
             },
-            "stats": event_store.stats(),
-            "run_status": get_run_status(),
-            "resume": state.resume_info(),
+            "stats": event_store.stats(user_id),
+            "run_status": get_run_status(user_id),
+            "resume": state.resume_info(user_id),
             "scheduler": {
-                "enabled": settings_store.get_scheduler_enabled(),
-                "interval": settings_store.get_scheduler_interval(),
+                "enabled": settings_store.get_scheduler_enabled(user_id),
+                "interval": settings_store.get_scheduler_interval(user_id),
             },
-            "results": match_store.get_all(),
+            "results": match_store.get_all(user_id),
         }
     )
 
 
 @router.post("/applied")
-async def api_match_applied(body: AppliedRequest) -> JSONResponse:
+async def api_match_applied(
+    body: AppliedRequest,
+    current_user: dict = Depends(get_current_user),
+) -> JSONResponse:
     """Toggle the applied flag on a scored job and log an 'applied' event."""
+    user_id = current_user["id"]
     job_id = (body.id or "").strip()
     applied = bool(body.applied)
     if not job_id:
         raise HTTPException(status_code=400, detail="id required")
-    match_store.set_applied(job_id, applied)
+    match_store.set_applied(user_id, job_id, applied)
     if applied:
-        event_store.log_event("applied", job_id)
+        event_store.log_event(user_id, "applied", job_id)
     return JSONResponse({"ok": True, "id": job_id, "applied": applied})
 
 
 @router.post("/app-status")
-async def api_match_app_status(body: AppStatusRequest) -> JSONResponse:
+async def api_match_app_status(
+    body: AppStatusRequest,
+    current_user: dict = Depends(get_current_user),
+) -> JSONResponse:
     """Set the application status for a job (applied / interview / offer / rejected)."""
+    user_id = current_user["id"]
     job_id = (body.id or "").strip()
     status = (body.status or "").strip().lower()
     if not job_id:
         raise HTTPException(status_code=400, detail="id required")
-    match_store.set_app_status(job_id, status)
+    match_store.set_app_status(user_id, job_id, status)
     if status == "applied":
-        event_store.log_event("applied", job_id)
+        event_store.log_event(user_id, "applied", job_id)
     return JSONResponse({"ok": True, "id": job_id, "app_status": status})
 
 
 @router.get("/detail")
-async def api_match_detail(id: str = Query(default="")) -> JSONResponse:
-    """
-    Return full detail for a scored job, lazily generating an LLM summary if absent.
-    """
+async def api_match_detail(
+    id: str = Query(default=""),
+    current_user: dict = Depends(get_current_user),
+) -> JSONResponse:
+    """Return full detail for a scored job, lazily generating an LLM summary if absent."""
+    user_id = current_user["id"]
     job_id = id.strip()
-    row = match_store.get_one(job_id)
+    row = match_store.get_one(user_id, job_id)
     if not row:
         return JSONResponse({"ok": False, "error": "not found"}, status_code=404)
 
     summary = row.get("summary")
-    if not summary and state.has_resume():
-        resume_json = state.get_resume()
+    if not summary and state.has_resume(user_id):
+        resume_json = state.get_resume(user_id)
         results = {
             "overall_score": row.get("score", 0),
             "label": row.get("label", ""),
@@ -285,7 +315,7 @@ async def api_match_detail(id: str = Query(default="")) -> JSONResponse:
             summary = await run_in_threadpool(
                 generate_summary, resume_json, row.get("jd_json", {}), results
             )
-            match_store.set_summary(job_id, summary)
+            match_store.set_summary(user_id, job_id, summary)
         except Exception as e:
             logger.error("summary generation failed: %s", e)
             summary = ""
@@ -309,57 +339,68 @@ async def api_match_detail(id: str = Query(default="")) -> JSONResponse:
             "matched_required": row.get("matched_required", []),
             "missing_required": row.get("missing_required", []),
             "jd": row.get("jd_json", {}),
-            "resume": state.resume_info(),
+            "resume": state.resume_info(user_id),
             "summary": summary or "",
         }
     )
 
 
 @router.post("/filters")
-async def api_match_filters(body: FiltersRequest) -> JSONResponse:
-    """Update target titles, countries, and/or location filter."""
+async def api_match_filters(
+    body: FiltersRequest,
+    current_user: dict = Depends(get_current_user),
+) -> JSONResponse:
+    """Update target titles, countries, and/or location filter for this user."""
+    user_id = current_user["id"]
+
     if isinstance(body.target_titles, list):
-        settings_store.set_titles(body.target_titles)
+        settings_store.set_titles(user_id, body.target_titles)
 
     if body.countries is not None:
         c = body.countries
         names = c if isinstance(c, list) else str(c).replace(",", " ").split()
-        settings_store.set_countries(names)
+        settings_store.set_countries(user_id, names)
 
     if body.location is not None:
-        settings_store.set_location(body.location or "")
+        settings_store.set_location(user_id, body.location or "")
 
     if body.entry_only is not None:
-        settings_store.set_entry_only(bool(body.entry_only))
+        settings_store.set_entry_only(user_id, bool(body.entry_only))
 
     if body.arbeitnow_limit is not None:
         try:
-            settings_store.set_arbeitnow_limit(int(body.arbeitnow_limit))
+            settings_store.set_arbeitnow_limit(user_id, int(body.arbeitnow_limit))
         except (ValueError, TypeError):
             pass
 
     if body.bundesagentur_limit is not None:
         try:
-            settings_store.set_bundesagentur_limit(int(body.bundesagentur_limit))
+            settings_store.set_bundesagentur_limit(
+                user_id, int(body.bundesagentur_limit)
+            )
         except (ValueError, TypeError):
             pass
 
     return JSONResponse(
         {
             "ok": True,
-            "target_titles": settings_store.get_titles(),
-            "countries": settings_store.country_names(),
-            "location": settings_store.get_location(),
-            "entry_only": settings_store.get_entry_only(),
-            "arbeitnow_limit": settings_store.get_arbeitnow_limit(),
-            "bundesagentur_limit": settings_store.get_bundesagentur_limit(),
+            "target_titles": settings_store.get_titles(user_id),
+            "countries": settings_store.country_names(user_id),
+            "location": settings_store.get_location(user_id),
+            "entry_only": settings_store.get_entry_only(user_id),
+            "arbeitnow_limit": settings_store.get_arbeitnow_limit(user_id),
+            "bundesagentur_limit": settings_store.get_bundesagentur_limit(user_id),
         }
     )
 
 
 @router.post("/score-jd")
-async def api_score_jd(body: ScoreJdRequest) -> JSONResponse:
+async def api_score_jd(
+    body: ScoreJdRequest,
+    current_user: dict = Depends(get_current_user),
+) -> JSONResponse:
     """Score a jd_unavailable job using a manually pasted JD."""
+    user_id = current_user["id"]
     job_id = (body.id or "").strip()
     jd_text = (body.jd_text or "").strip()
 
@@ -367,10 +408,10 @@ async def api_score_jd(body: ScoreJdRequest) -> JSONResponse:
         raise HTTPException(status_code=400, detail="id required")
     if len(jd_text) < 50:
         raise HTTPException(status_code=400, detail="jd_text too short")
-    if not state.has_resume():
+    if not state.has_resume(user_id):
         raise HTTPException(status_code=400, detail="no_resume")
 
-    row = match_store.get_one(job_id)
+    row = match_store.get_one(user_id, job_id)
     if not row:
         raise HTTPException(status_code=404, detail="job not found")
 
@@ -383,7 +424,7 @@ async def api_score_jd(body: ScoreJdRequest) -> JSONResponse:
         if not jd_json:
             return None, None
         try:
-            return jd_json, match(state.get_resume(), jd_json)
+            return jd_json, match(state.get_resume(user_id), jd_json)
         except Exception as exc:
             logger.exception("match() failed in score-jd: %s", exc)
             return None, None
@@ -393,6 +434,7 @@ async def api_score_jd(body: ScoreJdRequest) -> JSONResponse:
         raise HTTPException(status_code=422, detail="could not parse JD")
 
     match_store.upsert(
+        user_id,
         [
             {
                 "id": job_id,
@@ -412,7 +454,7 @@ async def api_score_jd(body: ScoreJdRequest) -> JSONResponse:
                 "jd_json": jd_json,
                 "status": "scored",
             }
-        ]
+        ],
     )
 
     return JSONResponse(
@@ -425,48 +467,65 @@ async def api_score_jd(body: ScoreJdRequest) -> JSONResponse:
 
 
 @router.post("/scheduler")
-async def api_match_scheduler(body: SchedulerRequest) -> JSONResponse:
+async def api_match_scheduler(
+    body: SchedulerRequest,
+    current_user: dict = Depends(get_current_user),
+) -> JSONResponse:
     """Enable/disable the auto-fetch scheduler or change its interval (minutes)."""
     from main import _sched_last_ref
 
+    user_id = current_user["id"]
+
     if body.enabled is not None:
-        settings_store.set_scheduler_enabled(bool(body.enabled))
+        settings_store.set_scheduler_enabled(user_id, bool(body.enabled))
         if body.enabled:
-            _sched_last_ref[0] = 0.0
+            # Reset the last-run timestamp so the scheduler fires promptly.
+            _sched_last_ref.pop(user_id, None)
     if body.interval is not None:
-        settings_store.set_scheduler_interval(int(body.interval))
+        settings_store.set_scheduler_interval(user_id, int(body.interval))
     return JSONResponse(
         {
             "ok": True,
-            "enabled": settings_store.get_scheduler_enabled(),
-            "interval": settings_store.get_scheduler_interval(),
+            "enabled": settings_store.get_scheduler_enabled(user_id),
+            "interval": settings_store.get_scheduler_interval(user_id),
         }
     )
 
 
 @router.post("/delete")
-async def api_match_delete(body: DeleteJobRequest) -> JSONResponse:
-    """Delete a job match and block its id from ever appearing again."""
+async def api_match_delete(
+    body: DeleteJobRequest,
+    current_user: dict = Depends(get_current_user),
+) -> JSONResponse:
+    """Delete a job match and block its id from ever appearing again for this user."""
+    user_id = current_user["id"]
     job_id = (body.id or "").strip()
     if not job_id:
         raise HTTPException(status_code=400, detail="id required")
-    match_store.delete(job_id)
-    event_store.block(job_id)
+    match_store.delete(user_id, job_id)
+    event_store.block(job_id, user_id)
     return JSONResponse({"ok": True})
 
 
 @router.post("/clear")
-async def api_match_clear() -> JSONResponse:
-    match_store.clear()
-    event_store.clear()
+async def api_match_clear(
+    current_user: dict = Depends(get_current_user),
+) -> JSONResponse:
+    """Wipe all matches, events, and vector store for this user."""
+    user_id = current_user["id"]
+    match_store.clear(user_id)
+    event_store.clear(user_id)
     vector_store.clear()
     return JSONResponse({"ok": True})
 
 
 @router.get("/export")
-async def api_match_export() -> StreamingResponse:
-    """Download all scored matches as a CSV file."""
-    rows = match_store.get_all()
+async def api_match_export(
+    current_user: dict = Depends(get_current_user),
+) -> StreamingResponse:
+    """Download all scored matches for this user as a CSV file."""
+    user_id = current_user["id"]
+    rows = match_store.get_all(user_id)
 
     buf = io.StringIO()
     writer = csv.writer(buf)

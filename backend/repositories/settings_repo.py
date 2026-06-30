@@ -1,12 +1,10 @@
 # repositories/settings_repo.py
 """
-User-editable search settings, persisted in SQLite so they survive restarts.
+Per-user search settings, persisted in SQLite so they survive restarts.
 
-- target_titles: the role keywords the LLM funnel screens against (editable
-  from the UI; defaults to config.yaml's list).
-- countries: Adzuna country codes to search (entered as country NAMES in the
-  UI, e.g. "germany, netherlands"); defaults to the config country.
-- location: optional city/region filter (Adzuna `where`); blank = whole country.
+Settings are stored in the `user_settings` table keyed by (user_id, key).
+Each public function takes user_id as its first argument so every user's
+preferences are fully isolated.
 """
 
 import json
@@ -64,9 +62,13 @@ _CODE_TO_NAME = {
 }
 
 
-def _get(key, default):
+def _get(user_id: str, key: str, default):
+    """Read one setting for a user, returning default if not set or unparseable."""
     with db.connect() as conn:
-        r = conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+        r = conn.execute(
+            "SELECT value FROM user_settings WHERE user_id = ? AND key = ?",
+            (user_id, key),
+        ).fetchone()
     if r and r["value"]:
         try:
             return json.loads(r["value"])
@@ -75,99 +77,133 @@ def _get(key, default):
     return default
 
 
-def _set(key, value) -> None:
+def _set(user_id: str, key: str, value) -> None:
+    """Write one setting for a user, upserting on conflict."""
     with db.connect() as conn:
         conn.execute(
-            "INSERT INTO settings (key, value) VALUES (?, ?) "
-            "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-            (key, json.dumps(value)),
+            "INSERT INTO user_settings (user_id, key, value) VALUES (?, ?, ?) "
+            "ON CONFLICT(user_id, key) DO UPDATE SET value = excluded.value",
+            (user_id, key, json.dumps(value)),
         )
 
 
-# --- Target titles ---
-def get_titles() -> list[str]:
-    return _get("target_titles", list(TARGET_TITLES))
+# === Target titles ===
 
 
-def set_titles(titles: list[str]) -> None:
+def get_titles(user_id: str) -> list[str]:
+    """Return the list of target job titles for this user."""
+    return _get(user_id, "target_titles", list(TARGET_TITLES))
+
+
+def set_titles(user_id: str, titles: list[str]) -> None:
+    """Persist deduplicated, lowercased target titles for this user."""
     cleaned, seen = [], set()
     for t in titles:
         t = (t or "").strip().lower()
         if t and t not in seen:
             seen.add(t)
             cleaned.append(t)
-    _set("target_titles", cleaned)
-    logger.info("Target titles updated: %d", len(cleaned))
+    _set(user_id, "target_titles", cleaned)
+    logger.info("Target titles updated for user %s: %d", user_id, len(cleaned))
 
 
-# --- Countries (codes) / location ---
-def get_countries() -> list[str]:
-    return _get("countries", [SEARCH_COUNTRY])
+# === Countries (codes) / location ===
 
 
-def set_countries(names: list[str]) -> None:
+def get_countries(user_id: str) -> list[str]:
+    """Return Adzuna country codes for this user."""
+    return _get(user_id, "countries", [SEARCH_COUNTRY])
+
+
+def set_countries(user_id: str, names: list[str]) -> None:
+    """Convert country names to Adzuna codes and persist for this user."""
     codes = []
     for n in names:
         code = COUNTRY_CODES.get((n or "").strip().lower())
         if code and code not in codes:
             codes.append(code)
-    _set("countries", codes or [SEARCH_COUNTRY])
-    logger.info("Countries updated: %s", codes or [SEARCH_COUNTRY])
+    _set(user_id, "countries", codes or [SEARCH_COUNTRY])
+    logger.info("Countries updated for user %s: %s", user_id, codes or [SEARCH_COUNTRY])
 
 
-def country_names() -> list[str]:
-    """Country codes as display names, for the UI."""
-    return [_CODE_TO_NAME.get(c, c) for c in get_countries()]
+def country_names(user_id: str) -> list[str]:
+    """Return this user's country codes as display names for the UI."""
+    return [_CODE_TO_NAME.get(c, c) for c in get_countries(user_id)]
 
 
-def get_location() -> str:
-    return _get("location", "")
+def get_location(user_id: str) -> str:
+    """Return the city/region filter for this user (empty = whole country)."""
+    return _get(user_id, "location", "")
 
 
-def set_location(loc: str) -> None:
-    _set("location", (loc or "").strip())
+def set_location(user_id: str, loc: str) -> None:
+    """Persist the location filter for this user."""
+    _set(user_id, "location", (loc or "").strip())
 
 
-# --- Background scheduler ---
-def get_scheduler_enabled() -> bool:
+# === Background scheduler ===
+
+
+def get_scheduler_enabled(user_id: str) -> bool:
+    """Return whether the auto-fetch scheduler is enabled for this user."""
     # Defaults to on only if config seeded a positive interval.
-    return bool(_get("scheduler_enabled", AUTO_FETCH_MINUTES > 0))
+    return bool(_get(user_id, "scheduler_enabled", AUTO_FETCH_MINUTES > 0))
 
 
-def set_scheduler_enabled(value: bool) -> None:
-    _set("scheduler_enabled", bool(value))
-    logger.info("Scheduler %s", "enabled" if value else "disabled")
+def set_scheduler_enabled(user_id: str, value: bool) -> None:
+    """Enable or disable the auto-fetch scheduler for this user."""
+    _set(user_id, "scheduler_enabled", bool(value))
+    logger.info("Scheduler %s for user %s", "enabled" if value else "disabled", user_id)
 
 
-def get_scheduler_interval() -> int:
+def get_scheduler_interval(user_id: str) -> int:
+    """Return the scheduler interval in minutes for this user."""
     default = AUTO_FETCH_MINUTES if AUTO_FETCH_MINUTES > 0 else 60
-    return int(_get("scheduler_interval", default))
+    return int(_get(user_id, "scheduler_interval", default))
 
 
-def set_scheduler_interval(minutes: int) -> None:
-    _set("scheduler_interval", max(5, int(minutes)))
+def set_scheduler_interval(user_id: str, minutes: int) -> None:
+    """Persist the scheduler interval (minimum 5 minutes) for this user."""
+    _set(user_id, "scheduler_interval", max(5, int(minutes)))
 
 
-# --- Fetch pipeline options ---
-def get_entry_only() -> bool:
-    return bool(_get("entry_only", True))
+def get_users_with_scheduler_enabled() -> list[str]:
+    """Return user_ids of all users who have enabled the auto-fetch scheduler."""
+    with db.connect() as conn:
+        rows = conn.execute(
+            "SELECT user_id FROM user_settings WHERE key = 'scheduler_enabled' AND value = 'true'"
+        ).fetchall()
+    return [r["user_id"] for r in rows]
 
 
-def set_entry_only(value: bool) -> None:
-    _set("entry_only", bool(value))
+# === Fetch pipeline options ===
 
 
-def get_arbeitnow_limit() -> int:
-    return int(_get("arbeitnow_limit", 100))
+def get_entry_only(user_id: str) -> bool:
+    """Return whether to limit fetched jobs to entry-level roles for this user."""
+    return bool(_get(user_id, "entry_only", True))
 
 
-def set_arbeitnow_limit(n: int) -> None:
-    _set("arbeitnow_limit", max(1, int(n)))
+def set_entry_only(user_id: str, value: bool) -> None:
+    """Persist the entry-level filter preference for this user."""
+    _set(user_id, "entry_only", bool(value))
 
 
-def get_bundesagentur_limit() -> int:
-    return int(_get("bundesagentur_limit", 50))
+def get_arbeitnow_limit(user_id: str) -> int:
+    """Return the maximum number of Arbeitnow jobs to fetch for this user."""
+    return int(_get(user_id, "arbeitnow_limit", 100))
 
 
-def set_bundesagentur_limit(n: int) -> None:
-    _set("bundesagentur_limit", max(1, int(n)))
+def set_arbeitnow_limit(user_id: str, n: int) -> None:
+    """Persist the Arbeitnow fetch limit (minimum 1) for this user."""
+    _set(user_id, "arbeitnow_limit", max(1, int(n)))
+
+
+def get_bundesagentur_limit(user_id: str) -> int:
+    """Return the maximum number of Bundesagentur jobs to fetch for this user."""
+    return int(_get(user_id, "bundesagentur_limit", 50))
+
+
+def set_bundesagentur_limit(user_id: str, n: int) -> None:
+    """Persist the Bundesagentur fetch limit (minimum 1) for this user."""
+    _set(user_id, "bundesagentur_limit", max(1, int(n)))

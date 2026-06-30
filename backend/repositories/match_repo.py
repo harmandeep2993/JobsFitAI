@@ -1,10 +1,9 @@
 # repositories/match_repo.py
 """
-Persistence for scored job matches (SQLite-backed).
+Persistence for scored job matches (SQLite-backed), scoped per user.
 
-Keeps the same API the rest of the app uses (known_ids / upsert / get_all /
-clear); storage moved from a JSON file to SQLite (core/db.py) so it
-queries cleanly and dedupes by primary key.
+Every function takes user_id as its first parameter so each user only
+sees and modifies their own matches.
 """
 
 import json
@@ -14,6 +13,7 @@ from core.logger import get_logger
 
 logger = get_logger(__name__)
 
+# Columns written on every upsert.
 _COLUMNS = (
     "id",
     "source",
@@ -30,25 +30,35 @@ _COLUMNS = (
     "scored_at",
 )
 
+# Columns returned to the UI (jd_json is large - excluded from list view).
+_LIST_COLS = (
+    "id, source, title, company, location, url, language, posted_at, "
+    "score, label, matched_required, missing_required, scored_at, applied, status, app_status"
+)
 
-def known_ids() -> set:
-    """Return the set of job ids already scored and stored."""
+_VALID_APP_STATUSES = {"", "applied", "interview", "offer", "rejected"}
+
+
+def known_ids(user_id: str) -> set:
+    """Return the set of job ids already scored and stored for this user."""
     with db.connect() as conn:
-        rows = conn.execute("SELECT id FROM matches").fetchall()
+        rows = conn.execute(
+            "SELECT id FROM matches WHERE user_id = ?", (user_id,)
+        ).fetchall()
     return {r["id"] for r in rows if r["id"]}
 
 
-def upsert(items: list[dict]) -> None:
-    """Insert or update scored items by id (stores the extracted JD too)."""
+def upsert(user_id: str, items: list[dict]) -> None:
+    """Insert or update scored items by id for this user (stores extracted JD too)."""
     if not items:
         return
 
     sql = """
         INSERT INTO matches
-            (id, source, title, company, location, url, language, posted_at,
+            (id, user_id, source, title, company, location, url, language, posted_at,
              score, label, matched_required, missing_required, scored_at,
              jd_json, section_scores, status)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         ON CONFLICT(id) DO UPDATE SET
             source=excluded.source, title=excluded.title, company=excluded.company,
             location=excluded.location, url=excluded.url, language=excluded.language,
@@ -61,6 +71,7 @@ def upsert(items: list[dict]) -> None:
     rows = [
         (
             it.get("id"),
+            user_id,
             it.get("source"),
             it.get("title"),
             it.get("company"),
@@ -83,9 +94,10 @@ def upsert(items: list[dict]) -> None:
         conn.executemany(sql, rows)
 
 
-def upsert_pending(job) -> None:
-    """Store a job's metadata immediately (status='pending'), before scoring."""
+def upsert_pending(user_id: str, job) -> None:
+    """Store a job's metadata immediately (status='pending') before scoring."""
     upsert(
+        user_id,
         [
             {
                 "id": job.id,
@@ -105,28 +117,25 @@ def upsert_pending(job) -> None:
                 "jd_json": None,
                 "status": "pending",
             }
-        ]
+        ],
     )
 
 
-def set_status(job_id: str, status: str) -> None:
-    """Update only a job's status (e.g. 'jd_unavailable')."""
+def set_status(user_id: str, job_id: str, status: str) -> None:
+    """Update only a job's status (e.g. 'jd_unavailable') for this user."""
     with db.connect() as conn:
-        conn.execute("UPDATE matches SET status = ? WHERE id = ?", (status, job_id))
+        conn.execute(
+            "UPDATE matches SET status = ? WHERE id = ? AND user_id = ?",
+            (status, job_id, user_id),
+        )
 
 
-# Columns returned to the UI (jd_json is large - excluded).
-_LIST_COLS = (
-    "id, source, title, company, location, url, language, posted_at, "
-    "score, label, matched_required, missing_required, scored_at, applied, status, app_status"
-)
-
-
-def get_all() -> list[dict]:
-    """Return all stored matches (without the bulky jd_json), highest score first."""
+def get_all(user_id: str) -> list[dict]:
+    """Return all stored matches for this user (no jd_json), highest score first."""
     with db.connect() as conn:
         rows = conn.execute(
-            f"SELECT {_LIST_COLS} FROM matches ORDER BY score DESC"
+            f"SELECT {_LIST_COLS} FROM matches WHERE user_id = ? ORDER BY score DESC",
+            (user_id,),
         ).fetchall()
 
     out = []
@@ -150,11 +159,12 @@ def get_all() -> list[dict]:
     return out
 
 
-def rows_with_jd() -> list[dict]:
-    """Return [{id, jd}] for every stored job that has a cached JD."""
+def rows_with_jd(user_id: str) -> list[dict]:
+    """Return [{id, jd}] for every stored job for this user that has a cached JD."""
     with db.connect() as conn:
         rows = conn.execute(
-            "SELECT id, jd_json FROM matches WHERE jd_json IS NOT NULL"
+            "SELECT id, jd_json FROM matches WHERE user_id = ? AND jd_json IS NOT NULL",
+            (user_id,),
         ).fetchall()
     out = []
     for r in rows:
@@ -165,8 +175,8 @@ def rows_with_jd() -> list[dict]:
     return out
 
 
-def update_score(job_id: str, result: dict) -> None:
-    """Update scoring fields for a job (used when re-scoring a new resume).
+def update_score(user_id: str, job_id: str, result: dict) -> None:
+    """Update scoring fields for a job (used when re-scoring against a new resume).
 
     Also clears the cached summary, which is now stale for the new resume.
     """
@@ -175,7 +185,7 @@ def update_score(job_id: str, result: dict) -> None:
             """
             UPDATE matches SET score=?, label=?, matched_required=?,
                 missing_required=?, section_scores=?, summary=NULL
-            WHERE id=?
+            WHERE id=? AND user_id=?
             """,
             (
                 result.get("overall_score", 0),
@@ -184,14 +194,17 @@ def update_score(job_id: str, result: dict) -> None:
                 json.dumps(result.get("missing_required", [])),
                 json.dumps(result.get("section_scores", {})),
                 job_id,
+                user_id,
             ),
         )
 
 
-def get_one(job_id: str) -> dict | None:
+def get_one(user_id: str, job_id: str) -> dict | None:
     """Return a single match row with jd/section_scores parsed, or None."""
     with db.connect() as conn:
-        row = conn.execute("SELECT * FROM matches WHERE id=?", (job_id,)).fetchone()
+        row = conn.execute(
+            "SELECT * FROM matches WHERE id=? AND user_id=?", (job_id, user_id)
+        ).fetchone()
     if not row:
         return None
     job = dict(row)
@@ -215,25 +228,25 @@ def get_one(job_id: str) -> dict | None:
     return job
 
 
-def set_summary(job_id: str, summary: str) -> None:
-    """Cache a generated summary for a job."""
-    with db.connect() as conn:
-        conn.execute("UPDATE matches SET summary=? WHERE id=?", (summary, job_id))
-
-
-def set_applied(job_id: str, applied: bool) -> None:
-    """Mark a stored job as applied / not applied."""
+def set_summary(user_id: str, job_id: str, summary: str) -> None:
+    """Cache a generated summary for a job belonging to this user."""
     with db.connect() as conn:
         conn.execute(
-            "UPDATE matches SET applied = ? WHERE id = ?",
-            (1 if applied else 0, job_id),
+            "UPDATE matches SET summary=? WHERE id=? AND user_id=?",
+            (summary, job_id, user_id),
         )
 
 
-_VALID_APP_STATUSES = {"", "applied", "interview", "offer", "rejected"}
+def set_applied(user_id: str, job_id: str, applied: bool) -> None:
+    """Mark a stored job as applied / not applied for this user."""
+    with db.connect() as conn:
+        conn.execute(
+            "UPDATE matches SET applied = ? WHERE id = ? AND user_id = ?",
+            (1 if applied else 0, job_id, user_id),
+        )
 
 
-def set_app_status(job_id: str, status: str) -> None:
+def set_app_status(user_id: str, job_id: str, status: str) -> None:
     """Set the application status for a job (applied/interview/offer/rejected)."""
     status = (status or "").strip().lower()
     if status not in _VALID_APP_STATUSES:
@@ -241,18 +254,25 @@ def set_app_status(job_id: str, status: str) -> None:
     applied = 1 if status else 0
     with db.connect() as conn:
         conn.execute(
-            "UPDATE matches SET app_status = ?, applied = ? WHERE id = ?",
-            (status, applied, job_id),
+            "UPDATE matches SET app_status = ?, applied = ? WHERE id = ? AND user_id = ?",
+            (status, applied, job_id, user_id),
         )
 
 
-def delete(job_id: str) -> None:
-    """Remove a single match."""
-    with db.connect() as conn:
-        conn.execute("DELETE FROM matches WHERE id = ?", (job_id,))
+def set_status_by_id(user_id: str, job_id: str, status: str) -> None:
+    """Update only a job's status field for this user (alias kept for callers using old name)."""
+    set_status(user_id, job_id, status)
 
 
-def clear() -> None:
-    """Remove all stored matches."""
+def delete(user_id: str, job_id: str) -> None:
+    """Remove a single match belonging to this user."""
     with db.connect() as conn:
-        conn.execute("DELETE FROM matches")
+        conn.execute(
+            "DELETE FROM matches WHERE id = ? AND user_id = ?", (job_id, user_id)
+        )
+
+
+def clear(user_id: str) -> None:
+    """Remove all stored matches for this user."""
+    with db.connect() as conn:
+        conn.execute("DELETE FROM matches WHERE user_id = ?", (user_id,))

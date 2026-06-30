@@ -1,10 +1,12 @@
 # repositories/event_repo.py
 """
-Seen-job tracking and an event timeline.
+Seen-job tracking and an event timeline, scoped per user.
 
-`seen_jobs` records every job id we've encountered (including ones rejected
-before scoring) so we never re-fetch or re-classify the same posting.
-`events` is an append-only log of what happened and when.
+`seen_jobs` records every job id a user has encountered (including ones
+rejected before scoring) so we never re-fetch or re-classify the same
+posting for the same user.
+
+`events` is an append-only log of what happened and when, per user.
 """
 
 from datetime import datetime, timezone
@@ -19,77 +21,92 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
-# --- Seen jobs ---
-def seen_ids() -> set:
-    """All job ids we've already encountered."""
+# === Seen jobs ===
+
+
+def seen_ids(user_id: str) -> set:
+    """Return all job ids this user has already encountered."""
     with db.connect() as conn:
-        rows = conn.execute("SELECT id FROM seen_jobs").fetchall()
+        rows = conn.execute(
+            "SELECT id FROM seen_jobs WHERE user_id = ?", (user_id,)
+        ).fetchall()
     return {r["id"] for r in rows if r["id"]}
 
 
-def mark_seen(job, decision: str) -> None:
-    """Record a job as seen with the decision made about it."""
+def mark_seen(job, user_id: str, decision: str) -> None:
+    """Record a job as seen for this user with the decision made about it."""
     with db.connect() as conn:
         conn.execute(
             """
-            INSERT INTO seen_jobs (id, source, title, first_seen, decision)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO seen_jobs (id, user_id, source, title, first_seen, decision)
+            VALUES (?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET decision = excluded.decision
             """,
-            (job.id, job.source, job.title, _now(), decision),
+            (job.id, user_id, job.source, job.title, _now(), decision),
         )
 
 
-def block(job_id: str) -> None:
-    """Mark a job id as 'deleted' so the funnel never resurfaces it."""
+def block(job_id: str, user_id: str) -> None:
+    """Mark a job id as 'deleted' for this user so the funnel never resurfaces it."""
     with db.connect() as conn:
         conn.execute(
             """
-            INSERT INTO seen_jobs (id, source, title, first_seen, decision)
-            VALUES (?, '', '', ?, 'deleted')
+            INSERT INTO seen_jobs (id, user_id, source, title, first_seen, decision)
+            VALUES (?, ?, '', '', ?, 'deleted')
             ON CONFLICT(id) DO UPDATE SET decision = 'deleted'
             """,
-            (job_id, _now()),
+            (job_id, user_id, _now()),
         )
 
 
-# --- Events ---
-def log_event(event_type: str, job_id: str = "", detail: str = "") -> None:
-    """Append an event to the timeline."""
+# === Events ===
+
+
+def log_event(
+    user_id: str, event_type: str, job_id: str = "", detail: str = ""
+) -> None:
+    """Append an event to this user's timeline."""
     with db.connect() as conn:
         conn.execute(
-            "INSERT INTO events (type, job_id, detail, created_at) VALUES (?, ?, ?, ?)",
-            (event_type, job_id, detail, _now()),
+            "INSERT INTO events (user_id, type, job_id, detail, created_at) VALUES (?, ?, ?, ?, ?)",
+            (user_id, event_type, job_id, detail, _now()),
         )
 
 
-def recent_events(limit: int = 50) -> list[dict]:
-    """Most recent events, newest first."""
+def recent_events(user_id: str, limit: int = 50) -> list[dict]:
+    """Return the most recent events for this user, newest first."""
     with db.connect() as conn:
         rows = conn.execute(
-            "SELECT type, job_id, detail, created_at FROM events ORDER BY id DESC LIMIT ?",
-            (limit,),
+            "SELECT type, job_id, detail, created_at FROM events "
+            "WHERE user_id = ? ORDER BY id DESC LIMIT ?",
+            (user_id, limit),
         ).fetchall()
     return [dict(r) for r in rows]
 
 
-# --- Stats (for the live dashboard) ---
-def stats() -> dict:
-    """Aggregate counts for the metrics header."""
+# === Stats (for the live dashboard) ===
+
+
+def stats(user_id: str) -> dict:
+    """Aggregate counts for this user's metrics header."""
     with db.connect() as conn:
-        scored = conn.execute("SELECT COUNT(*) FROM matches").fetchone()[0]
-        applied = conn.execute(
-            "SELECT COUNT(*) FROM matches WHERE applied = 1"
+        scored = conn.execute(
+            "SELECT COUNT(*) FROM matches WHERE user_id = ?", (user_id,)
         ).fetchone()[0]
-        seen = conn.execute("SELECT COUNT(*) FROM seen_jobs").fetchone()[0]
+        applied = conn.execute(
+            "SELECT COUNT(*) FROM matches WHERE user_id = ? AND applied = 1", (user_id,)
+        ).fetchone()[0]
+        seen = conn.execute(
+            "SELECT COUNT(*) FROM seen_jobs WHERE user_id = ?", (user_id,)
+        ).fetchone()[0]
         good = conn.execute(
-            "SELECT COUNT(*) FROM matches WHERE score >= 60"
+            "SELECT COUNT(*) FROM matches WHERE user_id = ? AND score >= 60", (user_id,)
         ).fetchone()[0]
     return {"seen": seen, "scored": scored, "applied": applied, "good": good}
 
 
-def clear() -> None:
-    """Wipe seen-jobs and events (used alongside match_repo.clear)."""
+def clear(user_id: str) -> None:
+    """Wipe seen-jobs and events for this user (used alongside match_repo.clear)."""
     with db.connect() as conn:
-        conn.execute("DELETE FROM seen_jobs")
-        conn.execute("DELETE FROM events")
+        conn.execute("DELETE FROM seen_jobs WHERE user_id = ?", (user_id,))
+        conn.execute("DELETE FROM events WHERE user_id = ?", (user_id,))

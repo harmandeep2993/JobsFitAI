@@ -44,8 +44,9 @@ from services.job_matcher import (
 logger = get_logger("main")
 
 # === Scheduler state ===
-# Exported so api/routes/matches.py can reset it when the user enables the scheduler.
-_sched_last_ref: list[float] = [0.0]
+# Keyed by user_id; exported so job_matches.py can reset a user's entry when
+# they enable the scheduler (so the next 30s tick fires immediately).
+_sched_last_ref: dict[str, float] = {}
 
 app = FastAPI(title="JobsFitAI")
 
@@ -223,38 +224,41 @@ async def _auto_fetch_loop() -> None:
     while True:
         await asyncio.sleep(30)
         try:
-            if not settings_store.get_scheduler_enabled():
-                continue
-            interval = settings_store.get_scheduler_interval() * 60
-            if (
-                _sched_last_ref[0]
-                and (time.monotonic() - _sched_last_ref[0]) < interval
-            ):
-                continue
-            if not session.has_resume() or get_run_status()["running"]:
-                continue
+            user_ids = settings_store.get_users_with_scheduler_enabled()
+            for uid in user_ids:
+                interval = settings_store.get_scheduler_interval(uid) * 60
+                last_run = _sched_last_ref.get(uid, 0.0)
+                if last_run and (time.monotonic() - last_run) < interval:
+                    continue
+                if not session.has_resume(uid) or get_run_status(uid)["running"]:
+                    continue
 
-            _sched_last_ref[0] = time.monotonic()
+                _sched_last_ref[uid] = time.monotonic()
 
-            def _run() -> dict:
-                jobs = fetch_combined(
-                    settings_store.get_titles(),
-                    location=settings_store.get_location(),
-                    countries=settings_store.get_countries(),
-                    per_title=SEARCH_PER_TITLE,
-                    arbeitnow_limit=settings_store.get_arbeitnow_limit(),
-                    bundesagentur_limit=settings_store.get_bundesagentur_limit(),
+                def _run(user_id=uid) -> dict:
+                    jobs = fetch_combined(
+                        settings_store.get_titles(user_id),
+                        location=settings_store.get_location(user_id),
+                        countries=settings_store.get_countries(user_id),
+                        per_title=SEARCH_PER_TITLE,
+                        arbeitnow_limit=settings_store.get_arbeitnow_limit(user_id),
+                        bundesagentur_limit=settings_store.get_bundesagentur_limit(
+                            user_id
+                        ),
+                    )
+                    return discover_and_score(
+                        jobs,
+                        user_id=user_id,
+                        entry_only=settings_store.get_entry_only(user_id),
+                    )
+
+                out = await run_in_threadpool(_run)
+                logger.info(
+                    "[scheduler] user=%s: %d checked, %d scored",
+                    uid,
+                    out.get("checked", 0),
+                    out.get("scored", 0),
                 )
-                return discover_and_score(
-                    jobs, entry_only=settings_store.get_entry_only()
-                )
-
-            out = await run_in_threadpool(_run)
-            logger.info(
-                "[scheduler] auto-fetch: %d checked, %d scored",
-                out.get("checked", 0),
-                out.get("scored", 0),
-            )
         except Exception as e:
             logger.error("[scheduler] error: %s", e)
 
@@ -304,28 +308,25 @@ async def _start_scheduler() -> None:
     _logging.getLogger("uvicorn.access").setLevel(_logging.WARNING)
     _logging.getLogger("uvicorn.access").propagate = False
 
-    # Seed _sched_last_ref from the last run event so server restarts don't
-    # trigger an immediate re-fetch when the interval hasn't elapsed yet.
+    # Seed _sched_last_ref from the last run event per user so server restarts
+    # don't trigger an immediate re-fetch when the interval hasn't elapsed yet.
     with db.connect() as conn:
-        row = conn.execute(
-            "SELECT created_at FROM events WHERE type='run' ORDER BY id DESC LIMIT 1"
-        ).fetchone()
-    if row:
+        rows = conn.execute(
+            "SELECT user_id, MAX(created_at) as created_at FROM events "
+            "WHERE type='run' GROUP BY user_id"
+        ).fetchall()
+    for row in rows:
         try:
             last_ts = datetime.fromisoformat(row["created_at"].replace("Z", "+00:00"))
             elapsed = (datetime.now(timezone.utc) - last_ts).total_seconds()
-            _sched_last_ref[0] = time.monotonic() - elapsed
+            _sched_last_ref[row["user_id"]] = time.monotonic() - elapsed
         except Exception:
             pass
 
     validate_secret()
     asyncio.create_task(_auto_fetch_loop())
     asyncio.create_task(_backfill_extractions())
-    logger.info(
-        "[scheduler] loop started (enabled=%s, every %s min)",
-        settings_store.get_scheduler_enabled(),
-        settings_store.get_scheduler_interval(),
-    )
+    logger.info("[scheduler] loop started (per-user scheduler enabled)")
 
 
 # === Entry point ===

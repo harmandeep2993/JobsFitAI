@@ -1,14 +1,13 @@
 # core/state.py
 """
-Runtime LLM selection state.
+Runtime state: per-user resume cache and app-wide LLM provider selection.
 
-Holds the currently active provider and (optional) model override chosen
-at runtime - e.g. from the Settings tab in the UI. This is in-memory only:
-it applies for the life of the running process and resets to the
-config.yaml defaults on restart.
+Resume state is per-user: each user's extracted resume JSON is kept in
+memory (keyed by user_id) and persisted to the `user_resume` table so it
+survives server restarts without re-extraction.
 
-The router reads `get_provider()` / `get_model()` on every call, so a
-change here takes effect on the next analysis without a restart.
+LLM provider/model selection is app-wide (not per-user) and lives only in
+memory - it resets to config.yaml defaults on restart.
 """
 
 import json
@@ -23,43 +22,51 @@ logger = get_logger(__name__)
 # Providers the router has a working path for.
 SUPPORTED_PROVIDERS = ["openai", "groq", "ollama"]
 
-# Default provider used until the user changes it.
+# Default provider used until changed at runtime.
 # OpenAI gpt-4o-mini has far higher rate limits than Groq's free tier
 # (which caps at 6k tokens/min - too small for this 3-call pipeline).
 DEFAULT_PROVIDER = "openai"
 
+# === App-wide LLM state ===
 # model = None means "use this provider's default model from config.yaml".
 _state = {
     "provider": DEFAULT_PROVIDER,
     "model": None,
 }
 
-# Extracted resume - cached in memory and persisted to SQLite so it
-# survives restarts (no re-extraction). "loaded" tracks whether we've
-# tried loading from the DB yet.
-_resume = {
-    "json": None,
-    "name": "",
-    "id": None,  # resume_id from the resumes table; None for legacy temp uploads
-    "loaded": False,
-}
+# === Per-user resume state ===
+# Keyed by user_id; lazily populated from DB on first access per user.
+_resume: dict[str, dict] = {}
+_resume_loaded: set[str] = set()
 
 
-def _ensure_resume_loaded() -> None:
-    """Lazily load the persisted resume from the DB on first access."""
-    if _resume["loaded"]:
+def _ensure_resume_loaded(user_id: str) -> None:
+    """Lazily load the persisted resume for user_id from the DB on first access."""
+    if user_id in _resume_loaded:
         return
     try:
         with database.connect() as conn:
-            row = conn.execute("SELECT name, json FROM resume WHERE id = 1").fetchone()
+            row = conn.execute(
+                "SELECT name, json FROM user_resume WHERE user_id = ?", (user_id,)
+            ).fetchone()
         if row and row["json"]:
-            _resume["json"] = json.loads(row["json"])
-            _resume["name"] = row["name"] or ""
-            logger.info("Loaded persisted resume: %s", _resume["name"] or "(unnamed)")
+            _resume[user_id] = {
+                "json": json.loads(row["json"]),
+                "name": row["name"] or "",
+                "id": None,
+            }
+            logger.info(
+                "Loaded persisted resume for user %s: %s",
+                user_id,
+                _resume[user_id]["name"] or "(unnamed)",
+            )
     except Exception as e:
-        logger.error("Failed to load persisted resume: %s", e)
+        logger.error("Failed to load persisted resume for user %s: %s", user_id, e)
     finally:
-        _resume["loaded"] = True
+        _resume_loaded.add(user_id)
+
+
+# === LLM provider functions (app-wide) ===
 
 
 def get_provider() -> str:
@@ -68,27 +75,21 @@ def get_provider() -> str:
 
 
 def get_model() -> str:
-    """
-    Return the active model id.
-
-    Falls back to the provider's default model from config.yaml when no
-    explicit override is set.
-    """
+    """Return the active model id, falling back to the provider's config default."""
     if _state["model"]:
         return _state["model"]
     return PROVIDER_CONFIGS.get(_state["provider"], {}).get("model", "")
 
 
 def set_active(provider: str, model: str | None = None) -> None:
-    """
-    Set the active provider and optional model override.
+    """Set the active provider and optional model override.
 
     Args:
-        provider (str): One of SUPPORTED_PROVIDERS.
-        model (str | None): Model id, or empty/None to use the provider default.
+        provider: One of SUPPORTED_PROVIDERS.
+        model: Model id, or empty/None to use the provider default.
 
     Raises:
-        ValueError: If the provider is not supported.
+        ValueError: If the provider is not in SUPPORTED_PROVIDERS.
     """
     provider = (provider or "").strip()
     if provider not in SUPPORTED_PROVIDERS:
@@ -101,57 +102,71 @@ def set_active(provider: str, model: str | None = None) -> None:
 
 
 def get_settings() -> dict:
-    """Return the current selection as {'provider', 'model'}."""
+    """Return the current LLM selection as {'provider', 'model'}."""
     return {"provider": get_provider(), "model": get_model()}
 
 
-def get_resume_id() -> str | None:
-    """Return the resume_id of the currently active resume, or None."""
-    return _resume["id"]
+# === Per-user resume functions ===
 
 
-def set_resume(resume_json: dict, name: str = "", resume_id: str | None = None) -> None:
-    """Store the extracted resume (in memory + persisted) for reuse."""
-    _resume["json"] = resume_json
-    _resume["name"] = name or ""
-    _resume["id"] = resume_id
-    _resume["loaded"] = True
+def get_resume_id(user_id: str) -> str | None:
+    """Return the resume_id of the active resume for this user, or None."""
+    _ensure_resume_loaded(user_id)
+    return (_resume.get(user_id) or {}).get("id")
+
+
+def set_resume(
+    user_id: str, resume_json: dict, name: str = "", resume_id: str | None = None
+) -> None:
+    """Store the extracted resume for user_id in memory and persist to DB.
+
+    Args:
+        user_id: The user this resume belongs to.
+        resume_json: Structured extraction output from resume_extractor.
+        name: Display name (original filename or label).
+        resume_id: Row id from the `resumes` table, if uploaded via the
+            resume-storage flow (None for legacy temp uploads).
+    """
+    _resume[user_id] = {"json": resume_json, "name": name or "", "id": resume_id}
+    _resume_loaded.add(user_id)
 
     try:
         with database.connect() as conn:
             conn.execute(
                 """
-                INSERT INTO resume (id, name, json, created_at) VALUES (1, ?, ?, ?)
-                ON CONFLICT(id) DO UPDATE SET
+                INSERT INTO user_resume (user_id, name, json, created_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(user_id) DO UPDATE SET
                     name=excluded.name, json=excluded.json, created_at=excluded.created_at
                 """,
                 (
-                    _resume["name"],
+                    user_id,
+                    name or "",
                     json.dumps(resume_json),
                     datetime.now(timezone.utc).isoformat(timespec="seconds"),
                 ),
             )
     except Exception as e:
-        logger.error("Failed to persist resume: %s", e)
+        logger.error("Failed to persist resume for user %s: %s", user_id, e)
 
-    logger.info("Resume stored for matching: %s", _resume["name"] or "(unnamed)")
-
-
-def get_resume() -> dict | None:
-    """Return the stored resume JSON, or None if none is loaded."""
-    _ensure_resume_loaded()
-    return _resume["json"]
+    logger.info("Resume stored for user %s: %s", user_id, name or "(unnamed)")
 
 
-def get_resume_name() -> str:
-    """Return the stored resume's display name."""
-    _ensure_resume_loaded()
-    return _resume["name"]
+def get_resume(user_id: str) -> dict | None:
+    """Return the stored resume JSON for this user, or None if none is loaded."""
+    _ensure_resume_loaded(user_id)
+    return (_resume.get(user_id) or {}).get("json")
 
 
-def has_resume() -> bool:
-    """True if a resume has been extracted and stored."""
-    return get_resume() is not None
+def get_resume_name(user_id: str) -> str:
+    """Return the stored resume's display name for this user."""
+    _ensure_resume_loaded(user_id)
+    return (_resume.get(user_id) or {}).get("name", "")
+
+
+def has_resume(user_id: str) -> bool:
+    """Return True if a resume has been extracted and stored for this user."""
+    return get_resume(user_id) is not None
 
 
 def _flatten_skills(skills) -> list:
@@ -166,13 +181,13 @@ def _flatten_skills(skills) -> list:
     return []
 
 
-def resume_info() -> dict:
-    """Compact view of the stored resume for the dashboard panel."""
-    r = get_resume()
+def resume_info(user_id: str) -> dict:
+    """Return a compact view of the stored resume for this user's dashboard panel."""
+    r = get_resume(user_id)
     if not r:
         return {}
     return {
-        "name": get_resume_name(),
+        "name": get_resume_name(user_id),
         "title": (r.get("candidate") or {}).get("title", ""),
         "total_years": (r.get("meta") or {}).get("total_experience_years", 0),
         "skills": _flatten_skills(r.get("skills", [])),
@@ -202,8 +217,7 @@ def resume_info() -> dict:
 
 
 def provider_catalog() -> list[dict]:
-    """
-    Return the selectable providers for the UI.
+    """Return the selectable providers for the UI.
 
     Each entry: {name, default_model, models[], needs_key, has_key, key_hint}.
     """
