@@ -1,27 +1,7 @@
 import { useState, useEffect } from 'react'
 import { apiFetch } from '../../lib/auth.js'
 import { useToast } from '../Toast.jsx'
-
-function Section({ title, children }) {
-  return (
-    <div className="card p-5 space-y-4">
-      <div className="text-[13.5px] font-semibold text-t1 pb-1 border-b border-border">{title}</div>
-      {children}
-    </div>
-  )
-}
-
-function Field({ label, hint, children }) {
-  return (
-    <div className="space-y-1.5">
-      <label className="block text-[12.5px] font-medium text-t2">
-        {label}
-        {hint && <span className="font-normal text-t3 ml-1">{hint}</span>}
-      </label>
-      {children}
-    </div>
-  )
-}
+import { PageHeader, CardSection, FieldLabel, PageSpinner } from '../ui.jsx'
 
 export default function Settings() {
   const toast = useToast()
@@ -38,13 +18,10 @@ export default function Settings() {
     e.preventDefault()
     setSaving('filters')
     const fd = new FormData(e.target)
-    const titles   = (fd.get('titles') || '').split('\n').map(t => t.trim()).filter(Boolean)
-    const location = (fd.get('location') || '').trim()
+    const titles    = (fd.get('titles') || '').split('\n').map(t => t.trim()).filter(Boolean)
+    const location  = (fd.get('location') || '').trim()
     const countries = (fd.get('countries') || '').split(',').map(c => c.trim()).filter(Boolean)
-    const res = await apiFetch('/api/match/filters', {
-      method: 'POST',
-      body: JSON.stringify({ titles, location, countries }),
-    })
+    const res = await apiFetch('/api/match/filters', { method: 'POST', body: JSON.stringify({ titles, location, countries }) })
     setSaving('')
     if (res?.ok) toast('Job search settings saved', 'success')
     else toast('Save failed', 'error')
@@ -53,10 +30,7 @@ export default function Settings() {
   async function toggleScheduler() {
     if (!state) return
     const enabled = !state.scheduler_enabled
-    const res = await apiFetch('/api/match/scheduler', {
-      method: 'POST',
-      body: JSON.stringify({ enabled }),
-    })
+    const res = await apiFetch('/api/match/scheduler', { method: 'POST', body: JSON.stringify({ enabled }) })
     if (res?.ok) setState(s => ({ ...s, scheduler_enabled: enabled }))
     else toast('Could not update scheduler', 'error')
   }
@@ -65,10 +39,7 @@ export default function Settings() {
     e.preventDefault()
     setSaving('llm')
     const fd = new FormData(e.target)
-    const res = await apiFetch('/api/llm-settings', {
-      method: 'POST',
-      body: JSON.stringify({ provider: fd.get('provider'), model: fd.get('model') }),
-    })
+    const res = await apiFetch('/api/llm-settings', { method: 'POST', body: JSON.stringify({ provider: fd.get('provider'), model: fd.get('model') }) })
     setSaving('')
     if (res?.ok) toast('LLM settings saved', 'success')
     else toast('Save failed', 'error')
@@ -77,148 +48,109 @@ export default function Settings() {
   async function pingLlm() {
     const res = await apiFetch('/api/llm-ping')
     const d = await res?.json()
-    toast(
-      d?.ok ? `Connected to ${d.provider}` : 'LLM unreachable',
-      d?.ok ? 'success' : 'error'
-    )
+    toast(d?.ok ? `Connected to ${d.provider}` : 'LLM unreachable', d?.ok ? 'success' : 'error')
   }
 
-  const isLoading = !state && !llm
-
-  if (isLoading) {
-    return (
-      <div className="space-y-5">
-        <div>
-          <h1 className="text-xl font-semibold text-t1">Settings</h1>
-        </div>
-        <div className="card p-8 text-center text-sm text-t3">Loading settings...</div>
-      </div>
-    )
-  }
+  if (!state && !llm) return (
+    <div className="space-y-5">
+      <PageHeader title="Settings" description="Configure job search targets, scheduler, and AI provider." />
+      <PageSpinner />
+    </div>
+  )
 
   return (
     <div className="space-y-5 max-w-2xl">
-      <div>
-        <h1 className="text-xl font-semibold text-t1">Settings</h1>
-        <p className="text-sm text-t2 mt-1">Configure job search targets, scheduler, and AI provider.</p>
-      </div>
+      <PageHeader
+        title="Settings"
+        description="Configure job search targets, auto scheduler, and your AI provider."
+      />
 
       {/* Job search */}
       {state && (
         <form onSubmit={saveFilters}>
-          <Section title="Job Search">
-            <Field label="Job titles" hint="(one per line)">
-              <textarea
-                name="titles"
-                defaultValue={(state.filters?.titles || []).join('\n')}
-                rows={4}
-                placeholder={"Software Engineer\nBackend Developer\nPython Developer"}
-                className="input-base resize-none"
-              />
-            </Field>
-
-            <Field label="Location">
-              <input
-                type="text"
-                name="location"
-                defaultValue={state.filters?.location || ''}
-                placeholder="Berlin, Munich, Remote..."
-                className="input-base"
-              />
-            </Field>
-
-            <Field label="Countries" hint="(comma separated ISO codes)">
-              <input
-                type="text"
-                name="countries"
-                defaultValue={(state.filters?.countries || []).join(', ')}
-                placeholder="de, at, ch"
-                className="input-base"
-              />
-            </Field>
-
-            <button
-              type="submit"
-              disabled={saving === 'filters'}
-              className="btn-primary py-2 px-5 text-[13.5px]"
-            >
-              {saving === 'filters' ? 'Saving...' : 'Save job search settings'}
-            </button>
-          </Section>
+          <CardSection
+            title="Job Search"
+            action={
+              <button type="submit" disabled={saving === 'filters'} className="btn-primary h-7 px-3.5 text-[12.5px]">
+                {saving === 'filters' ? 'Saving...' : 'Save'}
+              </button>
+            }
+          >
+            <div className="space-y-4">
+              <div>
+                <FieldLabel hint="(one per line)">Job titles</FieldLabel>
+                <textarea
+                  name="titles"
+                  defaultValue={(state.filters?.titles || []).join('\n')}
+                  rows={4}
+                  placeholder={"Software Engineer\nBackend Developer\nPython Developer"}
+                  className="input-base resize-none"
+                />
+              </div>
+              <div>
+                <FieldLabel>Location</FieldLabel>
+                <input type="text" name="location" defaultValue={state.filters?.location || ''} placeholder="Berlin, Munich, Remote..." className="input-base" />
+              </div>
+              <div>
+                <FieldLabel hint="(comma separated ISO codes)">Countries</FieldLabel>
+                <input type="text" name="countries" defaultValue={(state.filters?.countries || []).join(', ')} placeholder="de, at, ch" className="input-base" />
+              </div>
+            </div>
+          </CardSection>
         </form>
       )}
 
       {/* Scheduler */}
       {state && (
-        <Section title="Auto Scheduler">
-          <p className="text-[13px] text-t2">Automatically fetch and score new jobs in the background.</p>
+        <CardSection title="Auto Scheduler">
+          <p className="text-[13px] text-t2 mb-4">Automatically fetch and score new jobs in the background on a set interval.</p>
           <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={toggleScheduler}
-              className={`relative w-10 h-6 rounded-full transition-colors flex-shrink-0 ${
-                state.scheduler_enabled ? 'bg-accent' : 'bg-border'
-              }`}
+              className={`relative w-10 h-6 rounded-full transition-colors flex-shrink-0 ${state.scheduler_enabled ? 'bg-accent' : 'bg-border'}`}
             >
-              <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${
-                state.scheduler_enabled ? 'translate-x-5' : 'translate-x-1'
-              }`} />
+              <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${state.scheduler_enabled ? 'translate-x-5' : 'translate-x-1'}`} />
             </button>
-            <span className="text-[13px] font-medium text-t1">
-              {state.scheduler_enabled ? 'Enabled' : 'Disabled'}
-            </span>
+            <span className="text-[13.5px] font-medium text-t1">{state.scheduler_enabled ? 'Enabled' : 'Disabled'}</span>
             {state.scheduler_interval && (
               <span className="text-[12px] text-t3">- runs every {state.scheduler_interval} min</span>
             )}
           </div>
-        </Section>
+        </CardSection>
       )}
 
       {/* LLM */}
       {llm && (
         <form onSubmit={saveLlm}>
-          <Section title="LLM Provider">
-            <Field label="Provider">
-              <select
-                name="provider"
-                defaultValue={llm.active_provider}
-                className="input-base"
-              >
-                {llm.catalog?.map(p => (
-                  <option key={p.name} value={p.name}>
-                    {p.name}{!p.has_key && p.needs_key ? ' (no API key)' : ''}
-                  </option>
-                ))}
-              </select>
-            </Field>
-
-            <Field label="Model" hint="(leave blank for default)">
-              <input
-                type="text"
-                name="model"
-                defaultValue={llm.active_model || ''}
-                placeholder="e.g. gpt-4o-mini, llama3-8b-8192"
-                className="input-base"
-              />
-            </Field>
-
-            <div className="flex gap-2.5">
-              <button
-                type="submit"
-                disabled={saving === 'llm'}
-                className="btn-primary py-2 px-5 text-[13.5px]"
-              >
-                {saving === 'llm' ? 'Saving...' : 'Save LLM settings'}
-              </button>
-              <button
-                type="button"
-                onClick={pingLlm}
-                className="btn-secondary py-2 px-4 text-[13.5px]"
-              >
-                Test connection
-              </button>
+          <CardSection
+            title="LLM Provider"
+            action={
+              <div className="flex gap-1.5">
+                <button type="button" onClick={pingLlm} className="btn-secondary h-7 px-3 text-[12.5px]">Test</button>
+                <button type="submit" disabled={saving === 'llm'} className="btn-primary h-7 px-3.5 text-[12.5px]">
+                  {saving === 'llm' ? 'Saving...' : 'Save'}
+                </button>
+              </div>
+            }
+          >
+            <div className="space-y-4">
+              <div>
+                <FieldLabel>Provider</FieldLabel>
+                <select name="provider" defaultValue={llm.active_provider} className="input-base">
+                  {llm.catalog?.map(p => (
+                    <option key={p.name} value={p.name}>
+                      {p.name}{!p.has_key && p.needs_key ? ' (no API key)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <FieldLabel hint="(leave blank for default)">Model</FieldLabel>
+                <input type="text" name="model" defaultValue={llm.active_model || ''} placeholder="e.g. gpt-4o-mini, llama3-8b-8192" className="input-base" />
+              </div>
             </div>
-          </Section>
+          </CardSection>
         </form>
       )}
     </div>
