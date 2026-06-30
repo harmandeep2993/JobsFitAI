@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { isAuthed } from './lib/auth.js'
 import Landing from './pages/Landing.jsx'
 import Login from './pages/Login.jsx'
-import AppShell from './pages/AppShell.jsx'
+import AppShell from './layouts/AppShell.jsx'
 
 function RequireAuth({ children }) {
   if (!isAuthed()) return <Navigate to="/login" replace />

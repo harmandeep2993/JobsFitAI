@@ -88,6 +88,13 @@ class _TursoConn:
         rs = self._client.execute(sql, list(params))
         return _Cursor(rs)
 
+    def execute_batch(self, statements: list[str]) -> None:
+        """Send multiple parameter-free statements in a single round-trip.
+
+        Used by init() so schema creation doesn't cost N Turso HTTP calls.
+        """
+        self._client.batch(statements)
+
     def commit(self):
         """No-op - libsql auto-commits each statement."""
 
@@ -131,148 +138,123 @@ def connect():
 # === Schema init ===
 
 
+# All CREATE TABLE statements batched so Turso pays one HTTP round-trip at startup.
+_SCHEMA_STMTS = [
+    """CREATE TABLE IF NOT EXISTS users (
+        id              TEXT PRIMARY KEY,
+        email           TEXT UNIQUE NOT NULL,
+        hashed_password TEXT NOT NULL,
+        created_at      TEXT NOT NULL
+    )""",
+    """CREATE TABLE IF NOT EXISTS matches (
+        id               TEXT PRIMARY KEY,
+        user_id          TEXT NOT NULL DEFAULT 'local',
+        source           TEXT,
+        title            TEXT,
+        company          TEXT,
+        location         TEXT,
+        url              TEXT,
+        language         TEXT,
+        posted_at        TEXT,
+        score            REAL,
+        label            TEXT,
+        matched_required TEXT,
+        missing_required TEXT,
+        scored_at        TEXT,
+        applied          INTEGER DEFAULT 0,
+        jd_json          TEXT,
+        section_scores   TEXT,
+        summary          TEXT,
+        status           TEXT DEFAULT 'scored',
+        app_status       TEXT DEFAULT ''
+    )""",
+    """CREATE TABLE IF NOT EXISTS seen_jobs (
+        id         TEXT PRIMARY KEY,
+        user_id    TEXT NOT NULL DEFAULT 'local',
+        source     TEXT,
+        title      TEXT,
+        first_seen TEXT,
+        decision   TEXT
+    )""",
+    """CREATE TABLE IF NOT EXISTS events (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id    TEXT NOT NULL DEFAULT 'local',
+        type       TEXT,
+        job_id     TEXT,
+        detail     TEXT,
+        created_at TEXT
+    )""",
+    """CREATE TABLE IF NOT EXISTS resumes (
+        id             TEXT PRIMARY KEY,
+        user_id        TEXT NOT NULL DEFAULT 'local',
+        slot           INTEGER NOT NULL DEFAULT 0,
+        label          TEXT NOT NULL DEFAULT 'Base Resume',
+        original_name  TEXT NOT NULL,
+        file_path      TEXT NOT NULL,
+        mime_type      TEXT NOT NULL,
+        file_size_kb   REAL NOT NULL DEFAULT 0,
+        uploaded_at    TEXT NOT NULL,
+        extracted_json TEXT
+    )""",
+    """CREATE TABLE IF NOT EXISTS analyses (
+        id         TEXT PRIMARY KEY,
+        resume_id  TEXT NOT NULL,
+        jd_snippet TEXT,
+        score      REAL,
+        label      TEXT,
+        scored_at  TEXT NOT NULL
+    )""",
+    """CREATE TABLE IF NOT EXISTS analysis_cache (
+        hash        TEXT PRIMARY KEY,
+        result_json TEXT NOT NULL,
+        created_at  TEXT NOT NULL
+    )""",
+    """CREATE TABLE IF NOT EXISTS user_settings (
+        user_id TEXT NOT NULL,
+        key     TEXT NOT NULL,
+        value   TEXT,
+        PRIMARY KEY (user_id, key)
+    )""",
+    """CREATE TABLE IF NOT EXISTS user_resume (
+        user_id    TEXT PRIMARY KEY,
+        name       TEXT,
+        json       TEXT,
+        created_at TEXT
+    )""",
+    # Legacy singleton table kept for backward compat with older resume sessions
+    """CREATE TABLE IF NOT EXISTS resume (
+        id         INTEGER PRIMARY KEY CHECK (id = 1),
+        name       TEXT,
+        json       TEXT,
+        created_at TEXT
+    )""",
+    "CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)",
+]
+
+# Migrations that add columns to existing databases.
+# Each statement is attempted individually; "duplicate column" errors are expected and ignored.
+_MIGRATION_STMTS = [
+    "ALTER TABLE matches   ADD COLUMN user_id TEXT NOT NULL DEFAULT 'local'",
+    "ALTER TABLE events    ADD COLUMN user_id TEXT NOT NULL DEFAULT 'local'",
+    "ALTER TABLE seen_jobs ADD COLUMN user_id TEXT NOT NULL DEFAULT 'local'",
+]
+
+
 def init() -> None:
-    """Create all tables if they don't exist. Safe to call multiple times."""
+    """Create all tables and run column migrations. Safe to call multiple times."""
     with connect() as conn:
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS matches (
-                id               TEXT PRIMARY KEY,
-                source           TEXT,
-                title            TEXT,
-                company          TEXT,
-                location         TEXT,
-                url              TEXT,
-                language         TEXT,
-                posted_at        TEXT,
-                score            REAL,
-                label            TEXT,
-                matched_required TEXT,
-                missing_required TEXT,
-                scored_at        TEXT,
-                applied          INTEGER DEFAULT 0,
-                jd_json          TEXT,
-                section_scores   TEXT,
-                summary          TEXT,
-                status           TEXT DEFAULT 'scored',
-                app_status       TEXT DEFAULT ''
-            )
-            """
-        )
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS resume (
-                id         INTEGER PRIMARY KEY CHECK (id = 1),
-                name       TEXT,
-                json       TEXT,
-                created_at TEXT
-            )
-            """
-        )
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS seen_jobs (
-                id         TEXT PRIMARY KEY,
-                source     TEXT,
-                title      TEXT,
-                first_seen TEXT,
-                decision   TEXT
-            )
-            """
-        )
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS events (
-                id         INTEGER PRIMARY KEY AUTOINCREMENT,
-                type       TEXT,
-                job_id     TEXT,
-                detail     TEXT,
-                created_at TEXT
-            )
-            """
-        )
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)"
-        )
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS resumes (
-                id             TEXT PRIMARY KEY,
-                user_id        TEXT NOT NULL DEFAULT 'local',
-                slot           INTEGER NOT NULL DEFAULT 0,
-                label          TEXT NOT NULL DEFAULT 'Base Resume',
-                original_name  TEXT NOT NULL,
-                file_path      TEXT NOT NULL,
-                mime_type      TEXT NOT NULL,
-                file_size_kb   REAL NOT NULL DEFAULT 0,
-                uploaded_at    TEXT NOT NULL,
-                extracted_json TEXT
-            )
-            """
-        )
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS analyses (
-                id         TEXT PRIMARY KEY,
-                resume_id  TEXT NOT NULL,
-                jd_snippet TEXT,
-                score      REAL,
-                label      TEXT,
-                scored_at  TEXT NOT NULL
-            )
-            """
-        )
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS analysis_cache (
-                hash        TEXT PRIMARY KEY,
-                result_json TEXT NOT NULL,
-                created_at  TEXT NOT NULL
-            )
-            """
-        )
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS users (
-                id              TEXT PRIMARY KEY,
-                email           TEXT UNIQUE NOT NULL,
-                hashed_password TEXT NOT NULL,
-                created_at      TEXT NOT NULL
-            )
-            """
-        )
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS user_settings (
-                user_id TEXT NOT NULL,
-                key     TEXT NOT NULL,
-                value   TEXT,
-                PRIMARY KEY (user_id, key)
-            )
-            """
-        )
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS user_resume (
-                user_id    TEXT PRIMARY KEY,
-                name       TEXT,
-                json       TEXT,
-                created_at TEXT
-            )
-            """
-        )
-        # Add user_id to shared tables for per-user scoping.
-        # These columns may already exist on an existing database - ignore the error.
-        for _stmt in [
-            "ALTER TABLE matches   ADD COLUMN user_id TEXT NOT NULL DEFAULT 'local'",
-            "ALTER TABLE events    ADD COLUMN user_id TEXT NOT NULL DEFAULT 'local'",
-            "ALTER TABLE seen_jobs ADD COLUMN user_id TEXT NOT NULL DEFAULT 'local'",
-        ]:
+        if _USE_TURSO and hasattr(conn, "execute_batch"):
+            # Single HTTP round-trip for all CREATE TABLE statements on Turso
+            conn.execute_batch(_SCHEMA_STMTS)
+        else:
+            for stmt in _SCHEMA_STMTS:
+                conn.execute(stmt)
+
+        for stmt in _MIGRATION_STMTS:
             try:
-                conn.execute(_stmt)
+                conn.execute(stmt)
             except Exception as _e:
-                # "duplicate column name" is expected on subsequent startups
-                logger.debug("ALTER TABLE skipped (already applied?): %s", _e)
+                logger.debug("migration skipped (already applied?): %s", _e)
 
     mode = f"Turso ({_TURSO_URL})" if _USE_TURSO else f"SQLite ({DB_PATH})"
     logger.info("Database ready - %s", mode)
