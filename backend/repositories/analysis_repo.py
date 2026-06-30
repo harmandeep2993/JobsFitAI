@@ -9,7 +9,7 @@ than inserting a duplicate, so the history shows the most recent score.
 import uuid
 from datetime import datetime, timezone
 
-from core import db
+from core import database as db
 
 # Maximum characters stored in the jd_snippet column.
 # Long enough to be a useful identifier in the history view, short enough

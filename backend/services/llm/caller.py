@@ -1,12 +1,12 @@
-# services/llm/router.py
+# services/llm/caller.py
 """
 Unified LLM router for JobsFitAI.
 All extractors call call_llm() and check_llm() only.
 Never import providers directly outside this file.
 
 The active provider and model are runtime state held in
-core/session.py -- change them at runtime (e.g. from the Settings
-tab) via session.set_active(). They reset to the config.yaml defaults on
+core/state.py -- change them at runtime (e.g. from the Settings
+tab) via state.set_active(). They reset to the config.yaml defaults on
 restart.
 """
 
@@ -18,13 +18,13 @@ import threading
 import time
 from dataclasses import dataclass
 
-from core import session
+from core import state
 from core.config import GROQ_CONFIG, LLM_MAX_OUTPUT_TOKENS
 from core.logger import get_logger
 
 logger = get_logger(__name__)
 
-logger.info("LLM Router initialized with %s provider", session.get_provider())
+logger.info("LLM Router initialized with %s provider", state.get_provider())
 
 # --- Character/token estimate ---
 # Rough English average: 4 chars per token. Used only for Groq TPM pacing;
@@ -162,7 +162,7 @@ def _call_with_retry(
 
 def _get_provider():
     """Load the provider module for the currently active provider."""
-    name = session.get_provider()
+    name = state.get_provider()
 
     if name == "openai":
         from services.llm.providers import openai
@@ -186,7 +186,7 @@ def _get_provider():
 def check_llm() -> bool:
     """Check if the active LLM provider is available."""
     provider = _get_provider()
-    logger.debug("Checking %s provider connectivity...", session.get_provider())
+    logger.debug("Checking %s provider connectivity...", state.get_provider())
     return provider.check()
 
 
@@ -219,8 +219,8 @@ def call_llm(prompt: str) -> "LLMResult | None":
                           before using the response.
     """
     provider = _get_provider()
-    provider_name = session.get_provider()
-    model = session.get_model()
+    provider_name = state.get_provider()
+    model = state.get_model()
 
     logger.debug(
         "Calling %s (%s) - prompt %d chars",

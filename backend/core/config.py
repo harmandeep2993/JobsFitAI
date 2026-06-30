@@ -67,7 +67,7 @@ config = load_config()
 # validate_config() calls sys.exit(1) on any failure so the server never
 # starts with a broken config. Import is deferred to avoid a circular
 # dependency (settings.py imports nothing from this package).
-from core.settings import validate_config as _validate_config  # noqa: E402
+from core.config_validator import validate_config as _validate_config  # noqa: E402
 
 _validate_config(config)
 

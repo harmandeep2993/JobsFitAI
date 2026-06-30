@@ -19,7 +19,7 @@ Sources:
     JD     -> certifications[]
 """
 
-from services.matcher.utils import _best_match_score
+from services.matcher.scoring_utils import _best_match_score
 from core.logger import get_logger
 
 logger = get_logger(__name__)

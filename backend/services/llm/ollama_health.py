@@ -1,8 +1,8 @@
-# llm/ollama.py
+# llm/ollama_health.py
 """
 Thin HTTP wrapper around a locally-running Ollama instance.
 
-These functions are called only from llm/router.py via the ollama
+These functions are called only from llm/caller.py via the ollama
 provider path. Do not import this module directly from routes or services.
 """
 

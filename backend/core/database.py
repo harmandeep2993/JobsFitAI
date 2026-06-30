@@ -1,4 +1,4 @@
-# core/db.py
+# core/database.py
 """
 SQLite persistence for JobsFitAI.
 

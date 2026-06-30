@@ -10,9 +10,9 @@ from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 from starlette.requests import Request
 
-from core import db, session
+from core import database as db, state as session
 from core.logger import get_logger
-from services.llm.router import check_llm
+from services.llm.caller import check_llm
 
 logger = get_logger(__name__)
 

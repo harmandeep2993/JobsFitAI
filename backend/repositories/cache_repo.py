@@ -10,7 +10,7 @@ requests skip all LLM calls.
 import json
 from datetime import datetime, timezone
 
-from core import db
+from core import database as db
 from core.logger import get_logger
 
 logger = get_logger(__name__)

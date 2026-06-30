@@ -1,4 +1,4 @@
-# services/parsers/resume_parser.py
+# services/parsers/file_parser.py
 
 """
 Resume parsing entry point for JobsFitAI.
@@ -11,7 +11,7 @@ Orchestrates the full parsing pipeline:
 Supported formats: PDF, DOCX, DOC, TXT
 
 Usage:
-    from services.parsers.resume_parser import extract_all_text
+    from services.parsers.file_parser import extract_all_text
     text = extract_all_text("resume.pdf")
 """
 
@@ -20,7 +20,7 @@ from pathlib import Path
 from services.parsers.docx_parser import parse_docx
 from services.parsers.pdf_parser import parse_pdf
 from services.parsers.text_cleaner import clean
-from services.parsers.validator import validate
+from services.parsers.file_validator import validate
 from core.logger import get_logger
 
 #

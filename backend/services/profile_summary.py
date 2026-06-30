@@ -1,4 +1,4 @@
-# services/summary.py
+# services/profile_summary.py
 """
 Generates the LLM-powered candidate summary shown in the Summary tab.
 
@@ -8,7 +8,7 @@ Produces structured JSON with four sections: profile, strengths, gaps, focus.
 Falls back to a deterministic template if the LLM call fails.
 """
 
-from services.llm.router import call_llm
+from services.llm.caller import call_llm
 
 
 def generate_summary(resume_json, jd_json, results):

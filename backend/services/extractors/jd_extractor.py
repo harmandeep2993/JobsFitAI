@@ -1,4 +1,4 @@
-# services/extractors/jd.py
+# services/extractors/jd_extractor.py
 """
 Job Description extraction module.
 
@@ -9,7 +9,7 @@ Includes light post-processing to normalize all string values to lowercase.
 from services.prompts import get_jd_prompt
 from core.config import JD_MAX_CHARS
 from core.logger import get_logger
-from services.llm.router import call_llm, parse_json_response
+from services.llm.caller import call_llm, parse_json_response
 
 logger = get_logger(__name__)
 

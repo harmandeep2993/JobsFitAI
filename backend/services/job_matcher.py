@@ -11,18 +11,18 @@ import json as _json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 
-from services.extractors.jd import extract_jd
+from services.extractors.jd_extractor import extract_jd
 from services.fetchers import (
     Job,
     fetch_adzuna_multi,
     fetch_arbeitnow_jobs,
     fetch_bundesagentur_jobs,
 )
-from services.fetchers.enrich import fetch_full_description
+from services.fetchers.job_enricher import fetch_full_description
 from services.matcher import match
 from repositories import event_repo, match_repo
-from services import relevance, role_filter, vector_store
-from core import session
+from services import job_relevance as relevance, role_filter, vector_store
+from core import state as session
 from core.config import MAX_AGE_DAYS
 from core.logger import get_logger
 

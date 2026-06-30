@@ -10,7 +10,7 @@ Covers:
 from sentence_transformers import util
 
 from services.matcher.embedding_model import load_model
-from services.matcher.utils import get_all_skills
+from services.matcher.scoring_utils import get_all_skills
 from core.logger import get_logger
 
 logger = get_logger(__name__)

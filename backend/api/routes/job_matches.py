@@ -1,4 +1,4 @@
-# api/routes/matches.py
+# api/routes/job_matches.py
 """
 /api/match/* endpoints - job fetch, score, and state.
 """
@@ -15,11 +15,11 @@ from starlette.requests import Request
 
 from core.config import MAX_AGE_DAYS, SEARCH_PER_TITLE
 from core.logger import get_logger
-from core import session
-from services.extractors.jd import extract_jd
-from services.matcher.matcher import match
+from core import state
+from services.extractors.jd_extractor import extract_jd
+from services.matcher.engine import match
 from services.parsers import extract_all_text
-from services.extractors.resume import extract_resume
+from services.extractors.resume_extractor import extract_resume
 from repositories import event_repo as event_store
 from repositories import match_repo as match_store
 from repositories import settings_repo as settings_store
@@ -31,7 +31,7 @@ from services.job_matcher import (
     get_run_status,
     rescore_all,
 )
-from services.summary import generate_summary
+from services.profile_summary import generate_summary
 from services import vector_store
 
 logger = get_logger(__name__)
@@ -108,10 +108,10 @@ async def api_match_resume(request: Request) -> JSONResponse:
             {"ok": False, "error": "could not parse resume"}, status_code=422
         )
 
-    prev_resume = session.get_resume()
+    prev_resume = state.get_resume()
     diff = _resume_diff(prev_resume, resume_json) if prev_resume else None
 
-    session.set_resume(resume_json, name)
+    state.set_resume(resume_json, name)
 
     rescored = await run_in_threadpool(rescore_all)
     if rescored:
@@ -137,7 +137,7 @@ async def api_match_run(request: Request) -> JSONResponse:
     Returns immediately with {started: true} and runs the pipeline in a
     background task. Only one run can be active at a time.
     """
-    if not session.has_resume():
+    if not state.has_resume():
         return JSONResponse(
             {"ok": False, "error": "no_resume", "results": match_store.get_all()},
             status_code=400,
@@ -205,8 +205,8 @@ async def api_match_state() -> JSONResponse:
     return JSONResponse(
         {
             "ok": True,
-            "has_resume": session.has_resume(),
-            "resume_name": session.get_resume_name(),
+            "has_resume": state.has_resume(),
+            "resume_name": state.get_resume_name(),
             "filters": {
                 "target_titles": settings_store.get_titles(),
                 "countries": settings_store.country_names(),
@@ -218,7 +218,7 @@ async def api_match_state() -> JSONResponse:
             },
             "stats": event_store.stats(),
             "run_status": get_run_status(),
-            "resume": session.resume_info(),
+            "resume": state.resume_info(),
             "scheduler": {
                 "enabled": settings_store.get_scheduler_enabled(),
                 "interval": settings_store.get_scheduler_interval(),
@@ -267,8 +267,8 @@ async def api_match_detail(request: Request) -> JSONResponse:
         return JSONResponse({"ok": False, "error": "not found"}, status_code=404)
 
     summary = row.get("summary")
-    if not summary and session.has_resume():
-        resume_json = session.get_resume()
+    if not summary and state.has_resume():
+        resume_json = state.get_resume()
         results = {
             "overall_score": row.get("score", 0),
             "label": row.get("label", ""),
@@ -306,7 +306,7 @@ async def api_match_detail(request: Request) -> JSONResponse:
             "matched_required": row.get("matched_required", []),
             "missing_required": row.get("missing_required", []),
             "jd": row.get("jd_json", {}),
-            "resume": session.resume_info(),
+            "resume": state.resume_info(),
             "summary": summary or "",
         }
     )
@@ -369,7 +369,7 @@ async def api_score_jd(request: Request) -> JSONResponse:
         return JSONResponse(
             {"ok": False, "error": "jd_text too short"}, status_code=400
         )
-    if not session.has_resume():
+    if not state.has_resume():
         return JSONResponse({"ok": False, "error": "no_resume"}, status_code=400)
 
     row = match_store.get_one(job_id)
@@ -385,7 +385,7 @@ async def api_score_jd(request: Request) -> JSONResponse:
         if not jd_json:
             return None, None
         try:
-            return jd_json, match(session.get_resume(), jd_json)
+            return jd_json, match(state.get_resume(), jd_json)
         except Exception as exc:
             logger.exception("match() failed in score-jd: %s", exc)
             return None, None

@@ -1,4 +1,4 @@
-# api/routes/analyzer.py
+# api/routes/resume_analyzer.py
 """
 Analyzer endpoints: /api/upload, /api/resume-preview, /api/resume-file, /api/analyze
 """
@@ -18,13 +18,13 @@ from core.config import JD_MAX_CHARS, MAX_FILE_SIZE_MB, SUPPORTED_EXTENSIONS
 from core.logger import get_logger
 from services.extractors import extract_all
 from frontend.results import build_results_html, render_error_panel
-from services.matcher.matcher import match
+from services.matcher.engine import match
 from services.parsers import extract_all_text
 from repositories import analysis_repo as analysis_store
 from repositories import cache_repo as cache_store
 from repositories import resume_repo as resume_store
-from services.summary import generate_summary
-from services.llm.router import check_llm
+from services.profile_summary import generate_summary
+from services.llm.caller import check_llm
 
 logger = get_logger(__name__)
 

@@ -1,4 +1,4 @@
-# services/matcher/matcher.py
+# services/matcher/engine.py
 """
 Main matcher for JOBsFitAI.
 
@@ -39,7 +39,7 @@ from services.matcher.scores import (
     score_required_skills,
     score_responsibilities,
 )
-from services.matcher.utils import get_score_label
+from services.matcher.scoring_utils import get_score_label
 from core.config import WEIGHTS
 from core.logger import get_logger
 

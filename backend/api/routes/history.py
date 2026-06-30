@@ -6,7 +6,7 @@
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
-from core import db
+from core import database as db
 from core.logger import get_logger
 
 logger = get_logger(__name__)

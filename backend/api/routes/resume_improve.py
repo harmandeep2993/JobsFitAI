@@ -1,4 +1,4 @@
-# api/routes/improve.py
+# api/routes/resume_improve.py
 """
 /api/improve-resume endpoint - resume rewrite.
 """
@@ -9,8 +9,8 @@ from starlette.concurrency import run_in_threadpool
 from starlette.requests import Request
 
 from core.logger import get_logger
-from services.extractors.jd import extract_jd
-from services.rewrite import improve_resume
+from services.extractors.jd_extractor import extract_jd
+from services.resume_rewriter import improve_resume
 
 logger = get_logger(__name__)
 

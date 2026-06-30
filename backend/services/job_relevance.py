@@ -1,4 +1,4 @@
-# services/relevance.py
+# services/job_relevance.py
 """
 LLM relevance gate for the Job Matches funnel.
 
@@ -9,7 +9,7 @@ title). Batch size 30 titles per LLM call keeps cost low.
 """
 
 from core.logger import get_logger
-from services.llm.router import call_llm, parse_json_response
+from services.llm.caller import call_llm, parse_json_response
 
 logger = get_logger(__name__)
 

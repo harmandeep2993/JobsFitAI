@@ -16,10 +16,10 @@ from starlette.requests import Request
 
 from core.config import MAX_FILE_SIZE_MB, SUPPORTED_EXTENSIONS
 from core.logger import get_logger
-from core import session
-from services.extractors.jd import extract_jd
-from services.extractors.resume import extract_resume
-from services.matcher.matcher import match
+from core import state as session
+from services.extractors.jd_extractor import extract_jd
+from services.extractors.resume_extractor import extract_resume
+from services.matcher.engine import match
 from services.parsers import extract_all_text
 from repositories import resume_repo as resume_store
 from services.job_matcher import rescore_all

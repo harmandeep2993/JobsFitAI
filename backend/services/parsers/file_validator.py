@@ -1,4 +1,4 @@
-# parsers/validator.py
+# parsers/file_validator.py
 
 """
 File validation for uploaded resume files.

@@ -13,7 +13,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-from core import db
+from core import database as db
 from core.logger import get_logger
 
 logger = get_logger(__name__)

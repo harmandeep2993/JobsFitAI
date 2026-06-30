@@ -1,4 +1,4 @@
-# services/extractors/resume.py
+# services/extractors/resume_extractor.py
 """
 Resume extraction module.
 
@@ -12,7 +12,7 @@ import re
 from services.prompts import get_resume_prompt
 from core.config import RESUME_MAX_CHARS
 from core.logger import get_logger
-from services.llm.router import call_llm, parse_json_response
+from services.llm.caller import call_llm, parse_json_response
 
 logger = get_logger(__name__)
 

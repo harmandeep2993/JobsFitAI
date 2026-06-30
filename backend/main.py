@@ -26,7 +26,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 from starlette.requests import Request
 
-from core import db, session
+from core import database as db, state as session
 from core.config import (
     MAX_FILE_SIZE_MB,
     SEARCH_PER_TITLE,
@@ -207,13 +207,21 @@ async def index() -> HTMLResponse:
 # API routers
 # ---------------------------------------------------------------------------
 
-from api.routes import analyzer, ats, history, improve, matches, resumes, settings  # noqa: E402
+from api.routes import (  # noqa: E402
+    resume_analyzer,
+    ats_maker,
+    history,
+    resume_improve,
+    job_matches,
+    resumes,
+    settings,
+)
 
 app.include_router(resumes.router, prefix="/api/resumes")
-app.include_router(analyzer.router, prefix="/api")
-app.include_router(matches.router, prefix="/api/match")
-app.include_router(ats.router, prefix="/api/ats")
-app.include_router(improve.router, prefix="/api")
+app.include_router(resume_analyzer.router, prefix="/api")
+app.include_router(job_matches.router, prefix="/api/match")
+app.include_router(ats_maker.router, prefix="/api/ats")
+app.include_router(resume_improve.router, prefix="/api")
 app.include_router(history.router, prefix="/api")
 app.include_router(settings.router, prefix="/api")
 
@@ -268,7 +276,7 @@ _USER = "local"
 
 async def _backfill_extractions() -> None:
     """Extract resume JSON for any stored resumes that were uploaded before caching was added."""
-    from services.extractors.resume import extract_resume
+    from services.extractors.resume_extractor import extract_resume
     from services.parsers import extract_all_text
 
     resumes = resume_store.list_all(_USER)

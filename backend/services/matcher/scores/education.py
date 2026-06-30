@@ -17,7 +17,7 @@ Sources:
     JD     -> education_requirements[]
 """
 
-from services.matcher.utils import _cosine_score
+from services.matcher.scoring_utils import _cosine_score
 from core.logger import get_logger
 
 logger = get_logger(__name__)

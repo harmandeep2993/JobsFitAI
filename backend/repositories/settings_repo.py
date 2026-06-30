@@ -11,7 +11,7 @@ User-editable search settings, persisted in SQLite so they survive restarts.
 
 import json
 
-from core import db
+from core import database as db
 from core.config import AUTO_FETCH_MINUTES, SEARCH_COUNTRY, TARGET_TITLES
 from core.logger import get_logger
 

@@ -1,4 +1,4 @@
-# services/extractors/extract.py
+# services/extractors/pipeline.py
 """
 Extraction pipeline.
 
@@ -6,10 +6,10 @@ Orchestrates resume and JD extraction in sequence.
 Returns structured dicts for both inputs, or empty dicts on failure.
 """
 
-from services.extractors.jd import extract_jd
-from services.extractors.resume import extract_resume
+from services.extractors.jd_extractor import extract_jd
+from services.extractors.resume_extractor import extract_resume
 from core.logger import get_logger
-from services.llm.router import check_llm
+from services.llm.caller import check_llm
 
 logger = get_logger(__name__)
 

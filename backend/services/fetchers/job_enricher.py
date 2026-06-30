@@ -1,4 +1,4 @@
-# fetchers/enrich.py
+# fetchers/job_enricher.py
 """
 Full job-description enrichment.
 

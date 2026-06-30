@@ -1,4 +1,4 @@
-# core/settings.py
+# core/config_validator.py
 """
 Pydantic validation model for config.yaml.
 

@@ -7,7 +7,7 @@ Called after match() returns results dict.
 import math
 
 from frontend.components import make_tags, prog_grad, safe_html, score_col
-from core import session
+from core import state as session
 
 _GAUGE_R = 17
 _GAUGE_CIRC = round(2 * math.pi * _GAUGE_R, 2)  # 106.81

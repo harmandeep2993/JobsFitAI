@@ -1,4 +1,4 @@
-# services/matcher/utils.py
+# services/matcher/scoring_utils.py
 """
 Matcher utility functions.
 Shared helpers for scoring, labeling, and section text preparation.

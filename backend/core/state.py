@@ -1,4 +1,4 @@
-# core/session.py
+# core/state.py
 """
 Runtime LLM selection state.
 
@@ -14,7 +14,7 @@ change here takes effect on the next analysis without a restart.
 import json
 from datetime import datetime, timezone
 
-from core import db
+from core import database
 from core.config import PROVIDER_CONFIGS
 from core.logger import get_logger
 
@@ -50,7 +50,7 @@ def _ensure_resume_loaded() -> None:
     if _resume["loaded"]:
         return
     try:
-        with db.connect() as conn:
+        with database.connect() as conn:
             row = conn.execute("SELECT name, json FROM resume WHERE id = 1").fetchone()
         if row and row["json"]:
             _resume["json"] = json.loads(row["json"])
@@ -118,7 +118,7 @@ def set_resume(resume_json: dict, name: str = "", resume_id: str | None = None) 
     _resume["loaded"] = True
 
     try:
-        with db.connect() as conn:
+        with database.connect() as conn:
             conn.execute(
                 """
                 INSERT INTO resume (id, name, json, created_at) VALUES (1, ?, ?, ?)

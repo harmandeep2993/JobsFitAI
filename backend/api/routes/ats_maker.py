@@ -1,4 +1,4 @@
-# api/routes/ats.py
+# api/routes/ats_maker.py
 """
 /api/ats/* endpoints - ATS optimizer.
 """
@@ -9,7 +9,7 @@ from starlette.concurrency import run_in_threadpool
 from starlette.requests import Request
 
 from core.logger import get_logger
-from services.extractors.jd import extract_jd
+from services.extractors.jd_extractor import extract_jd
 from services.parsers import extract_all_text
 from repositories import resume_repo as resume_store
 from services.ats import ats_check, generate_ats_resume

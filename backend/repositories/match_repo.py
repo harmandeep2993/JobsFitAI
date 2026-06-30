@@ -9,7 +9,7 @@ queries cleanly and dedupes by primary key.
 
 import json
 
-from core import db
+from core import database as db
 from core.logger import get_logger
 
 logger = get_logger(__name__)
