@@ -9,7 +9,7 @@ import ATS from '../components/tabs/ATS.jsx'
 import History from '../components/tabs/History.jsx'
 import Settings from '../components/tabs/Settings.jsx'
 
-const TAB_COMPONENTS = {
+const TABS = {
   analyzer: Analyzer,
   matches:  JobMatches,
   resumes:  Resumes,
@@ -20,7 +20,7 @@ const TAB_COMPONENTS = {
 
 export default function AppShell({ dark, onToggleDark }) {
   const [tab, setTab] = useState('analyzer')
-  const TabContent = TAB_COMPONENTS[tab] || Analyzer
+  const TabContent = TABS[tab] || Analyzer
 
   return (
     <ToastProvider>
@@ -28,10 +28,13 @@ export default function AppShell({ dark, onToggleDark }) {
         <TopBar dark={dark} onToggleDark={onToggleDark} />
         <Sidebar active={tab} onChange={setTab} />
         <main
-          className="pt-topbar pl-sidebar min-h-screen"
-          style={{ paddingLeft: 'var(--sidebar-w)' }}
+          style={{
+            paddingTop: 'var(--topbar-h)',
+            paddingLeft: 'var(--sidebar-w)',
+            minHeight: '100vh',
+          }}
         >
-          <div className="p-6 max-w-5xl mx-auto">
+          <div className="max-w-5xl mx-auto px-6 py-8">
             <TabContent />
           </div>
         </main>

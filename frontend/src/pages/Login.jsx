@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { saveToken } from '../lib/auth.js'
 
 export default function Login() {
-  const [tab, setTab] = useState('login')
+  const [mode, setMode] = useState('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [err, setErr] = useState('')
@@ -13,24 +13,24 @@ export default function Login() {
   async function submit(e) {
     e.preventDefault()
     setErr('')
-    if (tab === 'register' && password.length < 8) {
-      setErr('Password must be at least 8 characters')
+    if (mode === 'register' && password.length < 8) {
+      setErr('Password must be at least 8 characters.')
       return
     }
     setLoading(true)
     try {
-      const path = tab === 'login' ? '/api/auth/login' : '/api/auth/register'
+      const path = mode === 'login' ? '/api/auth/login' : '/api/auth/register'
       const res = await fetch(path, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       })
       const data = await res.json()
-      if (!res.ok) { setErr(data.detail || 'Something went wrong'); return }
+      if (!res.ok) { setErr(data.detail || 'Something went wrong.'); return }
       saveToken(data.token)
       navigate('/app', { replace: true })
     } catch {
-      setErr('Network error - is the server running?')
+      setErr('Network error. Is the server running?')
     } finally {
       setLoading(false)
     }
@@ -38,71 +38,122 @@ export default function Login() {
 
   return (
     <div className="min-h-screen bg-bg flex items-center justify-center p-4">
-      <div className="w-full max-w-[360px] bg-surface border border-border rounded shadow-lg p-8">
-        {/* Brand */}
-        <div className="flex items-center gap-2 mb-7">
-          <div className="w-7 h-7 rounded-[7px] bg-accent flex items-center justify-center text-white text-[11px] font-black">JF</div>
-          <span className="text-[17px] font-black tracking-tight">Jobs<em className="text-accent not-italic">Fit</em>AI</span>
-        </div>
+      <div className="w-full max-w-[400px]">
 
-        {/* Tabs */}
-        <div className="flex border border-border rounded-s overflow-hidden mb-6">
-          {['login', 'register'].map(t => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => { setTab(t); setErr('') }}
-              className={`flex-1 py-2 text-[13px] font-semibold transition-colors ${
-                tab === t ? 'bg-accent text-white' : 'text-t2 hover:text-t1 hover:bg-hover'
-              }`}
-            >
-              {t === 'login' ? 'Sign In' : 'Create Account'}
-            </button>
-          ))}
-        </div>
+        {/* Card */}
+        <div className="bg-surface border border-border rounded-lg shadow-md p-8">
 
-        <form onSubmit={submit} className="space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-t2 mb-1.5">Email</label>
-            <input
-              type="email"
-              required
-              autoComplete="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              className="w-full px-3 py-2 bg-bg border border-border rounded-xs text-[13.5px] text-t1 placeholder:text-t3 focus:outline-none focus:border-accent transition-colors"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-t2 mb-1.5">
-              Password{tab === 'register' && ' (min 8 characters)'}
-            </label>
-            <input
-              type="password"
-              required
-              autoComplete={tab === 'login' ? 'current-password' : 'new-password'}
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="w-full px-3 py-2 bg-bg border border-border rounded-xs text-[13.5px] text-t1 placeholder:text-t3 focus:outline-none focus:border-accent transition-colors"
-            />
-          </div>
-
-          {err && (
-            <div className="text-xs text-red bg-red-bg border border-red-bd rounded-xs px-3 py-2">
-              {err}
+          {/* Brand */}
+          <div className="flex items-center gap-2.5 mb-8">
+            <div className="w-8 h-8 rounded-lg bg-accent flex items-center justify-center flex-shrink-0">
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="white">
+                <path d="M8 1L1 4.5v4c0 3.5 2.8 6.2 7 7.5 4.2-1.3 7-4 7-7.5v-4L8 1z"/>
+              </svg>
             </div>
-          )}
+            <span className="text-[17px] font-bold tracking-tight">
+              Jobs<span className="text-accent">Fit</span>AI
+            </span>
+          </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-2.5 bg-accent text-white rounded-xs text-sm font-semibold hover:bg-accent-h disabled:opacity-60 transition-colors mt-1"
-          >
-            {loading ? 'Please wait...' : tab === 'login' ? 'Sign In' : 'Create Account'}
-          </button>
-        </form>
+          {/* Heading */}
+          <div className="mb-6">
+            <h1 className="text-xl font-semibold text-t1 mb-1">
+              {mode === 'login' ? 'Welcome back' : 'Create account'}
+            </h1>
+            <p className="text-[13.5px] text-t2">
+              {mode === 'login'
+                ? 'Sign in to continue to your dashboard.'
+                : 'Start analyzing your resume against job listings.'}
+            </p>
+          </div>
+
+          {/* Form */}
+          <form onSubmit={submit} className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="block text-[12.5px] font-medium text-t2">
+                Email address
+              </label>
+              <input
+                type="email"
+                required
+                autoFocus
+                autoComplete="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                className="input-base"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-[12.5px] font-medium text-t2">
+                Password
+                {mode === 'register' && <span className="font-normal text-t3"> (min 8 characters)</span>}
+              </label>
+              <input
+                type="password"
+                required
+                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder="Enter your password"
+                className="input-base"
+              />
+            </div>
+
+            {err && (
+              <div className="flex items-start gap-2 text-[12.5px] text-red bg-red-bg border border-red-bd rounded-sm px-3 py-2.5">
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="flex-shrink-0 mt-px">
+                  <circle cx="8" cy="8" r="6.5"/>
+                  <path d="M8 5v3.5M8 11v.5"/>
+                </svg>
+                {err}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="btn-primary w-full py-2.5 text-[14px] mt-1"
+            >
+              {loading
+                ? 'Please wait...'
+                : mode === 'login' ? 'Sign in' : 'Create account'}
+            </button>
+          </form>
+
+          {/* Toggle mode */}
+          <div className="mt-5 pt-5 border-t border-border text-center text-[13px] text-t2">
+            {mode === 'login' ? (
+              <>
+                Don&apos;t have an account?{' '}
+                <button
+                  onClick={() => { setMode('register'); setErr('') }}
+                  className="text-accent font-medium hover:underline"
+                >
+                  Create one
+                </button>
+              </>
+            ) : (
+              <>
+                Already have an account?{' '}
+                <button
+                  onClick={() => { setMode('login'); setErr('') }}
+                  className="text-accent font-medium hover:underline"
+                >
+                  Sign in
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Back to home */}
+        <div className="mt-4 text-center">
+          <Link to="/" className="text-[12.5px] text-t3 hover:text-t2 transition-colors">
+            Back to home
+          </Link>
+        </div>
       </div>
     </div>
   )

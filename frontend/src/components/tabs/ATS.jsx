@@ -2,13 +2,25 @@ import { useState } from 'react'
 import { apiFetch } from '../../lib/auth.js'
 import { useToast } from '../Toast.jsx'
 
-function Flag({ ok, label }) {
+function SectionFlag({ label, ok }) {
   return (
-    <div className={`flex items-center gap-2 text-xs px-3 py-2 rounded-xs border ${
-      ok ? 'bg-green-bg border-green-bd text-green' : 'bg-red-bg border-red-bd text-red'
-    }`}>
-      <span>{ok ? '✓' : '✗'}</span>
-      <span>{label}</span>
+    <div
+      className={`flex items-center gap-2 px-3 py-2 rounded-sm border text-[12.5px] font-medium ${
+        ok
+          ? 'bg-green-bg border-green-bd text-green'
+          : 'bg-red-bg border-red-bd text-red'
+      }`}
+    >
+      {ok ? (
+        <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M2.5 7l3 3 6-6"/>
+        </svg>
+      ) : (
+        <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 3l8 8M11 3L3 11"/>
+        </svg>
+      )}
+      <span className="capitalize">{label}</span>
     </div>
   )
 }
@@ -30,8 +42,7 @@ export default function ATS() {
         body: JSON.stringify({ resume_text: resumeText }),
       })
       if (!res?.ok) { toast('Check failed', 'error'); return }
-      const data = await res.json()
-      setCheckResult(data)
+      setCheckResult(await res.json())
     } finally {
       setLoading('')
     }
@@ -47,74 +58,99 @@ export default function ATS() {
         body: JSON.stringify({ resume_text: resumeText, jd_text: jd }),
       })
       if (!res?.ok) { toast('Optimise failed', 'error'); return }
-      const data = await res.json()
-      setOptimResult(data)
+      setOptimResult(await res.json())
     } finally {
       setLoading('')
     }
   }
 
+  const scoreColor =
+    checkResult?.score >= 80 ? 'text-green' :
+    checkResult?.score >= 60 ? 'text-blue' :
+    checkResult?.score >= 40 ? 'text-amber' : 'text-red'
+
   return (
     <div className="space-y-5 max-w-3xl">
-      <h1 className="text-lg font-bold">ATS Check</h1>
-
-      <div className="bg-surface border border-border rounded p-4 space-y-3">
-        <div className="text-sm font-semibold">Resume text</div>
-        <textarea
-          value={resumeText}
-          onChange={e => setResumeText(e.target.value)}
-          placeholder="Paste your resume text here..."
-          className="w-full h-40 px-3 py-2 bg-bg border border-border rounded-xs text-[13px] text-t1 placeholder:text-t3 focus:outline-none focus:border-accent resize-none transition-colors"
-        />
+      <div>
+        <h1 className="text-xl font-semibold text-t1">ATS Check</h1>
+        <p className="text-sm text-t2 mt-1">Scan your resume for ATS compatibility and get AI-powered keyword optimisation.</p>
       </div>
 
-      <div className="bg-surface border border-border rounded p-4 space-y-3">
-        <div className="text-sm font-semibold">Job description <span className="text-t3 font-normal">(optional - for optimise)</span></div>
-        <textarea
-          value={jd}
-          onChange={e => setJd(e.target.value)}
-          placeholder="Paste the job description to optimise against..."
-          className="w-full h-28 px-3 py-2 bg-bg border border-border rounded-xs text-[13px] text-t1 placeholder:text-t3 focus:outline-none focus:border-accent resize-none transition-colors"
-        />
+      <div className="card p-5 space-y-4">
+        <div className="space-y-2">
+          <label className="block text-[12.5px] font-medium text-t2">Resume text</label>
+          <textarea
+            value={resumeText}
+            onChange={e => setResumeText(e.target.value)}
+            placeholder="Paste your full resume text here..."
+            className="input-base resize-none"
+            style={{ height: '160px' }}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <label className="block text-[12.5px] font-medium text-t2">
+            Job description
+            <span className="font-normal text-t3 ml-1">(optional - needed for AI optimise)</span>
+          </label>
+          <textarea
+            value={jd}
+            onChange={e => setJd(e.target.value)}
+            placeholder="Paste the job description to optimise your resume against..."
+            className="input-base resize-none"
+            style={{ height: '110px' }}
+          />
+        </div>
+
+        <div className="flex gap-2.5">
+          <button
+            onClick={check}
+            disabled={!!loading}
+            className="btn-primary py-2 px-5 text-[13.5px]"
+          >
+            {loading === 'check' ? (
+              <>
+                <svg className="animate-spin" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                  <path d="M21 12a9 9 0 11-6-8.5"/>
+                </svg>
+                Checking...
+              </>
+            ) : 'ATS Check'}
+          </button>
+          <button
+            onClick={optimise}
+            disabled={!!loading}
+            className="btn-secondary py-2 px-5 text-[13.5px]"
+          >
+            {loading === 'optimise' ? (
+              <>
+                <svg className="animate-spin" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                  <path d="M21 12a9 9 0 11-6-8.5"/>
+                </svg>
+                Optimising...
+              </>
+            ) : 'AI Optimise'}
+          </button>
+        </div>
       </div>
 
-      <div className="flex gap-3">
-        <button
-          onClick={check}
-          disabled={loading === 'check'}
-          className="px-5 py-2 bg-accent text-white rounded-s text-sm font-semibold hover:bg-accent-h disabled:opacity-60 transition-colors"
-        >
-          {loading === 'check' ? 'Checking...' : 'ATS Check'}
-        </button>
-        <button
-          onClick={optimise}
-          disabled={loading === 'optimise'}
-          className="px-5 py-2 bg-surface border border-border rounded-s text-sm font-medium text-t1 hover:bg-hover disabled:opacity-60 transition-colors"
-        >
-          {loading === 'optimise' ? 'Optimising...' : 'AI Optimise'}
-        </button>
-      </div>
-
+      {/* ATS Check result */}
       {checkResult && (
-        <div className="bg-surface border border-border rounded p-5 space-y-4">
-          <div className="flex items-center gap-3">
-            <div className="text-sm font-semibold">ATS Result</div>
-            <div className={`text-xs font-bold px-2.5 py-1 rounded-xs border ${
-              checkResult.score >= 80 ? 'bg-green-bg border-green-bd text-green' :
-              checkResult.score >= 60 ? 'bg-blue-bg border-blue-bd text-blue' :
-              checkResult.score >= 40 ? 'bg-amber-bg border-amber-bd text-amber' :
-              'bg-red-bg border-red-bd text-red'
-            }`}>
-              Score: {Math.round(checkResult.score || 0)}
+        <div className="card p-5 space-y-5">
+          <div className="flex items-center gap-4">
+            <div className="text-[14px] font-semibold text-t1">ATS Score</div>
+            <div className={`text-2xl font-bold ${scoreColor}`}>
+              {Math.round(checkResult.score || 0)}
+              <span className="text-sm font-normal text-t3 ml-1">/ 100</span>
             </div>
           </div>
 
-          {checkResult.section_flags && (
+          {checkResult.section_flags && Object.keys(checkResult.section_flags).length > 0 && (
             <div>
-              <div className="text-xs font-semibold text-t2 uppercase tracking-wide mb-2">Sections</div>
+              <div className="text-[12px] font-semibold text-t3 uppercase tracking-wide mb-2.5">Section presence</div>
               <div className="flex flex-wrap gap-2">
                 {Object.entries(checkResult.section_flags).map(([k, v]) => (
-                  <Flag key={k} ok={v} label={k} />
+                  <SectionFlag key={k} label={k} ok={v} />
                 ))}
               </div>
             </div>
@@ -122,32 +158,50 @@ export default function ATS() {
 
           {checkResult.formatting_flags?.length > 0 && (
             <div>
-              <div className="text-xs font-semibold text-t2 uppercase tracking-wide mb-2">Warnings</div>
-              <ul className="space-y-1">
+              <div className="text-[12px] font-semibold text-t3 uppercase tracking-wide mb-2.5">Formatting warnings</div>
+              <ul className="space-y-1.5">
                 {checkResult.formatting_flags.map((f, i) => (
-                  <li key={i} className="flex gap-2 text-xs text-amber">
-                    <span>!</span>{f}
+                  <li key={i} className="flex items-start gap-2 text-[13px] text-amber">
+                    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="flex-shrink-0 mt-0.5">
+                      <path d="M8 3v5M8 11v.5"/>
+                      <path d="M8 1L1 13h14L8 1z"/>
+                    </svg>
+                    {f}
                   </li>
                 ))}
               </ul>
             </div>
           )}
+
+          {checkResult.formatting_flags?.length === 0 && (
+            <div className="flex items-center gap-2 text-[13px] text-green">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 8l3.5 3.5L13 5"/>
+              </svg>
+              No formatting issues detected
+            </div>
+          )}
         </div>
       )}
 
+      {/* Optimise result */}
       {optimResult && (
-        <div className="bg-surface border border-border rounded p-5 space-y-4">
-          <div className="text-sm font-semibold">Optimised Resume</div>
+        <div className="card p-5 space-y-4">
+          <div className="text-[14px] font-semibold text-t1">Optimised Resume</div>
+
           {optimResult.coverage_before !== undefined && optimResult.coverage_after !== undefined && (
-            <div className="flex items-center gap-3 text-xs">
-              <span className="text-t2">Coverage:</span>
-              <span className="text-red font-semibold">{Math.round(optimResult.coverage_before)}%</span>
-              <span className="text-t3">-&gt;</span>
-              <span className="text-green font-semibold">{Math.round(optimResult.coverage_after)}%</span>
+            <div className="flex items-center gap-3 bg-surface-2 rounded-sm px-4 py-3">
+              <span className="text-[12.5px] text-t2">Keyword coverage:</span>
+              <span className="text-red font-bold">{Math.round(optimResult.coverage_before)}%</span>
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--t3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 8h10M9 4l4 4-4 4"/>
+              </svg>
+              <span className="text-green font-bold">{Math.round(optimResult.coverage_after)}%</span>
             </div>
           )}
+
           {optimResult.resume_text && (
-            <pre className="bg-bg border border-border rounded-xs p-4 text-[12px] text-t1 whitespace-pre-wrap overflow-auto max-h-96">
+            <pre className="bg-surface-2 border border-border rounded-sm p-4 text-[12px] text-t1 whitespace-pre-wrap overflow-auto max-h-96 leading-relaxed">
               {optimResult.resume_text}
             </pre>
           )}
