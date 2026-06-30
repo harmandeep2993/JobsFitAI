@@ -9,10 +9,9 @@ import os
 from pathlib import Path
 from typing import Set
 
-from fastapi import APIRouter
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, JSONResponse
-from starlette.concurrency import run_in_threadpool
-from starlette.requests import Request
 
 from core.config import MAX_FILE_SIZE_MB, SUPPORTED_EXTENSIONS
 from core.logger import get_logger
@@ -23,6 +22,7 @@ from services.matcher.engine import match
 from services.parsers import extract_all_text
 from repositories import resume_repo as resume_store
 from services.job_matcher import rescore_all
+from schemas.resume import LabelRequest, RecommendRequest
 
 logger = get_logger(__name__)
 
@@ -40,35 +40,27 @@ _PREVIEW_TYPES = {
 
 
 @router.post("/upload")
-async def api_resumes_upload(request: Request) -> JSONResponse:
+async def api_resumes_upload(
+    file: UploadFile = File(...), slot: int = Form(0)
+) -> JSONResponse:
     """Upload a resume into a persistent slot (0=Base, 1=Tailored 1, 2=Tailored 2)."""
-    form = await request.form()
-    upload = form.get("file")
-    slot = int(form.get("slot", 0))
-
-    if upload is None:
-        return JSONResponse({"ok": False, "error": "no file"}, status_code=400)
     if slot not in range(resume_store.MAX_SLOTS):
-        return JSONResponse({"ok": False, "error": "invalid slot"}, status_code=400)
+        raise HTTPException(status_code=400, detail="invalid slot")
 
-    data = await upload.read()
-    filename = upload.filename or "resume"
+    data = await file.read()
+    filename = file.filename or "resume"
     suffix = Path(filename).suffix.lower()
 
     if len(data) == 0:
-        return JSONResponse({"ok": False, "error": "empty file"}, status_code=400)
+        raise HTTPException(status_code=400, detail="empty file")
     if len(data) > MAX_FILE_MB * 1024 * 1024:
-        return JSONResponse(
-            {"ok": False, "error": f"file too large (max {MAX_FILE_MB} MB)"},
-            status_code=400,
+        raise HTTPException(
+            status_code=400, detail=f"file too large (max {MAX_FILE_MB} MB)"
         )
     if suffix not in ALLOWED_EXTENSIONS:
-        return JSONResponse(
-            {
-                "ok": False,
-                "error": f"unsupported file type (allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))})",
-            },
+        raise HTTPException(
             status_code=400,
+            detail=f"unsupported file type (allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))})",
         )
 
     mime = _PREVIEW_TYPES.get(suffix, "application/octet-stream")
@@ -122,11 +114,10 @@ async def api_resumes_file(resume_id: str) -> FileResponse:
 
 
 @router.post("/{resume_id}/label")
-async def api_resumes_label(resume_id: str, request: Request) -> JSONResponse:
-    body = await request.json()
-    label = (body.get("label") or "").strip()
+async def api_resumes_label(resume_id: str, body: LabelRequest) -> JSONResponse:
+    label = (body.label or "").strip()
     if not label:
-        return JSONResponse({"ok": False, "error": "label required"}, status_code=400)
+        raise HTTPException(status_code=400, detail="label required")
     resume_store.set_label(_USER, resume_id, label)
     return JSONResponse({"ok": True})
 
@@ -156,13 +147,12 @@ async def api_resumes_use_for_matching(resume_id: str) -> JSONResponse:
 
 
 @router.post("/recommend")
-async def api_resumes_recommend(request: Request) -> JSONResponse:
+async def api_resumes_recommend(body: RecommendRequest) -> JSONResponse:
     """Score all cached resumes against a JD and return ranked results."""
-    body = await request.json()
-    jd_text = (body.get("jd") or "").strip()
+    jd_text = (body.jd or "").strip()
 
     if len(jd_text) < 100:
-        return JSONResponse({"ok": False, "error": "jd too short"}, status_code=400)
+        raise HTTPException(status_code=400, detail="jd too short")
 
     scoreable = resume_store.list_scoreable(_USER)
     if len(scoreable) < 2:
@@ -195,9 +185,7 @@ async def api_resumes_recommend(request: Request) -> JSONResponse:
 
     scores = await run_in_threadpool(_score)
     if scores is None:
-        return JSONResponse(
-            {"ok": False, "error": "could not parse JD"}, status_code=422
-        )
+        raise HTTPException(status_code=422, detail="could not parse JD")
 
     return JSONResponse(
         {

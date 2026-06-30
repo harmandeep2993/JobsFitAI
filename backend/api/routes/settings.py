@@ -5,14 +5,14 @@
 
 from pathlib import Path
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
-from starlette.concurrency import run_in_threadpool
-from starlette.requests import Request
 
 from core import database as db, state as session
 from core.logger import get_logger
 from services.llm.caller import check_llm
+from schemas.common import LlmKeyRequest, LlmSettingsRequest
 
 logger = get_logger(__name__)
 
@@ -44,16 +44,15 @@ async def api_get_llm_settings() -> JSONResponse:
 
 
 @router.post("/llm-settings")
-async def api_set_llm_settings(request: Request) -> JSONResponse:
+async def api_set_llm_settings(body: LlmSettingsRequest) -> JSONResponse:
     """Switch the active LLM provider and/or model; verifies connectivity after switching."""
-    body = await request.json()
-    provider = (body.get("provider") or "").strip()
-    model = (body.get("model") or "").strip()
+    provider = (body.provider or "").strip()
+    model = (body.model or "").strip()
 
     try:
         session.set_active(provider, model)
     except ValueError as e:
-        return JSONResponse({"ok": False, "error": str(e)}, status_code=400)
+        raise HTTPException(status_code=400, detail=str(e))
 
     online = await run_in_threadpool(check_llm)
 
@@ -67,18 +66,15 @@ async def api_set_llm_settings(request: Request) -> JSONResponse:
 
 
 @router.post("/llm-settings/key")
-async def api_set_llm_key(request: Request) -> JSONResponse:
+async def api_set_llm_key(body: LlmKeyRequest) -> JSONResponse:
     """Set the API key for a provider at runtime; persists to .env."""
-    body = await request.json()
-    provider = (body.get("provider") or "").strip()
-    api_key = (body.get("api_key") or "").strip()
+    provider = (body.provider or "").strip()
+    api_key = (body.api_key or "").strip()
 
     if not provider:
-        return JSONResponse(
-            {"ok": False, "error": "provider required"}, status_code=400
-        )
+        raise HTTPException(status_code=400, detail="provider required")
     if not api_key:
-        return JSONResponse({"ok": False, "error": "api_key required"}, status_code=400)
+        raise HTTPException(status_code=400, detail="api_key required")
 
     if provider == "openai":
         from services.llm.providers import openai as _op
@@ -93,9 +89,8 @@ async def api_set_llm_key(request: Request) -> JSONResponse:
         env_var = "GROQ_API_KEY"
         hint = _gp.get_key_hint()
     else:
-        return JSONResponse(
-            {"ok": False, "error": f"key setting not supported for {provider}"},
-            status_code=400,
+        raise HTTPException(
+            status_code=400, detail=f"key setting not supported for {provider}"
         )
 
     try:

@@ -8,10 +8,9 @@ import csv
 import io
 from datetime import datetime, timezone
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, Query
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, StreamingResponse
-from starlette.concurrency import run_in_threadpool
-from starlette.requests import Request
 
 from core.config import MAX_AGE_DAYS, SEARCH_PER_TITLE
 from core.logger import get_logger
@@ -33,6 +32,15 @@ from services.job_matcher import (
 )
 from services.profile_summary import generate_summary
 from services import vector_store
+from schemas.matches import (
+    AppliedRequest,
+    AppStatusRequest,
+    DeleteJobRequest,
+    FiltersRequest,
+    MatchResumeRequest,
+    ScoreJdRequest,
+    SchedulerRequest,
+)
 
 logger = get_logger(__name__)
 
@@ -82,18 +90,15 @@ def _resume_diff(old: dict, new: dict) -> dict:
 
 
 @router.post("/resume")
-async def api_match_resume(request: Request) -> JSONResponse:
+async def api_match_resume(body: MatchResumeRequest) -> JSONResponse:
     """Parse + extract an uploaded resume and store it for matching."""
     import os
 
-    body = await request.json()
-    tmp = (body.get("tmp") or "").strip()
-    name = (body.get("name") or "resume").strip()
+    tmp = (body.tmp or "").strip()
+    name = (body.name or "resume").strip()
 
     if not tmp or not os.path.exists(tmp):
-        return JSONResponse(
-            {"ok": False, "error": "resume file not found"}, status_code=400
-        )
+        raise HTTPException(status_code=400, detail="resume file not found")
 
     def _process() -> dict:
         text = extract_all_text(tmp)
@@ -104,9 +109,7 @@ async def api_match_resume(request: Request) -> JSONResponse:
     resume_json = await run_in_threadpool(_process)
 
     if not resume_json:
-        return JSONResponse(
-            {"ok": False, "error": "could not parse resume"}, status_code=422
-        )
+        raise HTTPException(status_code=422, detail="could not parse resume")
 
     prev_resume = state.get_resume()
     diff = _resume_diff(prev_resume, resume_json) if prev_resume else None
@@ -130,7 +133,11 @@ async def api_match_resume(request: Request) -> JSONResponse:
 
 
 @router.get("/run")
-async def api_match_run(request: Request) -> JSONResponse:
+async def api_match_run(
+    query: str = Query(default=""),
+    entry_only: str = Query(default="true"),
+    location: str = Query(default=""),
+) -> JSONResponse:
     """
     Kick off a background job-fetch-and-score run.
 
@@ -146,11 +153,10 @@ async def api_match_run(request: Request) -> JSONResponse:
     if not begin_run():
         return JSONResponse({"ok": True, "started": False, "already_running": True})
 
-    params = request.query_params
-    query = (params.get("query") or "").strip()
-    entry_only = params.get("entry_only", "true").lower() != "false"
+    query = query.strip()
+    entry_only_flag = entry_only.lower() != "false"
     titles = [query] if query else settings_store.get_titles()
-    location = (params.get("location") or "").strip() or settings_store.get_location()
+    location = location.strip() or settings_store.get_location()
     countries = settings_store.get_countries()
 
     async def _bg() -> None:
@@ -163,7 +169,7 @@ async def api_match_run(request: Request) -> JSONResponse:
                 arbeitnow_limit=settings_store.get_arbeitnow_limit(),
                 bundesagentur_limit=settings_store.get_bundesagentur_limit(),
             )
-            discover_and_score(jobs, entry_only=entry_only, manual=True)
+            discover_and_score(jobs, entry_only=entry_only_flag, manual=True)
 
         try:
             await run_in_threadpool(_run)
@@ -229,13 +235,12 @@ async def api_match_state() -> JSONResponse:
 
 
 @router.post("/applied")
-async def api_match_applied(request: Request) -> JSONResponse:
+async def api_match_applied(body: AppliedRequest) -> JSONResponse:
     """Toggle the applied flag on a scored job and log an 'applied' event."""
-    body = await request.json()
-    job_id = (body.get("id") or "").strip()
-    applied = bool(body.get("applied"))
+    job_id = (body.id or "").strip()
+    applied = bool(body.applied)
     if not job_id:
-        return JSONResponse({"ok": False, "error": "id required"}, status_code=400)
+        raise HTTPException(status_code=400, detail="id required")
     match_store.set_applied(job_id, applied)
     if applied:
         event_store.log_event("applied", job_id)
@@ -243,13 +248,12 @@ async def api_match_applied(request: Request) -> JSONResponse:
 
 
 @router.post("/app-status")
-async def api_match_app_status(request: Request) -> JSONResponse:
+async def api_match_app_status(body: AppStatusRequest) -> JSONResponse:
     """Set the application status for a job (applied / interview / offer / rejected)."""
-    body = await request.json()
-    job_id = (body.get("id") or "").strip()
-    status = (body.get("status") or "").strip().lower()
+    job_id = (body.id or "").strip()
+    status = (body.status or "").strip().lower()
     if not job_id:
-        return JSONResponse({"ok": False, "error": "id required"}, status_code=400)
+        raise HTTPException(status_code=400, detail="id required")
     match_store.set_app_status(job_id, status)
     if status == "applied":
         event_store.log_event("applied", job_id)
@@ -257,11 +261,11 @@ async def api_match_app_status(request: Request) -> JSONResponse:
 
 
 @router.get("/detail")
-async def api_match_detail(request: Request) -> JSONResponse:
+async def api_match_detail(id: str = Query(default="")) -> JSONResponse:
     """
     Return full detail for a scored job, lazily generating an LLM summary if absent.
     """
-    job_id = (request.query_params.get("id") or "").strip()
+    job_id = id.strip()
     row = match_store.get_one(job_id)
     if not row:
         return JSONResponse({"ok": False, "error": "not found"}, status_code=404)
@@ -313,33 +317,31 @@ async def api_match_detail(request: Request) -> JSONResponse:
 
 
 @router.post("/filters")
-async def api_match_filters(request: Request) -> JSONResponse:
+async def api_match_filters(body: FiltersRequest) -> JSONResponse:
     """Update target titles, countries, and/or location filter."""
-    body = await request.json()
+    if isinstance(body.target_titles, list):
+        settings_store.set_titles(body.target_titles)
 
-    if isinstance(body.get("target_titles"), list):
-        settings_store.set_titles(body["target_titles"])
-
-    if "countries" in body:
-        c = body["countries"]
+    if body.countries is not None:
+        c = body.countries
         names = c if isinstance(c, list) else str(c).replace(",", " ").split()
         settings_store.set_countries(names)
 
-    if "location" in body:
-        settings_store.set_location(body.get("location") or "")
+    if body.location is not None:
+        settings_store.set_location(body.location or "")
 
-    if "entry_only" in body:
-        settings_store.set_entry_only(bool(body["entry_only"]))
+    if body.entry_only is not None:
+        settings_store.set_entry_only(bool(body.entry_only))
 
-    if "arbeitnow_limit" in body:
+    if body.arbeitnow_limit is not None:
         try:
-            settings_store.set_arbeitnow_limit(int(body["arbeitnow_limit"]))
+            settings_store.set_arbeitnow_limit(int(body.arbeitnow_limit))
         except (ValueError, TypeError):
             pass
 
-    if "bundesagentur_limit" in body:
+    if body.bundesagentur_limit is not None:
         try:
-            settings_store.set_bundesagentur_limit(int(body["bundesagentur_limit"]))
+            settings_store.set_bundesagentur_limit(int(body.bundesagentur_limit))
         except (ValueError, TypeError):
             pass
 
@@ -357,24 +359,21 @@ async def api_match_filters(request: Request) -> JSONResponse:
 
 
 @router.post("/score-jd")
-async def api_score_jd(request: Request) -> JSONResponse:
+async def api_score_jd(body: ScoreJdRequest) -> JSONResponse:
     """Score a jd_unavailable job using a manually pasted JD."""
-    body = await request.json()
-    job_id = (body.get("id") or "").strip()
-    jd_text = (body.get("jd_text") or "").strip()
+    job_id = (body.id or "").strip()
+    jd_text = (body.jd_text or "").strip()
 
     if not job_id:
-        return JSONResponse({"ok": False, "error": "id required"}, status_code=400)
+        raise HTTPException(status_code=400, detail="id required")
     if len(jd_text) < 50:
-        return JSONResponse(
-            {"ok": False, "error": "jd_text too short"}, status_code=400
-        )
+        raise HTTPException(status_code=400, detail="jd_text too short")
     if not state.has_resume():
-        return JSONResponse({"ok": False, "error": "no_resume"}, status_code=400)
+        raise HTTPException(status_code=400, detail="no_resume")
 
     row = match_store.get_one(job_id)
     if not row:
-        return JSONResponse({"ok": False, "error": "job not found"}, status_code=404)
+        raise HTTPException(status_code=404, detail="job not found")
 
     def _score():
         try:
@@ -392,9 +391,7 @@ async def api_score_jd(request: Request) -> JSONResponse:
 
     jd_json, result = await run_in_threadpool(_score)
     if not result:
-        return JSONResponse(
-            {"ok": False, "error": "could not parse JD"}, status_code=422
-        )
+        raise HTTPException(status_code=422, detail="could not parse JD")
 
     match_store.upsert(
         [
@@ -429,17 +426,16 @@ async def api_score_jd(request: Request) -> JSONResponse:
 
 
 @router.post("/scheduler")
-async def api_match_scheduler(request: Request) -> JSONResponse:
+async def api_match_scheduler(body: SchedulerRequest) -> JSONResponse:
     """Enable/disable the auto-fetch scheduler or change its interval (minutes)."""
     from main import _sched_last_ref
 
-    body = await request.json()
-    if "enabled" in body:
-        settings_store.set_scheduler_enabled(bool(body["enabled"]))
-        if body.get("enabled"):
+    if body.enabled is not None:
+        settings_store.set_scheduler_enabled(bool(body.enabled))
+        if body.enabled:
             _sched_last_ref[0] = 0.0
-    if "interval" in body:
-        settings_store.set_scheduler_interval(int(body["interval"]))
+    if body.interval is not None:
+        settings_store.set_scheduler_interval(int(body.interval))
     return JSONResponse(
         {
             "ok": True,
@@ -450,11 +446,10 @@ async def api_match_scheduler(request: Request) -> JSONResponse:
 
 
 @router.post("/delete")
-async def api_match_delete(request: Request) -> JSONResponse:
-    body = await request.json()
-    job_id = (body.get("id") or "").strip()
+async def api_match_delete(body: DeleteJobRequest) -> JSONResponse:
+    job_id = (body.id or "").strip()
     if not job_id:
-        return JSONResponse({"ok": False, "error": "id required"}, status_code=400)
+        raise HTTPException(status_code=400, detail="id required")
     match_store.delete(job_id)
     event_store.block(job_id)
     return JSONResponse({"ok": True})

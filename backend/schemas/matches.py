@@ -2,7 +2,7 @@
 """Request/response models for job match endpoints."""
 
 from pydantic import BaseModel
-from typing import Optional
+from typing import List, Optional, Union
 
 
 class MatchResumeRequest(BaseModel):
@@ -32,3 +32,12 @@ class SchedulerRequest(BaseModel):
 
 class DeleteJobRequest(BaseModel):
     id: str
+
+
+class FiltersRequest(BaseModel):
+    target_titles: Optional[List[str]] = None
+    countries: Optional[Union[List[str], str]] = None
+    location: Optional[str] = None
+    entry_only: Optional[bool] = None
+    arbeitnow_limit: Optional[int] = None
+    bundesagentur_limit: Optional[int] = None

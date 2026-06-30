@@ -9,10 +9,9 @@ import tempfile
 from pathlib import Path
 from typing import Set
 
-from fastapi import APIRouter
+from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, JSONResponse
-from starlette.concurrency import run_in_threadpool
-from starlette.requests import Request
 
 from core.config import JD_MAX_CHARS, MAX_FILE_SIZE_MB, SUPPORTED_EXTENSIONS
 from core.logger import get_logger
@@ -25,6 +24,7 @@ from repositories import cache_repo as cache_store
 from repositories import resume_repo as resume_store
 from services.profile_summary import generate_summary
 from services.llm.caller import check_llm
+from schemas.analyzer import AnalyzeRequest, ResumePreviewRequest
 
 logger = get_logger(__name__)
 
@@ -41,36 +41,29 @@ _PREVIEW_TYPES = {
 
 
 @router.post("/upload")
-async def api_upload(request: Request) -> JSONResponse:
+async def api_upload(file: UploadFile = File(...)) -> JSONResponse:
     """
     Handle resume file uploads.
 
     Returns {ok, name, tmp, kb, ext} on success.
     """
-    form = await request.form()
-    upload = form.get("file")
+    if file is None:
+        raise HTTPException(status_code=400, detail="no file uploaded")
 
-    if upload is None:
-        return JSONResponse({"ok": False, "error": "no file uploaded"}, status_code=400)
-
-    data = await upload.read()
-    filename = upload.filename or "resume"
+    data = await file.read()
+    filename = file.filename or "resume"
     suffix = Path(filename).suffix.lower()
 
     if len(data) == 0:
-        return JSONResponse({"ok": False, "error": "empty file"}, status_code=400)
+        raise HTTPException(status_code=400, detail="empty file")
     if len(data) > MAX_FILE_MB * 1024 * 1024:
-        return JSONResponse(
-            {"ok": False, "error": f"file too large (max {MAX_FILE_MB} MB)"},
-            status_code=400,
+        raise HTTPException(
+            status_code=400, detail=f"file too large (max {MAX_FILE_MB} MB)"
         )
     if suffix not in ALLOWED_EXTENSIONS:
-        return JSONResponse(
-            {
-                "ok": False,
-                "error": f"unsupported file type (allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))})",
-            },
+        raise HTTPException(
             status_code=400,
+            detail=f"unsupported file type (allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))})",
         )
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp_file:
@@ -100,11 +93,10 @@ async def api_resume_file(tmp: str) -> FileResponse:
 
 
 @router.post("/resume-preview")
-async def api_resume_preview(request: Request) -> JSONResponse:
+async def api_resume_preview(body: ResumePreviewRequest) -> JSONResponse:
     """Extract raw text from a stored or temp resume file - no LLM, no scoring."""
-    body = await request.json()
-    tmp = (body.get("tmp") or "").strip()
-    resume_id = (body.get("resume_id") or "").strip()
+    tmp = (body.tmp or "").strip()
+    resume_id = (body.resume_id or "").strip()
 
     if resume_id:
         row = resume_store.get(_USER, resume_id)
@@ -125,17 +117,16 @@ async def api_resume_preview(request: Request) -> JSONResponse:
 
 
 @router.post("/analyze")
-async def api_analyze(request: Request) -> JSONResponse:
+async def api_analyze(body: AnalyzeRequest) -> JSONResponse:
     """
     Full analysis pipeline: parse resume -> extract -> score -> summarize.
 
     Body: {"tmp": <temp path from /api/upload>, "jd": <job description text>}
     Returns: {"ok": true, "score": float, "label": str, "html": str}
     """
-    body = await request.json()
-    tmp = (body.get("tmp") or "").strip()
-    resume_id = (body.get("resume_id") or "").strip()
-    jd_text = (body.get("jd") or "").strip()
+    tmp = (body.tmp or "").strip()
+    resume_id = (body.resume_id or "").strip()
+    jd_text = (body.jd or "").strip()
 
     if resume_id:
         row = resume_store.get(_USER, resume_id)
