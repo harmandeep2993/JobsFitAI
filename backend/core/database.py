@@ -22,6 +22,13 @@ _TURSO_URL = (os.getenv("TURSO_DATABASE_URL") or os.getenv("TURSO_URL", "")).str
 _TURSO_TOKEN = os.getenv("TURSO_AUTH_TOKEN", "").strip()
 _USE_TURSO = bool(_TURSO_URL and _TURSO_TOKEN)
 
+# libsql_client is only required when Turso is configured. Import it now so
+# the missing-package error surfaces at startup rather than on the first request.
+try:
+    from libsql_client import create_client_sync as _create_client_sync
+except ImportError:
+    _create_client_sync = None  # type: ignore[assignment]
+
 DB_PATH = Path("data/jobsfitai.db")
 
 
@@ -98,9 +105,11 @@ def connect():
     are set, otherwise a local SQLite connection. Both behave identically.
     """
     if _USE_TURSO:
-        from libsql_client import create_client_sync
-
-        client = create_client_sync(url=_TURSO_URL, auth_token=_TURSO_TOKEN)
+        if _create_client_sync is None:
+            raise ImportError(
+                "libsql-client is required for Turso. Install it: uv add libsql-client"
+            )
+        client = _create_client_sync(url=_TURSO_URL, auth_token=_TURSO_TOKEN)
         conn = _TursoConn(client)
         try:
             yield conn
@@ -259,8 +268,9 @@ def init() -> None:
         ]:
             try:
                 conn.execute(_stmt)
-            except Exception:
-                pass
+            except Exception as _e:
+                # "duplicate column name" is expected on subsequent startups
+                logger.debug("ALTER TABLE skipped (already applied?): %s", _e)
 
     mode = f"Turso ({_TURSO_URL})" if _USE_TURSO else f"SQLite ({DB_PATH})"
     logger.info("Database ready - %s", mode)

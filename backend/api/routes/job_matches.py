@@ -20,6 +20,7 @@ from api.routes.auth import get_current_user
 from core.config import MAX_AGE_DAYS, SEARCH_PER_TITLE
 from core.logger import get_logger
 from core import state
+from core.state import sched_last_ref
 from services.extractors.jd_extractor import extract_jd
 from services.matcher.engine import match
 from services.parsers import extract_all_text
@@ -36,7 +37,6 @@ from services.job_matcher import (
     rescore_all,
 )
 from services.profile_summary import generate_summary
-from services import vector_store
 from schemas.matches import (
     AppliedRequest,
     AppStatusRequest,
@@ -472,15 +472,13 @@ async def api_match_scheduler(
     current_user: dict = Depends(get_current_user),
 ) -> JSONResponse:
     """Enable/disable the auto-fetch scheduler or change its interval (minutes)."""
-    from main import _sched_last_ref
-
     user_id = current_user["id"]
 
     if body.enabled is not None:
         settings_store.set_scheduler_enabled(user_id, bool(body.enabled))
         if body.enabled:
             # Reset the last-run timestamp so the scheduler fires promptly.
-            _sched_last_ref.pop(user_id, None)
+            sched_last_ref.pop(user_id, None)
     if body.interval is not None:
         settings_store.set_scheduler_interval(user_id, int(body.interval))
     return JSONResponse(
@@ -511,11 +509,14 @@ async def api_match_delete(
 async def api_match_clear(
     current_user: dict = Depends(get_current_user),
 ) -> JSONResponse:
-    """Wipe all matches, events, and vector store for this user."""
+    """Wipe all matches and events for this user.
+
+    The vector dedup store is shared across users and is not cleared here -
+    clearing it for one user would corrupt dedup state for all other users.
+    """
     user_id = current_user["id"]
     match_store.clear(user_id)
     event_store.clear(user_id)
-    vector_store.clear()
     return JSONResponse({"ok": True})
 
 

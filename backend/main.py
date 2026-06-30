@@ -12,8 +12,11 @@ Responsibilities:
 import asyncio
 import hmac as _hmac
 import json as _json
+import logging as _logging
 import os
 import secrets as _secrets
+import socket
+import sys
 import time
 import uuid
 from datetime import datetime, timezone
@@ -34,19 +37,23 @@ from core.config import (
     SUPPORTED_EXTENSIONS,
 )
 from core.logger import get_logger
+from repositories import resume_repo as resume_store
 from repositories import settings_repo as settings_store
+from services.extractors.resume_extractor import extract_resume
 from services.job_matcher import (
     discover_and_score,
     fetch_combined,
     get_run_status,
 )
+from services.parsers import extract_all_text
 
 logger = get_logger("main")
 
 # === Scheduler state ===
-# Keyed by user_id; exported so job_matches.py can reset a user's entry when
-# they enable the scheduler (so the next 30s tick fires immediately).
-_sched_last_ref: dict[str, float] = {}
+# Imported from core.state so job_matches.py can reset a user's entry without
+# creating a circular import (main imports job_matches router; job_matches
+# cannot import main back).
+_sched_last_ref = session.sched_last_ref
 
 app = FastAPI(title="JobsFitAI")
 
@@ -265,13 +272,8 @@ async def _auto_fetch_loop() -> None:
 
 async def _backfill_extractions() -> None:
     """Extract resume JSON for any stored resumes that were uploaded before caching was added."""
-    from services.extractors.resume_extractor import extract_resume
-    from services.parsers import extract_all_text
-    from repositories import resume_repo as _resume_store_local
-    from core import database as _db
-
     # Backfill runs across all users - query without user filter
-    with _db.connect() as conn:
+    with db.connect() as conn:
         rows = conn.execute(
             "SELECT id, user_id, label, file_path FROM resumes WHERE extracted_json IS NULL"
         ).fetchall()
@@ -287,7 +289,7 @@ async def _backfill_extractions() -> None:
                 return
             extracted = extract_resume(text)
             if extracted:
-                _resume_store_local.set_extracted(
+                resume_store.set_extracted(
                     r["user_id"], r["id"], _json.dumps(extracted)
                 )
                 logger.info("[backfill] done: %s (%s)", r["label"], r["id"])
@@ -300,8 +302,7 @@ async def _backfill_extractions() -> None:
 
 @app.on_event("startup")
 async def _start_scheduler() -> None:
-    import logging as _logging
-
+    """Wire up logging, seed scheduler state, and start background tasks."""
     # Uvicorn re-initialises its own loggers after our logger.py setup runs,
     # restoring the access log to INFO. Re-silence it here so requests are not
     # printed twice (our middleware already covers /api/* with richer context).
@@ -335,8 +336,7 @@ PORT = 8080
 
 
 def _port_in_use(port: int) -> bool:
-    import socket
-
+    """Return True if something is already listening on the given port."""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         return s.connect_ex(("127.0.0.1", port)) == 0
 
@@ -345,13 +345,12 @@ if __name__ == "__main__":
     import uvicorn
 
     if _port_in_use(PORT):
-        import sys
-
-        print(
-            f"\n[JobsFitAI] Port {PORT} is already in use - an old server is still running.\n"
-            f"           Stop it first, then re-run:\n"
-            f"           Windows : taskkill /F /IM python.exe\n"
-            f"           macOS/Linux: kill $(lsof -ti tcp:{PORT})\n"
+        logger.error(
+            "Port %d is already in use - stop the old server first.\n"
+            "  Windows:    taskkill /F /IM python.exe\n"
+            "  macOS/Linux: kill $(lsof -ti tcp:%d)",
+            PORT,
+            PORT,
         )
         sys.exit(1)
 

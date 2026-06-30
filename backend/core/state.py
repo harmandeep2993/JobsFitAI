@@ -16,8 +16,16 @@ from datetime import datetime, timezone
 from core import database
 from core.config import PROVIDER_CONFIGS
 from core.logger import get_logger
+from services.llm.providers import groq as _groq_p
+from services.llm.providers import openai as _openai_p
 
 logger = get_logger(__name__)
+
+# === Scheduler state ===
+# Keyed by user_id; tracks when each user's last fetch run fired so the
+# scheduler can enforce the configured interval without a database round-trip.
+# Exported so both main.py and job_matches.py can read/mutate it.
+sched_last_ref: dict[str, float] = {}
 
 # Providers the router has a working path for.
 SUPPORTED_PROVIDERS = ["openai", "groq", "ollama"]
@@ -221,9 +229,6 @@ def provider_catalog() -> list[dict]:
 
     Each entry: {name, default_model, models[], needs_key, has_key, key_hint}.
     """
-    from services.llm.providers import groq as _groq_p
-    from services.llm.providers import openai as _openai_p
-
     _meta = {
         "openai": {"needs_key": True, "mod": _openai_p},
         "groq": {"needs_key": True, "mod": _groq_p},
