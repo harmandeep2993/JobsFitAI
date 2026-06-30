@@ -1,12 +1,22 @@
 const NAV_ITEMS = [
   {
     id: 'analyzer',
-    label: 'Analyzer',
+    label: 'Resume Analyser',
     icon: (
       <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="9" cy="9" r="6.5"/>
         <path d="M14 14l3.5 3.5"/>
         <path d="M9 6v3l2 2"/>
+      </svg>
+    ),
+  },
+  {
+    id: 'ats',
+    label: 'ATS Check',
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M8.5 1.5L2 5v4.5c0 3.5 2.8 6.2 6.5 7.5 3.7-1.3 6.5-4 6.5-7.5V5L8.5 1.5z"/>
+        <polyline points="6,10 8,12 12.5,7.5"/>
       </svg>
     ),
   },
@@ -28,16 +38,6 @@ const NAV_ITEMS = [
       <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
         <rect x="4" y="2" width="12" height="16" rx="2"/>
         <path d="M8 7h4M8 10h4M8 13h2"/>
-      </svg>
-    ),
-  },
-  {
-    id: 'ats',
-    label: 'ATS Check',
-    icon: (
-      <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M8.5 1.5L2 5v4.5c0 3.5 2.8 6.2 6.5 7.5 3.7-1.3 6.5-4 6.5-7.5V5L8.5 1.5z"/>
-        <polyline points="6,10 8,12 12.5,7.5"/>
       </svg>
     ),
   },
