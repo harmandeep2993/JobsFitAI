@@ -4,6 +4,7 @@ Analyzer endpoints: /api/upload, /api/resume-preview, /api/resume-file, /api/ana
 """
 
 import hashlib
+import json
 import os
 import tempfile
 from pathlib import Path
@@ -16,7 +17,6 @@ from fastapi.responses import FileResponse, JSONResponse
 from core.config import JD_MAX_CHARS, MAX_FILE_SIZE_MB, SUPPORTED_EXTENSIONS
 from core.logger import get_logger
 from services.extractors import extract_all
-from frontend.results import build_results_html, render_error_panel
 from services.matcher.engine import match
 from services.parsers import extract_all_text
 from repositories import analysis_repo as analysis_store
@@ -116,13 +116,57 @@ async def api_resume_preview(body: ResumePreviewRequest) -> JSONResponse:
     return JSONResponse({"ok": True, "text": text[:3000], "total_chars": len(text)})
 
 
+def _build_summary(raw: dict | str | None) -> dict:
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except Exception:
+            raw = {}
+    if not isinstance(raw, dict):
+        raw = {}
+    return {
+        "profile": raw.get("profile") or [],
+        "strengths": raw.get("strengths") or [],
+        "gaps": raw.get("gaps") or [],
+        "focus": raw.get("focus") or [],
+    }
+
+
+def _build_breakdown(results: dict) -> dict:
+    ss = results.get("section_scores") or {}
+    return {
+        "required_skills": {
+            "score": ss.get("required_skills", 0),
+            "matched": results.get("matched_required") or [],
+            "missing": results.get("missing_required") or [],
+        },
+        "preferred_skills": {
+            "score": ss.get("preferred_skills", 0),
+            "matched": results.get("matched_preferred") or [],
+            "missing": results.get("missing_preferred") or [],
+        },
+        "responsibilities": {
+            "score": ss.get("responsibilities", 0),
+            "matched": [],
+            "missing": [],
+        },
+        "experience": {"score": ss.get("experience", 0), "matched": [], "missing": []},
+        "education": {"score": ss.get("education", 0), "matched": [], "missing": []},
+        "languages": {"score": ss.get("languages", 0), "matched": [], "missing": []},
+        "certifications": {
+            "score": ss.get("certifications", 0),
+            "matched": [],
+            "missing": [],
+        },
+    }
+
+
 @router.post("/analyze")
 async def api_analyze(body: AnalyzeRequest) -> JSONResponse:
     """
     Full analysis pipeline: parse resume -> extract -> score -> summarize.
 
-    Body: {"tmp": <temp path from /api/upload>, "jd": <job description text>}
-    Returns: {"ok": true, "score": float, "label": str, "html": str}
+    Returns structured JSON - no HTML blobs.
     """
     tmp = (body.tmp or "").strip()
     resume_id = (body.resume_id or "").strip()
@@ -139,16 +183,13 @@ async def api_analyze(body: AnalyzeRequest) -> JSONResponse:
         return JSONResponse(
             {"ok": False, "error": "resume file not found"}, status_code=400
         )
+
     if len(jd_text) < 50:
         return JSONResponse(
             {
                 "ok": False,
                 "error": "jd_too_short",
-                "html": render_error_panel(
-                    "Job description too short",
-                    "Paste the full job description (at least a few sentences). "
-                    "Short snippets don't give the analyser enough signal to score accurately.",
-                ),
+                "message": "Job description must be at least 50 characters.",
             },
             status_code=400,
         )
@@ -184,65 +225,31 @@ async def api_analyze(body: AnalyzeRequest) -> JSONResponse:
     except Exception as e:
         logger.error("analyze failed: %s", e)
         return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
-    finally:
-        pass  # temp file kept so the same resume can be re-analysed without re-uploading
 
     if not resume_json and not jd_json:
         return JSONResponse(
-            {
-                "ok": False,
-                "error": "could_not_parse_resume",
-                "html": render_error_panel(
-                    "Could not read resume",
-                    "The file could not be parsed. Make sure it is a valid PDF or DOCX "
-                    "with selectable text (not a scanned image). Try re-exporting from your word processor.",
-                ),
-            },
-            status_code=422,
+            {"ok": False, "error": "could_not_parse_resume"}, status_code=422
         )
     if not resume_json:
         return JSONResponse(
-            {
-                "ok": False,
-                "error": "resume_extraction_failed",
-                "html": render_error_panel(
-                    "Resume extraction failed",
-                    "The resume text was found but the LLM could not extract structured data. "
-                    "Check that your LLM provider is configured and reachable in Settings.",
-                ),
-            },
-            status_code=422,
+            {"ok": False, "error": "resume_extraction_failed"}, status_code=422
         )
     if not jd_json:
         return JSONResponse(
-            {
-                "ok": False,
-                "error": "jd_extraction_failed",
-                "html": render_error_panel(
-                    "Job description extraction failed",
-                    "The job description text could not be parsed. Try adding more detail -- "
-                    "responsibilities, required skills, and qualifications improve extraction accuracy.",
-                ),
-            },
-            status_code=422,
+            {"ok": False, "error": "jd_extraction_failed"}, status_code=422
         )
     if not results:
         return JSONResponse({"ok": False, "error": "scoring_failed"}, status_code=500)
 
-    try:
-        html = build_results_html(results, resume_json, jd_json, summary or "")
-    except Exception as e:
-        logger.error("build_results_html failed: %s", e, exc_info=True)
-        return JSONResponse(
-            {"ok": False, "error": "results_render_failed"}, status_code=500
-        )
-
     payload = {
         "score": results.get("overall_score", 0),
         "label": results.get("label", ""),
-        "html": html,
-        "gaps": results.get("missing_required", []),
-        "strengths": results.get("matched_required", []),
+        "summary": _build_summary(summary),
+        "breakdown": _build_breakdown(results),
+        "keywords": {
+            "matched": results.get("matched_required") or [],
+            "missing": results.get("missing_required") or [],
+        },
     }
     cache_store.set(cache_key, payload)
 

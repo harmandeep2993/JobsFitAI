@@ -14,7 +14,7 @@ from core.logger import get_logger
 logger = get_logger(__name__)
 
 # Absolute path so it resolves correctly regardless of working directory
-JD_SCHEMA_PATH = Path(__file__).parent.parent / "schemas" / "jd_schema.json"
+JD_SCHEMA_PATH = Path(__file__).parent / "schemas" / "jd_schema.json"
 
 
 def _get_jd_schema() -> str:
