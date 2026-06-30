@@ -27,6 +27,7 @@ from starlette.concurrency import run_in_threadpool
 from starlette.requests import Request
 
 from core import database as db, state as session
+from core.security import validate_secret
 from core.config import (
     MAX_FILE_SIZE_MB,
     SEARCH_PER_TITLE,
@@ -208,6 +209,7 @@ async def index() -> HTMLResponse:
 # ---------------------------------------------------------------------------
 
 from api.routes import (  # noqa: E402
+    auth,
     resume_analyzer,
     ats_maker,
     history,
@@ -217,6 +219,7 @@ from api.routes import (  # noqa: E402
     settings,
 )
 
+app.include_router(auth.router, prefix="/api/auth")
 app.include_router(resumes.router, prefix="/api/resumes")
 app.include_router(resume_analyzer.router, prefix="/api")
 app.include_router(job_matches.router, prefix="/api/match")
@@ -325,6 +328,7 @@ async def _start_scheduler() -> None:
         except Exception:
             pass
 
+    validate_secret()
     asyncio.create_task(_auto_fetch_loop())
     asyncio.create_task(_backfill_extractions())
     logger.info(

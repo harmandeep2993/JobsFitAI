@@ -153,6 +153,17 @@ def init() -> None:
             )
             """
         )
+        # Registered users - one row per account.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                id              TEXT PRIMARY KEY,
+                email           TEXT UNIQUE NOT NULL,
+                hashed_password TEXT NOT NULL,
+                created_at      TEXT NOT NULL
+            )
+            """
+        )
     logger.info("SQLite ready at %s", DB_PATH)
 
 
