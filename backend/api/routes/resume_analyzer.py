@@ -117,10 +117,18 @@ async def api_resume_preview(body: ResumePreviewRequest) -> JSONResponse:
 
 
 def _build_summary(raw: dict | str | None) -> dict:
+    """Normalise generate_summary() output to a plain dict with guaranteed keys.
+
+    Args:
+        raw: JSON string, dict, or None from generate_summary().
+
+    Returns:
+        Dict with keys profile, strengths, gaps, focus - each a list.
+    """
     if isinstance(raw, str):
         try:
             raw = json.loads(raw)
-        except Exception:
+        except (json.JSONDecodeError, ValueError):
             raw = {}
     if not isinstance(raw, dict):
         raw = {}
@@ -133,6 +141,14 @@ def _build_summary(raw: dict | str | None) -> dict:
 
 
 def _build_breakdown(results: dict) -> dict:
+    """Map match() output into a per-section breakdown for the API response.
+
+    Args:
+        results: Dict returned by match() containing section_scores and matched/missing lists.
+
+    Returns:
+        Dict keyed by section name, each with score, matched, and missing lists.
+    """
     ss = results.get("section_scores") or {}
     return {
         "required_skills": {

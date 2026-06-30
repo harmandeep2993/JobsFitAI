@@ -75,4 +75,7 @@ async def api_ats_optimise(body: AtsOptimiseRequest) -> JSONResponse:
     if not resume_text:
         raise HTTPException(status_code=422, detail="could_not_read_resume")
 
+    # TODO: implement LLM-powered ATS resume generation in services/ats.py
+    # Should call generate_ats_resume(resume_text, jd_text) and return
+    # {resume, coverage_before, coverage_after, section_flags, formatting_flags, plain_text}
     raise HTTPException(status_code=501, detail="ats_optimise_not_implemented")

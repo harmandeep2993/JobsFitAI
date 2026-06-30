@@ -7,6 +7,7 @@ jose or passlib directly.
 """
 
 import os
+import secrets
 from datetime import datetime, timedelta, timezone
 
 from jose import JWTError, jwt
@@ -19,38 +20,61 @@ logger = get_logger(__name__)
 _pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # Secret used to sign tokens. Must be set in .env for production.
-_SECRET = os.getenv("JWT_SECRET", "")
+# If missing, a random secret is generated per process - tokens cannot be
+# forged but will be invalidated on every server restart.
+_SECRET = os.getenv("JWT_SECRET") or secrets.token_hex(32)
+
 _ALGORITHM = "HS256"
 _TOKEN_EXPIRE_DAYS = 30
 
 
 def validate_secret() -> None:
-    """Call at startup - warns if JWT_SECRET is not set in .env."""
-    if not _SECRET:
+    """Warn at startup if JWT_SECRET is not pinned in .env.
+
+    Without a fixed secret, tokens are valid only for the lifetime of the
+    process - every restart logs all users out. Acceptable for local dev,
+    not for production.
+    """
+    if not os.getenv("JWT_SECRET"):
         logger.warning(
-            "JWT_SECRET not set in .env - safe for local dev only, required for production"
+            "JWT_SECRET not set in .env - tokens will be invalidated on every restart. "
+            "Set JWT_SECRET in .env for production."
         )
 
 
 def hash_password(plain: str) -> str:
+    """Return a bcrypt hash of plain. Store this, never the plain password."""
     return _pwd_context.hash(plain)
 
 
 def verify_password(plain: str, hashed: str) -> bool:
+    """Return True if plain matches the bcrypt hash, False otherwise."""
     return _pwd_context.verify(plain, hashed)
 
 
 def create_token(user_id: str, email: str) -> str:
-    """Create a signed JWT that expires in 30 days."""
+    """Create a signed HS256 JWT that expires in 30 days.
+
+    Args:
+        user_id: The user's UUID stored in the `sub` claim.
+        email:   Stored in the payload for convenience.
+
+    Returns:
+        Encoded JWT string ready to send to the client.
+    """
     expire = datetime.now(timezone.utc) + timedelta(days=_TOKEN_EXPIRE_DAYS)
     payload = {"sub": user_id, "email": email, "exp": expire}
     return jwt.encode(payload, _SECRET, algorithm=_ALGORITHM)
 
 
 def decode_token(token: str) -> dict | None:
-    """
-    Decode and verify a JWT. Returns the payload dict on success,
-    None if the token is invalid or expired.
+    """Decode and verify a JWT.
+
+    Args:
+        token: The raw JWT string from the Authorization header.
+
+    Returns:
+        Payload dict on success, None if the token is invalid or expired.
     """
     try:
         return jwt.decode(token, _SECRET, algorithms=[_ALGORITHM])

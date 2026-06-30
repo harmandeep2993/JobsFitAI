@@ -6,6 +6,7 @@
 import asyncio
 import csv
 import io
+import os
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Query
@@ -92,8 +93,6 @@ def _resume_diff(old: dict, new: dict) -> dict:
 @router.post("/resume")
 async def api_match_resume(body: MatchResumeRequest) -> JSONResponse:
     """Parse + extract an uploaded resume and store it for matching."""
-    import os
-
     tmp = (body.tmp or "").strip()
     name = (body.name or "resume").strip()
 
@@ -447,6 +446,7 @@ async def api_match_scheduler(body: SchedulerRequest) -> JSONResponse:
 
 @router.post("/delete")
 async def api_match_delete(body: DeleteJobRequest) -> JSONResponse:
+    """Delete a job match and block its id from ever appearing again."""
     job_id = (body.id or "").strip()
     if not job_id:
         raise HTTPException(status_code=400, detail="id required")

@@ -42,6 +42,7 @@ def get_by_id(user_id: str) -> dict | None:
 
 
 def email_exists(email: str) -> bool:
+    """Return True if the email is already registered, False otherwise."""
     with db.connect() as conn:
         row = conn.execute(
             "SELECT 1 FROM users WHERE email = ?",
