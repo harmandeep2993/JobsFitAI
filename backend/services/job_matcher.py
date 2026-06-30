@@ -1,0 +1,393 @@
+# services/job_matcher.py
+"""
+Job matching service.
+
+Scores fetched jobs against the stored resume and persists the results.
+Each job costs one JD-extraction LLM call; the resume is extracted once
+(held in session per user) and reused across all jobs for that user.
+"""
+
+import json as _json
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timezone
+
+from services.extractors.jd_extractor import extract_jd
+from services.fetchers import (
+    Job,
+    fetch_adzuna_multi,
+    fetch_arbeitnow_jobs,
+    fetch_bundesagentur_jobs,
+)
+from services.fetchers.job_enricher import fetch_full_description
+from services.matcher import match
+from repositories import event_repo, match_repo
+from services import job_relevance as relevance, role_filter, vector_store
+from core import state as session
+from core.config import MAX_AGE_DAYS
+from core.logger import get_logger
+
+logger = get_logger(__name__)
+
+# Below this length an Adzuna description is just a snippet - fetch the full JD.
+_SNIPPET_LIMIT = 1200
+
+
+def _enrich(job: Job) -> None:
+    """Replace a thin or empty description with the full JD scraped from the posting URL.
+
+    Applies to Adzuna snippets and Bundesagentur jobs where the real JD lives
+    on an external site (StepStone, LinkedIn, etc.).
+    """
+    needs_enrich = (
+        job.source == "adzuna" and len(job.description) < _SNIPPET_LIMIT
+    ) or (job.source == "bundesagentur" and len(job.description) < _SNIPPET_LIMIT)
+    if not needs_enrich:
+        return
+    full = fetch_full_description(job.url)
+    if full and len(full) > len(job.description):
+        logger.debug(
+            "Enriched '%s': %d -> %d chars",
+            job.title[:40],
+            len(job.description),
+            len(full),
+        )
+        job.description = full
+
+
+def _score_one(job: Job, resume_json: dict) -> dict | None:
+    """Extract a job's JD and score the resume against it."""
+    try:
+        jd_json = extract_jd(job.description)
+        if not jd_json:
+            logger.warning("Empty JD extraction for '%s'", job.title)
+            return None
+
+        result = match(resume_json, jd_json)
+
+        return {
+            "id": job.id,
+            "source": job.source,
+            "title": job.title,
+            "company": job.company,
+            "location": job.location,
+            "url": job.url,
+            "language": job.language,
+            "posted_at": job.posted_at,
+            "score": result.get("overall_score", 0),
+            "label": result.get("label", ""),
+            "matched_required": result.get("matched_required", []),
+            "missing_required": result.get("missing_required", []),
+            "section_scores": result.get("section_scores", {}),
+            "scored_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "jd_json": jd_json,
+        }
+    except Exception as e:
+        logger.error("Scoring failed for '%s': %s", job.title, e)
+        return None
+
+
+# === Per-user run status ===
+# Progress of the current/last run per user, polled by the dashboard for live updates.
+_run_statuses: dict[str, dict] = {}
+
+
+def _default_status() -> dict:
+    """Return a blank run-status dict."""
+    return {"running": False, "phase": "idle", "checked": 0, "scored": 0, "total": 0}
+
+
+def get_run_status(user_id: str) -> dict:
+    """Return a snapshot of the current run's progress for this user."""
+    return dict(_run_statuses.get(user_id, _default_status()))
+
+
+def begin_run(user_id: str) -> bool:
+    """Mark a run as starting for this user. Returns False if one is already running."""
+    if _run_statuses.get(user_id, {}).get("running"):
+        return False
+    _run_statuses[user_id] = {
+        "running": True,
+        "phase": "fetching",
+        "checked": 0,
+        "scored": 0,
+        "total": 0,
+    }
+    return True
+
+
+def end_run(user_id: str) -> None:
+    """Force-clear the running flag for this user (e.g. after a failure)."""
+    if user_id in _run_statuses:
+        _run_statuses[user_id]["running"] = False
+        _run_statuses[user_id]["phase"] = "idle"
+
+
+def fetch_combined(
+    titles: list[str],
+    location: str = "",
+    countries: list[str] | None = None,
+    per_title: int = 5,
+    arbeitnow_limit: int = 100,
+    bundesagentur_limit: int = 500,
+) -> list[Job]:
+    """Pull jobs from all sources across one or more countries and merge.
+
+    - Adzuna: server-side search per target title, per country code.
+    - Arbeitnow: Germany feed filtered to target-title roles (DE only).
+    - Bundesagentur: Germany official job board via public API (DE only).
+
+    Deduped by id; the LLM funnel and vector dedup refine further.
+    """
+    countries = countries or ["de"]
+
+    adzuna: list[Job] = []
+    for code in countries:
+        adzuna += fetch_adzuna_multi(
+            titles, location=location, country=code, per_title=per_title
+        )
+
+    arbeitnow: list[Job] = []
+    bundesagentur: list[Job] = []
+    if "de" in countries:
+        # Arbeitnow: word-union query is fine since it filters in Python afterwards
+        terms = sorted({w for t in titles for w in t.split()})
+        arb_raw = fetch_arbeitnow_jobs(
+            query=" ".join(terms), location=location, limit=arbeitnow_limit
+        )
+        arbeitnow = [j for j in arb_raw if role_filter.is_target_role(j.title, titles)]
+
+        # Bundesagentur: fetch all titles in parallel - each title is an
+        # independent API search so there is no shared state to protect.
+        seen_ba: set[str] = set()
+
+        def _ba_fetch(title: str) -> list[Job]:
+            return fetch_bundesagentur_jobs(
+                query=title, location=location, max_age_days=MAX_AGE_DAYS
+            )
+
+        with ThreadPoolExecutor(max_workers=min(6, len(titles))) as pool:
+            futures = {pool.submit(_ba_fetch, t): t for t in titles}
+            for fut in as_completed(futures):
+                try:
+                    for job in fut.result():
+                        if job.id not in seen_ba:
+                            seen_ba.add(job.id)
+                            bundesagentur.append(job)
+                except Exception as e:
+                    logger.warning(
+                        "BA fetch failed for title '%s': %s", futures[fut], e
+                    )
+
+    merged, seen_ids, seen_content = [], set(), set()
+    for job in adzuna + arbeitnow + bundesagentur:
+        ckey = (
+            (job.title or "").strip().lower()
+            + "|"
+            + (job.company or "").strip().lower()
+        )
+        if job.id and job.id not in seen_ids and ckey not in seen_content:
+            seen_ids.add(job.id)
+            seen_content.add(ckey)
+            merged.append(job)
+
+    logger.info(
+        "Combined sources (%s): %d adzuna + %d arbeitnow + %d bundesagentur -> %d unique",
+        ",".join(countries),
+        len(adzuna),
+        len(arbeitnow),
+        len(bundesagentur),
+        len(merged),
+    )
+    return merged
+
+
+def rescore_all(user_id: str) -> int:
+    """Re-score every stored job for this user against the current resume.
+
+    Uses the cached JD - no LLM tokens and no re-fetch. Used when a new
+    resume is loaded. Returns the number of jobs re-scored.
+    """
+    resume_json = session.get_resume(user_id)
+    if not resume_json:
+        return 0
+
+    rows = match_repo.rows_with_jd(user_id)
+    if not rows:
+        return 0
+
+    resume_name = session.get_resume_name(user_id) or "resume"
+    logger.info(
+        "Rescoring %d stored jobs for user %s against '%s' (no LLM - cached JD only)",
+        len(rows),
+        user_id,
+        resume_name,
+    )
+
+    count = 0
+    for row in rows:
+        jd = row.get("jd")
+        if not jd:
+            continue
+        try:
+            result = match(resume_json, jd)
+            match_repo.update_score(user_id, row["id"], result)
+            count += 1
+        except Exception as e:
+            logger.error("Re-score failed for %s: %s", row["id"], e)
+
+    logger.info(
+        "Rescore complete for user %s: %d/%d jobs updated", user_id, count, len(rows)
+    )
+    return count
+
+
+def discover_and_score(
+    jobs: list[Job], user_id: str, entry_only: bool = True, manual: bool = False
+) -> dict:
+    """Token-efficient funnel for one user's job run.
+
+    skip already-seen -> recency -> cheap LLM relevance gate ->
+    full-JD enrich + extract + score.
+
+    Each scored job is persisted immediately so the dashboard can show
+    results streaming in. Progress is exposed via get_run_status(user_id).
+
+    Args:
+        jobs: Raw job list from fetch_combined.
+        user_id: The user this run belongs to.
+        entry_only: When True, filter to entry-level roles only.
+        manual: Whether this was a user-triggered run (vs scheduler).
+    """
+    status = _run_statuses.setdefault(user_id, _default_status())
+    status["running"] = True  # idempotent - begin_run may have set this already
+
+    resume_json = session.get_resume(user_id)
+    if not resume_json:
+        status.update({"running": False, "phase": "idle"})
+        return {
+            "error": "no_resume",
+            "checked": 0,
+            "scored": 0,
+            "results": match_repo.get_all(user_id),
+        }
+
+    seen = event_repo.seen_ids(user_id)
+    new_jobs = [j for j in jobs if j.id and j.id not in seen]
+
+    # --- recency filter (free) ---
+    candidates = []
+    for job in new_jobs:
+        if role_filter.is_recent(job):
+            candidates.append(job)
+        else:
+            event_repo.mark_seen(job, user_id, "stale")
+
+    logger.info(
+        ">> Run user=%s: %d fetched, %d new, %d recent",
+        user_id,
+        len(jobs),
+        len(new_jobs),
+        len(candidates),
+    )
+
+    # --- bulk LLM relevance gate (few calls, not one-per-job) ---
+    status.update(
+        {"phase": "classifying", "total": len(candidates), "checked": 0, "scored": 0}
+    )
+    verdicts = relevance.classify_batch(candidates)
+
+    survivors = []
+    for job in candidates:
+        verdict = verdicts.get(job.id, {"relevant": True, "entry_level": True})
+        if not verdict["relevant"]:
+            event_repo.mark_seen(job, user_id, "irrelevant")
+        elif entry_only and not verdict["entry_level"]:
+            event_repo.mark_seen(job, user_id, "not_entry")
+        else:
+            survivors.append(job)
+
+    logger.info(
+        "   %d relevant entry-level survivors for user %s", len(survivors), user_id
+    )
+    status.update({"phase": "scoring", "total": len(survivors), "checked": 0})
+
+    scored = 0
+    try:
+        for job in survivors:
+            status["checked"] += 1
+            tag = f"{job.title[:42]} @ {job.company[:20]}"
+
+            # cross-source near-duplicate dedup (free, local embeddings)
+            if vector_store.is_duplicate(job):
+                event_repo.mark_seen(job, user_id, "duplicate")
+                logger.debug("   skip duplicate | %s", tag)
+                continue
+
+            # store metadata now (appears on dashboard), then enrich + score
+            match_repo.upsert_pending(user_id, job)
+            vector_store.add(job)
+
+            _enrich(job)
+            item = _score_one(job, resume_json)
+            jd = item.get("jd_json") if item else None
+            has_jd = bool(
+                jd and (jd.get("required_skills") or jd.get("responsibilities"))
+            )
+
+            if item and has_jd:
+                item["status"] = "scored"
+                match_repo.upsert(user_id, [item])
+                scored += 1
+                status["scored"] = scored
+                event_repo.mark_seen(job, user_id, "scored")
+                event_repo.log_event(
+                    user_id,
+                    "scored",
+                    job.id,
+                    f"{round(item['score'])}% - {item['title'][:40]}",
+                )
+                logger.debug("   stored %3d%% | %s", round(item["score"]), tag)
+            else:
+                # JD not on Adzuna (real posting lives elsewhere) - keep for
+                # manual review instead of a fake score.
+                match_repo.set_status(user_id, job.id, "jd_unavailable")
+                event_repo.mark_seen(job, user_id, "jd_unavailable")
+                logger.debug("   jd-unavailable | %s", tag)
+
+        logger.info(
+            "== Run complete user=%s: %d candidates, %d survivors, %d scored",
+            user_id,
+            len(candidates),
+            len(survivors),
+            scored,
+        )
+    finally:
+        # Always log the run event - even if scoring was interrupted by an error.
+        by_source: dict[str, int] = {}
+        for j in jobs:
+            by_source[j.source] = by_source.get(j.source, 0) + 1
+        run_detail = _json.dumps(
+            {
+                "fetched": len(jobs),
+                "new": len(new_jobs),
+                "recent": len(candidates),
+                "relevant": len(survivors),
+                "scored": scored,
+                "adzuna": by_source.get("adzuna", 0),
+                "arbeitnow": by_source.get("arbeitnow", 0),
+                "bundesagentur": by_source.get("bundesagentur", 0),
+                "total_seen": len(seen) + len(new_jobs),
+                "manual": manual,
+            }
+        )
+        try:
+            event_repo.log_event(user_id, "run", "", run_detail)
+        except Exception as _log_err:
+            logger.warning("Could not log run event: %s", _log_err)
+        status.update({"running": False, "phase": "idle"})
+
+    return {
+        "checked": len(candidates),
+        "scored": scored,
+        "results": match_repo.get_all(user_id),
+    }

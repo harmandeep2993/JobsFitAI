@@ -4,13 +4,16 @@ RUN pip install uv --no-cache-dir
 
 WORKDIR /app
 
-COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev
+COPY backend/pyproject.toml backend/uv.lock ./backend/
+RUN cd backend && uv sync --frozen --no-dev
 
-COPY . .
+COPY backend/ ./backend/
+COPY templates/ ./templates/
+COPY assets/ ./assets/
 
-RUN mkdir -p data resumes logs
+RUN mkdir -p backend/data backend/resumes backend/logs
 
-EXPOSE 8000
+EXPOSE 8080
 
-CMD ["uv", "run", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+WORKDIR /app/backend
+CMD ["uv", "run", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8080"]

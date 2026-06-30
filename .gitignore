@@ -14,9 +14,11 @@ uv.lock
 logs
 server.log
 server.err
+start.bat
 prompts.skillwise_prompt.py
 .claude
 CLAUDE.md
 EXECUTION_PLAN.md
+LEARN.md
 .pre-commit-config.yaml
 scripts/
