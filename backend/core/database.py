@@ -19,6 +19,8 @@ logger = get_logger(__name__)
 # === Connection mode ===
 
 _TURSO_URL = (os.getenv("TURSO_DATABASE_URL") or os.getenv("TURSO_URL", "")).strip()
+# Force HTTP mode - libsql:// uses WebSocket which can be blocked; https:// uses HTTP pipeline
+_TURSO_URL = _TURSO_URL.replace("libsql://", "https://")
 _TURSO_TOKEN = os.getenv("TURSO_AUTH_TOKEN", "").strip()
 _USE_TURSO = bool(_TURSO_URL and _TURSO_TOKEN)
 

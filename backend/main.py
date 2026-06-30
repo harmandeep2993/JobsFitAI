@@ -3,7 +3,7 @@
 Application entry point for JobsFitAI.
 
 Responsibilities:
-- Serve the static frontend (templates/index.html + assets/)
+- Serve the static frontend (frontend/)
 - Register all API routers
 - Run background auto-fetch scheduler
 - Start the FastAPI/uvicorn server
@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Set
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
@@ -57,11 +58,26 @@ _sched_last_ref = session.sched_last_ref
 
 app = FastAPI(title="JobsFitAI")
 
+# Allow all origins in dev so the frontend served from /app can reach /api/*.
+# In production, restrict origins to the actual domain.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # templates/ and assets/ live one level up, at the repo root (sibling of backend/).
 _ROOT_DIR = Path(__file__).parent.parent
 
-# Static assets
-app.mount("/assets", StaticFiles(directory=str(_ROOT_DIR / "assets")), name="assets")
+# Serve the React build (frontend/dist/) when it exists.
+# During dev, Vite runs on port 5173 and proxies /api to this server.
+_DIST = _ROOT_DIR / "frontend" / "dist"
+if _DIST.exists():
+    app.mount(
+        "/assets", StaticFiles(directory=str(_DIST / "assets")), name="vite-assets"
+    )
 
 
 # === Request logging middleware ===
@@ -102,7 +118,9 @@ _AUTH_USER = os.getenv("APP_USERNAME", "admin").strip()
 _AUTH_PASS = os.getenv("APP_PASSWORD", "").strip()
 _SESSION_SECRET = os.getenv("SESSION_SECRET") or _secrets.token_hex(32)
 _SESSION_COOKIE = "jfai_sess"
-_LOGIN_HTML = (_ROOT_DIR / "templates" / "login.html").read_text(encoding="utf-8")
+_LOGIN_HTML = (_ROOT_DIR / "frontend" / "login-app-password.html").read_text(
+    encoding="utf-8"
+)
 
 _OPEN_PATHS = {"/login", "/logout"}
 
@@ -148,15 +166,6 @@ async def _auth_guard(request: Request, call_next):
     return await call_next(request)
 
 
-@app.get("/login")
-async def login_page(error: str = ""):
-    body = _LOGIN_HTML.replace(
-        "{ERROR_HTML}",
-        '<div class="lc-err">Invalid username or password.</div>' if error else "",
-    )
-    return HTMLResponse(body)
-
-
 @app.post("/login")
 async def login_submit(request: Request):
     form = await request.form()
@@ -192,13 +201,42 @@ ALLOWED_EXTENSIONS: Set[str] = SUPPORTED_EXTENSIONS
 MAX_FILE_MB: int = MAX_FILE_SIZE_MB
 
 
-# === Frontend ===
+# === Frontend routes ===
+# In production, serve the React build (frontend/dist/index.html) for all
+# non-API routes so React Router handles client-side navigation.
+# In dev, Vite serves the frontend on port 5173.
+
+
+def _serve_spa() -> HTMLResponse:
+    """Return the React SPA entry point from the production build."""
+    index = _DIST / "index.html"
+    if index.exists():
+        return HTMLResponse(index.read_text(encoding="utf-8"))
+    return HTMLResponse(
+        "<h2>Frontend not built.</h2><p>Run <code>npm run build</code> in the frontend/ folder.</p>",
+        status_code=503,
+    )
 
 
 @app.get("/")
 async def index() -> HTMLResponse:
-    with open(_ROOT_DIR / "templates" / "index.html", encoding="utf-8") as f:
-        return HTMLResponse(f.read())
+    return _serve_spa()
+
+
+@app.get("/login")
+async def login_page_react(error: str = "") -> HTMLResponse:
+    if _AUTH_ENABLED:
+        body = _LOGIN_HTML.replace(
+            "{ERROR_HTML}",
+            '<div class="lc-err">Invalid username or password.</div>' if error else "",
+        )
+        return HTMLResponse(body)
+    return _serve_spa()
+
+
+@app.get("/app")
+async def app_page() -> HTMLResponse:
+    return _serve_spa()
 
 
 # === API routers ===

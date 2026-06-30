@@ -91,17 +91,19 @@ def stats(user_id: str) -> dict:
     """Aggregate counts for this user's metrics header."""
     with db.connect() as conn:
         scored = conn.execute(
-            "SELECT COUNT(*) FROM matches WHERE user_id = ?", (user_id,)
-        ).fetchone()[0]
+            "SELECT COUNT(*) AS n FROM matches WHERE user_id = ?", (user_id,)
+        ).fetchone()["n"]
         applied = conn.execute(
-            "SELECT COUNT(*) FROM matches WHERE user_id = ? AND applied = 1", (user_id,)
-        ).fetchone()[0]
+            "SELECT COUNT(*) AS n FROM matches WHERE user_id = ? AND applied = 1",
+            (user_id,),
+        ).fetchone()["n"]
         seen = conn.execute(
-            "SELECT COUNT(*) FROM seen_jobs WHERE user_id = ?", (user_id,)
-        ).fetchone()[0]
+            "SELECT COUNT(*) AS n FROM seen_jobs WHERE user_id = ?", (user_id,)
+        ).fetchone()["n"]
         good = conn.execute(
-            "SELECT COUNT(*) FROM matches WHERE user_id = ? AND score >= 60", (user_id,)
-        ).fetchone()[0]
+            "SELECT COUNT(*) AS n FROM matches WHERE user_id = ? AND score >= 60",
+            (user_id,),
+        ).fetchone()["n"]
     return {"seen": seen, "scored": scored, "applied": applied, "good": good}
 
 
