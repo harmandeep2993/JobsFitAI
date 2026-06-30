@@ -44,10 +44,8 @@ from services.job_matcher import (
 
 logger = get_logger("main")
 
-# ---------------------------------------------------------------------------
-# Mutable scheduler-state container -- exported so api/routes/matches.py can
-# reset it when the user enables the scheduler via the settings panel.
-# ---------------------------------------------------------------------------
+# === Scheduler state ===
+# Exported so api/routes/matches.py can reset it when the user enables the scheduler.
 _sched_last_ref: list[float] = [0.0]
 
 app = FastAPI(title="JobsFitAI")
@@ -59,9 +57,7 @@ _ROOT_DIR = Path(__file__).parent.parent
 app.mount("/assets", StaticFiles(directory=str(_ROOT_DIR / "assets")), name="assets")
 
 
-# ---------------------------------------------------------------------------
-# Request logging middleware
-# ---------------------------------------------------------------------------
+# === Request logging middleware ===
 
 # High-frequency poll endpoints logged at DEBUG to avoid console spam.
 _POLL_PATHS = {"/api/match/state", "/api/resumes", "/api/llm-ping"}
@@ -92,9 +88,7 @@ async def _request_logger(request: Request, call_next):
     return await call_next(request)
 
 
-# ---------------------------------------------------------------------------
-# Auth middleware (opt-in: only active when APP_PASSWORD is set in .env)
-# ---------------------------------------------------------------------------
+# === Auth middleware (opt-in: only active when APP_PASSWORD is set in .env) ===
 
 _AUTH_ENABLED = bool(os.getenv("APP_PASSWORD", "").strip())
 _AUTH_USER = os.getenv("APP_USERNAME", "admin").strip()
@@ -185,17 +179,13 @@ async def logout():
     return resp
 
 
-# ---------------------------------------------------------------------------
-# Config constants mirrored for validation
-# ---------------------------------------------------------------------------
+# === Config constants ===
 
 ALLOWED_EXTENSIONS: Set[str] = SUPPORTED_EXTENSIONS
 MAX_FILE_MB: int = MAX_FILE_SIZE_MB
 
 
-# ---------------------------------------------------------------------------
-# Frontend
-# ---------------------------------------------------------------------------
+# === Frontend ===
 
 
 @app.get("/")
@@ -204,9 +194,7 @@ async def index() -> HTMLResponse:
         return HTMLResponse(f.read())
 
 
-# ---------------------------------------------------------------------------
-# API routers
-# ---------------------------------------------------------------------------
+# === API routers ===
 
 from api.routes import (  # noqa: E402
     auth,
@@ -229,9 +217,7 @@ app.include_router(history.router, prefix="/api")
 app.include_router(settings.router, prefix="/api")
 
 
-# ---------------------------------------------------------------------------
-# Background scheduler
-# ---------------------------------------------------------------------------
+# === Background scheduler ===
 
 
 async def _auto_fetch_loop() -> None:
@@ -338,9 +324,7 @@ async def _start_scheduler() -> None:
     )
 
 
-# ---------------------------------------------------------------------------
-# Entry point
-# ---------------------------------------------------------------------------
+# === Entry point ===
 
 PORT = 8080
 
