@@ -9,7 +9,7 @@ title). Batch size 30 titles per LLM call keeps cost low.
 """
 
 from core.logger import get_logger
-from llm.router import call_llm, parse_json_response
+from services.llm.router import call_llm, parse_json_response
 
 logger = get_logger(__name__)
 

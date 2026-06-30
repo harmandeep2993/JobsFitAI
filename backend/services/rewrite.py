@@ -18,7 +18,7 @@ from collections import defaultdict
 
 from repositories import resume_repo
 from core.logger import get_logger
-from llm.router import call_llm
+from services.llm.router import call_llm
 
 logger = get_logger(__name__)
 

@@ -14,7 +14,7 @@ skipped and the rest of the pipeline runs normally.
 
 from pathlib import Path
 
-from matcher.embedding_model import load_model
+from services.matcher.embedding_model import load_model
 from core.logger import get_logger
 
 logger = get_logger(__name__)

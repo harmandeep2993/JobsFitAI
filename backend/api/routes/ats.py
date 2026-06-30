@@ -9,8 +9,8 @@ from starlette.concurrency import run_in_threadpool
 from starlette.requests import Request
 
 from core.logger import get_logger
-from extractors.jd import extract_jd
-from parsers import extract_all_text
+from services.extractors.jd import extract_jd
+from services.parsers import extract_all_text
 from repositories import resume_repo as resume_store
 from services.ats import ats_check, generate_ats_resume
 

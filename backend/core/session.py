@@ -207,8 +207,8 @@ def provider_catalog() -> list[dict]:
 
     Each entry: {name, default_model, models[], needs_key, has_key, key_hint}.
     """
-    from llm.providers import groq as _groq_p
-    from llm.providers import openai as _openai_p
+    from services.llm.providers import groq as _groq_p
+    from services.llm.providers import openai as _openai_p
 
     _meta = {
         "openai": {"needs_key": True, "mod": _openai_p},

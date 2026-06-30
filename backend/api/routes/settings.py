@@ -12,7 +12,7 @@ from starlette.requests import Request
 
 from core import db, session
 from core.logger import get_logger
-from llm.router import check_llm
+from services.llm.router import check_llm
 
 logger = get_logger(__name__)
 
@@ -81,13 +81,13 @@ async def api_set_llm_key(request: Request) -> JSONResponse:
         return JSONResponse({"ok": False, "error": "api_key required"}, status_code=400)
 
     if provider == "openai":
-        from llm.providers import openai as _op
+        from services.llm.providers import openai as _op
 
         _op.set_api_key(api_key)
         env_var = "OPENAI_API_KEY"
         hint = _op.get_key_hint()
     elif provider == "groq":
-        from llm.providers import groq as _gp
+        from services.llm.providers import groq as _gp
 
         _gp.set_api_key(api_key)
         env_var = "GROQ_API_KEY"

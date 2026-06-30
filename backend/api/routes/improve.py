@@ -9,7 +9,7 @@ from starlette.concurrency import run_in_threadpool
 from starlette.requests import Request
 
 from core.logger import get_logger
-from extractors.jd import extract_jd
+from services.extractors.jd import extract_jd
 from services.rewrite import improve_resume
 
 logger = get_logger(__name__)

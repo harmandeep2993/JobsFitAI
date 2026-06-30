@@ -16,10 +16,10 @@ from starlette.requests import Request
 from core.config import MAX_AGE_DAYS, SEARCH_PER_TITLE
 from core.logger import get_logger
 from core import session
-from extractors.jd import extract_jd
-from matcher.matcher import match
-from parsers import extract_all_text
-from extractors.resume import extract_resume
+from services.extractors.jd import extract_jd
+from services.matcher.matcher import match
+from services.parsers import extract_all_text
+from services.extractors.resume import extract_resume
 from repositories import event_repo as event_store
 from repositories import match_repo as match_store
 from repositories import settings_repo as settings_store
@@ -431,7 +431,7 @@ async def api_score_jd(request: Request) -> JSONResponse:
 @router.post("/scheduler")
 async def api_match_scheduler(request: Request) -> JSONResponse:
     """Enable/disable the auto-fetch scheduler or change its interval (minutes)."""
-    from app import _sched_last_ref
+    from main import _sched_last_ref
 
     body = await request.json()
     if "enabled" in body:

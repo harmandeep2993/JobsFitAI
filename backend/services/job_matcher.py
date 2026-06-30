@@ -11,15 +11,15 @@ import json as _json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 
-from extractors.jd import extract_jd
-from fetchers import (
+from services.extractors.jd import extract_jd
+from services.fetchers import (
     Job,
     fetch_adzuna_multi,
     fetch_arbeitnow_jobs,
     fetch_bundesagentur_jobs,
 )
-from fetchers.enrich import fetch_full_description
-from matcher import match
+from services.fetchers.enrich import fetch_full_description
+from services.matcher import match
 from repositories import event_repo, match_repo
 from services import relevance, role_filter, vector_store
 from core import session

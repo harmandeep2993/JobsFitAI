@@ -11,7 +11,7 @@ Final relevance/entry-level decisions are made by the LLM relevance gate
 import re
 import time
 
-from fetchers import Job
+from services.fetchers import Job
 from core.config import MAX_AGE_DAYS, TARGET_TITLES
 
 
