@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 from typing import Set
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, JSONResponse
 
@@ -23,12 +23,11 @@ from services.parsers import extract_all_text
 from repositories import resume_repo as resume_store
 from services.job_matcher import rescore_all
 from schemas.resume import LabelRequest, RecommendRequest
+from api.routes.auth import get_current_user
 
 logger = get_logger(__name__)
 
 router = APIRouter()
-
-_USER = "local"
 
 ALLOWED_EXTENSIONS: Set[str] = SUPPORTED_EXTENSIONS
 MAX_FILE_MB: int = MAX_FILE_SIZE_MB
@@ -41,7 +40,9 @@ _PREVIEW_TYPES = {
 
 @router.post("/upload")
 async def api_resumes_upload(
-    file: UploadFile = File(...), slot: int = Form(0)
+    file: UploadFile = File(...),
+    slot: int = Form(0),
+    current_user: dict = Depends(get_current_user),
 ) -> JSONResponse:
     """Upload a resume into a persistent slot (0=Base, 1=Tailored 1, 2=Tailored 2)."""
     if slot not in range(resume_store.MAX_SLOTS):
@@ -63,8 +64,9 @@ async def api_resumes_upload(
             detail=f"unsupported file type (allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))})",
         )
 
+    user_id = current_user["id"]
     mime = _PREVIEW_TYPES.get(suffix, "application/octet-stream")
-    record = resume_store.save(_USER, slot, filename, data, suffix, mime)
+    record = resume_store.save(user_id, slot, filename, data, suffix, mime)
 
     async def _extract_bg(rid: str, path: str) -> None:
         def _run():
@@ -74,7 +76,7 @@ async def api_resumes_upload(
                     return
                 extracted = extract_resume(text)
                 if extracted:
-                    resume_store.set_extracted(_USER, rid, _json.dumps(extracted))
+                    resume_store.set_extracted(user_id, rid, _json.dumps(extracted))
                     logger.info("Background extraction done for resume %s", rid)
             except Exception as e:
                 logger.warning("Background extraction failed for %s: %s", rid, e)
@@ -83,49 +85,67 @@ async def api_resumes_upload(
 
     asyncio.create_task(
         _extract_bg(
-            record["id"], str(resume_store.get(_USER, record["id"])["file_path"])
+            record["id"], str(resume_store.get(user_id, record["id"])["file_path"])
         )
     )
     return JSONResponse({"ok": True, **record})
 
 
 @router.get("")
-async def api_resumes_list() -> JSONResponse:
+async def api_resumes_list(
+    current_user: dict = Depends(get_current_user),
+) -> JSONResponse:
     """List all stored resumes for the current user."""
-    resumes = resume_store.list_all(_USER)
+    resumes = resume_store.list_all(current_user["id"])
     return JSONResponse({"ok": True, "resumes": resumes})
 
 
 @router.delete("/{resume_id}")
-async def api_resumes_delete(resume_id: str) -> JSONResponse:
-    deleted = resume_store.delete(_USER, resume_id)
+async def api_resumes_delete(
+    resume_id: str,
+    current_user: dict = Depends(get_current_user),
+) -> JSONResponse:
+    """Delete a stored resume by ID."""
+    deleted = resume_store.delete(current_user["id"], resume_id)
     if not deleted:
         return JSONResponse({"ok": False, "error": "not found"}, status_code=404)
     return JSONResponse({"ok": True})
 
 
 @router.get("/{resume_id}/file")
-async def api_resumes_file(resume_id: str) -> FileResponse:
+async def api_resumes_file(
+    resume_id: str,
+    current_user: dict = Depends(get_current_user),
+) -> FileResponse:
     """Serve the raw file for preview."""
-    row = resume_store.get(_USER, resume_id)
+    row = resume_store.get(current_user["id"], resume_id)
     if not row or not os.path.exists(row["file_path"]):
         return JSONResponse({"ok": False, "error": "not found"}, status_code=404)
     return FileResponse(row["file_path"], media_type=row["mime_type"])
 
 
 @router.post("/{resume_id}/label")
-async def api_resumes_label(resume_id: str, body: LabelRequest) -> JSONResponse:
+async def api_resumes_label(
+    resume_id: str,
+    body: LabelRequest,
+    current_user: dict = Depends(get_current_user),
+) -> JSONResponse:
+    """Rename a resume's display label."""
     label = (body.label or "").strip()
     if not label:
         raise HTTPException(status_code=400, detail="label required")
-    resume_store.set_label(_USER, resume_id, label)
+    resume_store.set_label(current_user["id"], resume_id, label)
     return JSONResponse({"ok": True})
 
 
 @router.post("/{resume_id}/use-for-matching")
-async def api_resumes_use_for_matching(resume_id: str) -> JSONResponse:
+async def api_resumes_use_for_matching(
+    resume_id: str,
+    current_user: dict = Depends(get_current_user),
+) -> JSONResponse:
     """Load a stored resume into the job-matching session so Job Matches uses it."""
-    row = resume_store.get(_USER, resume_id)
+    user_id = current_user["id"]
+    row = resume_store.get(user_id, resume_id)
     if not row:
         return JSONResponse({"ok": False, "error": "not found"}, status_code=404)
     extracted = row.get("extracted_json")
@@ -147,14 +167,18 @@ async def api_resumes_use_for_matching(resume_id: str) -> JSONResponse:
 
 
 @router.post("/recommend")
-async def api_resumes_recommend(body: RecommendRequest) -> JSONResponse:
+async def api_resumes_recommend(
+    body: RecommendRequest,
+    current_user: dict = Depends(get_current_user),
+) -> JSONResponse:
     """Score all cached resumes against a JD and return ranked results."""
     jd_text = (body.jd or "").strip()
 
     if len(jd_text) < 100:
         raise HTTPException(status_code=400, detail="jd too short")
 
-    scoreable = resume_store.list_scoreable(_USER)
+    user_id = current_user["id"]
+    scoreable = resume_store.list_scoreable(user_id)
     if len(scoreable) < 2:
         return JSONResponse({"ok": True, "scores": [], "recommended_id": None})
 

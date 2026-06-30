@@ -10,7 +10,7 @@ import tempfile
 from pathlib import Path
 from typing import Set
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, JSONResponse
 
@@ -25,12 +25,11 @@ from repositories import resume_repo as resume_store
 from services.profile_summary import generate_summary
 from services.llm.caller import check_llm
 from schemas.analyzer import AnalyzeRequest, ResumePreviewRequest
+from api.routes.auth import get_current_user
 
 logger = get_logger(__name__)
 
 router = APIRouter()
-
-_USER = "local"
 ALLOWED_EXTENSIONS: Set[str] = SUPPORTED_EXTENSIONS
 MAX_FILE_MB: int = MAX_FILE_SIZE_MB
 
@@ -83,6 +82,7 @@ async def api_upload(file: UploadFile = File(...)) -> JSONResponse:
 
 @router.get("/resume-file")
 async def api_resume_file(tmp: str) -> FileResponse:
+    """Serve a temp-path resume file for inline preview in the browser."""
     tmp = tmp.strip()
     if not tmp or not os.path.exists(tmp):
         return JSONResponse({"ok": False, "error": "file not found"}, status_code=404)
@@ -93,13 +93,16 @@ async def api_resume_file(tmp: str) -> FileResponse:
 
 
 @router.post("/resume-preview")
-async def api_resume_preview(body: ResumePreviewRequest) -> JSONResponse:
+async def api_resume_preview(
+    body: ResumePreviewRequest,
+    current_user: dict = Depends(get_current_user),
+) -> JSONResponse:
     """Extract raw text from a stored or temp resume file - no LLM, no scoring."""
     tmp = (body.tmp or "").strip()
     resume_id = (body.resume_id or "").strip()
 
     if resume_id:
-        row = resume_store.get(_USER, resume_id)
+        row = resume_store.get(current_user["id"], resume_id)
         if not row or not os.path.exists(row["file_path"]):
             return JSONResponse(
                 {"ok": False, "error": "file not found"}, status_code=404
@@ -178,7 +181,10 @@ def _build_breakdown(results: dict) -> dict:
 
 
 @router.post("/analyze")
-async def api_analyze(body: AnalyzeRequest) -> JSONResponse:
+async def api_analyze(
+    body: AnalyzeRequest,
+    current_user: dict = Depends(get_current_user),
+) -> JSONResponse:
     """
     Full analysis pipeline: parse resume -> extract -> score -> summarize.
 
@@ -189,7 +195,7 @@ async def api_analyze(body: AnalyzeRequest) -> JSONResponse:
     jd_text = (body.jd or "").strip()
 
     if resume_id:
-        row = resume_store.get(_USER, resume_id)
+        row = resume_store.get(current_user["id"], resume_id)
         if not row or not os.path.exists(row["file_path"]):
             return JSONResponse(
                 {"ok": False, "error": "resume file not found"}, status_code=400
@@ -239,6 +245,7 @@ async def api_analyze(body: AnalyzeRequest) -> JSONResponse:
     try:
         resume_json, jd_json, results, summary = await run_in_threadpool(_run)
     except Exception as e:
+        # Multi-step pipeline - any layer (parser, LLM, matcher) can raise
         logger.error("analyze failed: %s", e)
         return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
 

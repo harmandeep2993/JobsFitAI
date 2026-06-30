@@ -1,14 +1,13 @@
 # core/database.py
 """
-SQLite persistence for JobsFitAI.
+Database connection for JobsFitAI.
 
-A single local database file (data/jobsfitai.db, gitignored) holds scored
-job matches and the current extracted resume, so both survive restarts.
-
-Connections are short-lived (one per operation) for thread safety - NiceGUI
-runs endpoint work in a threadpool.
+Uses Turso (cloud SQLite) when TURSO_DATABASE_URL + TURSO_AUTH_TOKEN are set,
+falls back to local SQLite for development. Both paths expose the same
+connect() context manager so no other file needs to know which backend is active.
 """
 
+import os
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
@@ -17,24 +16,112 @@ from core.logger import get_logger
 
 logger = get_logger(__name__)
 
+# === Connection mode ===
+
+_TURSO_URL = (os.getenv("TURSO_DATABASE_URL") or os.getenv("TURSO_URL", "")).strip()
+_TURSO_TOKEN = os.getenv("TURSO_AUTH_TOKEN", "").strip()
+_USE_TURSO = bool(_TURSO_URL and _TURSO_TOKEN)
+
 DB_PATH = Path("data/jobsfitai.db")
+
+
+# === Turso row/cursor/connection wrappers ===
+# libsql_client has a different API from sqlite3. These thin wrappers make
+# Turso connections look identical to sqlite3 connections so callers never
+# need to know which backend they are talking to.
+
+
+class _Row:
+    """Dict-like row that supports both key and index access."""
+
+    def __init__(self, data: dict):
+        self._data = data
+
+    def __getitem__(self, key):
+        return self._data[key]
+
+    def keys(self):
+        """Return column names."""
+        return self._data.keys()
+
+    def get(self, key, default=None):
+        """Return value for key, or default if missing."""
+        return self._data.get(key, default)
+
+
+class _Cursor:
+    """Wraps a libsql_client ResultSet to match the sqlite3 cursor API."""
+
+    def __init__(self, result_set):
+        columns = list(result_set.columns)
+        self._rows = [_Row(dict(zip(columns, r))) for r in result_set.rows]
+
+    def fetchone(self):
+        """Return first row or None."""
+        return self._rows[0] if self._rows else None
+
+    def fetchall(self):
+        """Return all rows."""
+        return self._rows
+
+    def __iter__(self):
+        return iter(self._rows)
+
+
+class _TursoConn:
+    """Wraps libsql_client ClientSync to match the sqlite3 connection API."""
+
+    def __init__(self, client):
+        self._client = client
+
+    def execute(self, sql: str, params: tuple = ()) -> _Cursor:
+        """Execute sql with params and return a cursor-like object."""
+        rs = self._client.execute(sql, list(params))
+        return _Cursor(rs)
+
+    def commit(self):
+        """No-op - libsql auto-commits each statement."""
+
+    def close(self):
+        """Close the underlying client."""
+        self._client.close()
+
+
+# === connect() context manager ===
 
 
 @contextmanager
 def connect():
-    """Yield a SQLite connection; commit on success, always close."""
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH, timeout=10)
-    conn.row_factory = sqlite3.Row
-    try:
-        yield conn
-        conn.commit()
-    finally:
-        conn.close()
+    """Yield a database connection; commit on success, always close.
+
+    Returns a Turso connection when TURSO_DATABASE_URL and TURSO_AUTH_TOKEN
+    are set, otherwise a local SQLite connection. Both behave identically.
+    """
+    if _USE_TURSO:
+        from libsql_client import create_client_sync
+
+        client = create_client_sync(url=_TURSO_URL, auth_token=_TURSO_TOKEN)
+        conn = _TursoConn(client)
+        try:
+            yield conn
+        finally:
+            conn.close()
+    else:
+        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+        conn = sqlite3.connect(DB_PATH, timeout=10)
+        conn.row_factory = sqlite3.Row
+        try:
+            yield conn
+            conn.commit()
+        finally:
+            conn.close()
+
+
+# === Schema init ===
 
 
 def init() -> None:
-    """Create tables if they don't exist."""
+    """Create all tables if they don't exist. Safe to call multiple times."""
     with connect() as conn:
         conn.execute(
             """
@@ -55,19 +142,12 @@ def init() -> None:
                 applied          INTEGER DEFAULT 0,
                 jd_json          TEXT,
                 section_scores   TEXT,
-                summary          TEXT
+                summary          TEXT,
+                status           TEXT DEFAULT 'scored',
+                app_status       TEXT DEFAULT ''
             )
             """
         )
-        # Migrate older DBs that predate later columns.
-        cols = [r[1] for r in conn.execute("PRAGMA table_info(matches)").fetchall()]
-        for col in ("jd_json", "section_scores", "summary"):
-            if col not in cols:
-                conn.execute(f"ALTER TABLE matches ADD COLUMN {col} TEXT")
-        if "status" not in cols:
-            conn.execute("ALTER TABLE matches ADD COLUMN status TEXT DEFAULT 'scored'")
-        if "app_status" not in cols:
-            conn.execute("ALTER TABLE matches ADD COLUMN app_status TEXT DEFAULT ''")
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS resume (
@@ -78,59 +158,47 @@ def init() -> None:
             )
             """
         )
-        # Every job id we've ever encountered (incl. rejected), so we never
-        # re-fetch or re-classify the same posting - the main token saver.
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS seen_jobs (
-                id          TEXT PRIMARY KEY,
-                source      TEXT,
-                title       TEXT,
-                first_seen  TEXT,
-                decision    TEXT      -- scored | irrelevant | not_entry | stale
+                id         TEXT PRIMARY KEY,
+                source     TEXT,
+                title      TEXT,
+                first_seen TEXT,
+                decision   TEXT
             )
             """
         )
-        # Timeline of what the system did and when.
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS events (
                 id         INTEGER PRIMARY KEY AUTOINCREMENT,
-                type       TEXT,      -- fetched | scored | applied | run
+                type       TEXT,
                 job_id     TEXT,
                 detail     TEXT,
                 created_at TEXT
             )
             """
         )
-        # User-editable search settings (target titles, countries, location).
         conn.execute(
             "CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)"
         )
-        # Stored resumes (survive restarts; user_id='local' for single-user mode).
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS resumes (
-                id            TEXT PRIMARY KEY,
-                user_id       TEXT NOT NULL DEFAULT 'local',
-                slot          INTEGER NOT NULL DEFAULT 0,
-                label         TEXT NOT NULL DEFAULT 'Base Resume',
-                original_name TEXT NOT NULL,
-                file_path     TEXT NOT NULL,
-                mime_type     TEXT NOT NULL,
-                file_size_kb  REAL NOT NULL DEFAULT 0,
-                uploaded_at   TEXT NOT NULL,
+                id             TEXT PRIMARY KEY,
+                user_id        TEXT NOT NULL DEFAULT 'local',
+                slot           INTEGER NOT NULL DEFAULT 0,
+                label          TEXT NOT NULL DEFAULT 'Base Resume',
+                original_name  TEXT NOT NULL,
+                file_path      TEXT NOT NULL,
+                mime_type      TEXT NOT NULL,
+                file_size_kb   REAL NOT NULL DEFAULT 0,
+                uploaded_at    TEXT NOT NULL,
                 extracted_json TEXT
             )
             """
         )
-        # Migrate existing resumes table that predates extracted_json column.
-        resume_cols = [
-            r[1] for r in conn.execute("PRAGMA table_info(resumes)").fetchall()
-        ]
-        if "extracted_json" not in resume_cols:
-            conn.execute("ALTER TABLE resumes ADD COLUMN extracted_json TEXT")
-        # Analysis history tied to stored resumes.
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS analyses (
@@ -143,7 +211,6 @@ def init() -> None:
             )
             """
         )
-        # SHA-256 keyed cache of full analysis results (score, label, html).
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS analysis_cache (
@@ -153,7 +220,6 @@ def init() -> None:
             )
             """
         )
-        # Registered users - one row per account.
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS users (
@@ -164,8 +230,9 @@ def init() -> None:
             )
             """
         )
-    logger.info("SQLite ready at %s", DB_PATH)
+
+    mode = f"Turso ({_TURSO_URL})" if _USE_TURSO else f"SQLite ({DB_PATH})"
+    logger.info("Database ready - %s", mode)
 
 
-# Ensure the schema exists as soon as the module is imported.
 init()

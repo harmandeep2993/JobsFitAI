@@ -1,16 +1,16 @@
 # services/ats.py
 """
-ATS Score service.
+ATS services: lightweight scan (no LLM) and full LLM-powered optimisation.
 
-Checks a resume against a job description using only deterministic
-string matching - no LLM required. Reports keyword coverage (the only
-metric real ATS systems use), section heading presence, and formatting
-warnings. No resume content is generated or modified.
+ats_check() - deterministic scan: keyword coverage, section flags, formatting warnings.
+generate_ats_resume() - LLM pipeline: rewrites the resume to maximise ATS keyword match.
 """
 
+import json
 import re
 
 from core.logger import get_logger
+from services.llm.caller import call_llm
 
 logger = get_logger(__name__)
 
@@ -68,11 +68,7 @@ _EXPECTED_SECTIONS = [
 ]
 
 
-def ats_score(
-    coverage_pct: int | None,
-    sec_flags: list[dict],
-    fmt_flags: list[str],
-) -> dict:
+def ats_score(coverage_pct: int | None) -> dict:
     """
     ATS score = keyword coverage % only (0-100).
 
@@ -81,6 +77,12 @@ def ats_score(
     failures, not point deductions. We report them separately as checklists.
 
     Returns score=None when no JD is provided (cannot score without keywords).
+
+    Args:
+        coverage_pct: percentage of required skills found in resume, or None if no JD.
+
+    Returns:
+        Dict with score and has_jd flag.
     """
     return {
         "score": coverage_pct,
@@ -189,10 +191,139 @@ def ats_check(resume_text: str, required_skills: list[str] | None = None) -> dic
     sec_flags = section_flags(resume_text)
     fmt_flags = formatting_flags(resume_text)
     coverage = exact_coverage(resume_text, required_skills) if required_skills else None
-    score = ats_score(coverage["pct"] if coverage else None, sec_flags, fmt_flags)
+    score = ats_score(coverage["pct"] if coverage else None)
     return {
         "section_flags": sec_flags,
         "formatting_flags": fmt_flags,
         "coverage": coverage,
         "ats_score": score,
+    }
+
+
+# === ATS resume generation ===
+
+_GENERATE_PROMPT = """You are an expert resume writer specialising in ATS (Applicant Tracking System) optimisation.
+
+TASK: Rewrite the resume below so it passes ATS keyword matching for the job description provided.
+
+RULES:
+- Keep all real experience, education, and skills - never invent anything
+- Mirror exact keywords and phrases from the job description wherever they truthfully apply
+- Use standard ATS-friendly section headings: Summary, Work Experience, Education, Skills
+- Write clean plain text - no tables, no columns, no decorative symbols
+- Each bullet point should start with a strong action verb
+- Return ONLY a JSON object with this exact shape:
+
+{
+  "summary": "2-3 sentence professional summary using JD keywords",
+  "experience": [
+    {
+      "title": "Job Title",
+      "company": "Company Name",
+      "dates": "Start - End",
+      "bullets": ["bullet 1", "bullet 2"]
+    }
+  ],
+  "skills": ["skill1", "skill2"],
+  "education": [
+    {
+      "degree": "Degree Name",
+      "institution": "University",
+      "year": "2020"
+    }
+  ]
+}
+
+RESUME:
+{resume}
+
+JOB DESCRIPTION:
+{jd}
+"""
+
+_PLAIN_TEXT_TEMPLATE = """{summary}
+
+WORK EXPERIENCE
+{experience}
+
+SKILLS
+{skills}
+
+EDUCATION
+{education}"""
+
+
+def _render_plain_text(parsed: dict) -> str:
+    """Convert the parsed LLM JSON into a plain-text resume string."""
+    exp_lines = []
+    for job in parsed.get("experience") or []:
+        header = f"{job.get('title', '')} | {job.get('company', '')} | {job.get('dates', '')}"
+        exp_lines.append(header)
+        for b in job.get("bullets") or []:
+            exp_lines.append(f"- {b}")
+        exp_lines.append("")
+
+    edu_lines = []
+    for edu in parsed.get("education") or []:
+        edu_lines.append(
+            f"{edu.get('degree', '')} - {edu.get('institution', '')} ({edu.get('year', '')})"
+        )
+
+    return _PLAIN_TEXT_TEMPLATE.format(
+        summary=parsed.get("summary", ""),
+        experience="\n".join(exp_lines).strip(),
+        skills=", ".join(parsed.get("skills") or []),
+        education="\n".join(edu_lines),
+    )
+
+
+def generate_ats_resume(resume_text: str, jd_text: str) -> dict | None:
+    """
+    Generate a complete ATS-optimised resume via LLM.
+
+    Extracts required skills from the JD first (via LLM), then runs ats_check
+    before and after rewriting so the caller gets a real before/after coverage delta.
+
+    Returns {resume, plain_text, coverage_before, coverage_after,
+             section_flags, formatting_flags} or None if the LLM is unavailable.
+    """
+    from services.extractors.jd_extractor import extract_jd
+
+    # Extract JD skills first so we can compute coverage_before against real keywords
+    jd_json = extract_jd(jd_text)
+    required_skills = (jd_json.get("required_skills") or []) if jd_json else []
+
+    sec_flags = section_flags(resume_text)
+    fmt_flags = formatting_flags(resume_text)
+    coverage_before = (
+        exact_coverage(resume_text, required_skills) if required_skills else None
+    )
+
+    prompt = _GENERATE_PROMPT.format(resume=resume_text[:6000], jd=jd_text[:3000])
+    _res = call_llm(prompt)
+    if not _res or not _res.text:
+        return None
+
+    # Extract JSON block from LLM response
+    raw = _res.text.strip()
+    try:
+        start = raw.index("{")
+        end = raw.rindex("}") + 1
+        parsed = json.loads(raw[start:end])
+    except (ValueError, json.JSONDecodeError) as e:
+        logger.warning("ATS generate: failed to parse LLM JSON: %s", e)
+        return None
+
+    plain_text = _render_plain_text(parsed)
+    coverage_after = (
+        exact_coverage(plain_text, required_skills) if required_skills else None
+    )
+
+    return {
+        "resume": parsed,
+        "plain_text": plain_text,
+        "coverage_before": coverage_before,
+        "coverage_after": coverage_after,
+        "section_flags": sec_flags,
+        "formatting_flags": fmt_flags,
     }

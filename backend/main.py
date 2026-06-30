@@ -34,7 +34,6 @@ from core.config import (
     SUPPORTED_EXTENSIONS,
 )
 from core.logger import get_logger
-from repositories import resume_repo as resume_store
 from repositories import settings_repo as settings_store
 from services.job_matcher import (
     discover_and_score,
@@ -260,33 +259,38 @@ async def _auto_fetch_loop() -> None:
             logger.error("[scheduler] error: %s", e)
 
 
-_USER = "local"
-
-
 async def _backfill_extractions() -> None:
     """Extract resume JSON for any stored resumes that were uploaded before caching was added."""
     from services.extractors.resume_extractor import extract_resume
     from services.parsers import extract_all_text
+    from repositories import resume_repo as _resume_store_local
+    from core import database as _db
 
-    resumes = resume_store.list_all(_USER)
-    pending = [r for r in resumes if not r.get("extracted_json")]
-    if not pending:
+    # Backfill runs across all users - query without user filter
+    with _db.connect() as conn:
+        rows = conn.execute(
+            "SELECT id, user_id, label, file_path FROM resumes WHERE extracted_json IS NULL"
+        ).fetchall()
+
+    if not rows:
         return
-    logger.info("[backfill] extracting %d resume(s) without cached JSON", len(pending))
+    logger.info("[backfill] extracting %d resume(s) without cached JSON", len(rows))
 
-    def _run(r: dict) -> None:
+    def _run(r) -> None:
         try:
             text = extract_all_text(r["file_path"])
             if not text or len(text) < 50:
                 return
             extracted = extract_resume(text)
             if extracted:
-                resume_store.set_extracted(_USER, r["id"], _json.dumps(extracted))
+                _resume_store_local.set_extracted(
+                    r["user_id"], r["id"], _json.dumps(extracted)
+                )
                 logger.info("[backfill] done: %s (%s)", r["label"], r["id"])
         except Exception as e:
             logger.warning("[backfill] failed for %s: %s", r["id"], e)
 
-    for r in pending:
+    for r in rows:
         await run_in_threadpool(_run, r)
 
 
