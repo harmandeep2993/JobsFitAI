@@ -1,7 +1,17 @@
 import { useState, useEffect, useCallback } from 'react'
+import { motion } from 'framer-motion'
 import { apiFetch } from '../../lib/auth.js'
 import { useToast } from '../Toast.jsx'
 import { PageHeader, EmptyState, ScoreBadge } from '../ui.jsx'
+
+const listVariants = {
+  show: { transition: { staggerChildren: 0.045 } },
+}
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 10 },
+  show:   { opacity: 1, y: 0, transition: { duration: 0.18, ease: [0.25, 0.1, 0.25, 1] } },
+}
 
 function JobCard({ job, onApply, onDelete }) {
   const chips = (job.matched_required || []).slice(0, 5)
@@ -201,9 +211,13 @@ export default function JobMatches() {
 
       {/* List */}
       {results.length > 0 && (
-        <div className="space-y-2.5">
-          {results.map(r => <JobCard key={r.id} job={r} onApply={toggleApplied} onDelete={deleteJob} />)}
-        </div>
+        <motion.div className="space-y-2.5" variants={listVariants} initial="hidden" animate="show">
+          {results.map(r => (
+            <motion.div key={r.id} variants={itemVariants}>
+              <JobCard job={r} onApply={toggleApplied} onDelete={deleteJob} />
+            </motion.div>
+          ))}
+        </motion.div>
       )}
     </div>
   )

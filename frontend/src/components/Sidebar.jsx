@@ -1,12 +1,12 @@
+import { motion } from 'framer-motion'
+
 const NAV_ITEMS = [
   {
     id: 'analyzer',
     label: 'Resume Analyser',
     icon: (
       <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="9" cy="9" r="6.5"/>
-        <path d="M14 14l3.5 3.5"/>
-        <path d="M9 6v3l2 2"/>
+        <circle cx="9" cy="9" r="6.5"/><path d="M14 14l3.5 3.5"/><path d="M9 6.5v2.5l1.5 1.5"/>
       </svg>
     ),
   },
@@ -25,9 +25,7 @@ const NAV_ITEMS = [
     label: 'Job Matches',
     icon: (
       <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M2 10h16M2 5h10M2 15h7"/>
-        <circle cx="15" cy="14" r="3"/>
-        <path d="M13.5 14l1 1 2-2"/>
+        <rect x="2" y="4" width="16" height="3" rx="1"/><rect x="2" y="9" width="12" height="3" rx="1"/><rect x="2" y="14" width="8" height="3" rx="1"/>
       </svg>
     ),
   },
@@ -46,9 +44,7 @@ const NAV_ITEMS = [
     label: 'History',
     icon: (
       <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M3.5 9.5A6.5 6.5 0 1110 3.5H3.5"/>
-        <path d="M3.5 5.5v4h4"/>
-        <path d="M10 7v3l2.5 2"/>
+        <path d="M3.5 9.5A6.5 6.5 0 1110 3.5H3.5"/><path d="M3.5 5.5v4h4"/><path d="M10 7v3l2.5 2"/>
       </svg>
     ),
   },
@@ -67,36 +63,48 @@ const NAV_ITEMS = [
 export default function Sidebar({ active, onChange }) {
   return (
     <aside
-      className="fixed left-0 bottom-0 border-r border-border bg-surface z-40 flex flex-col"
-      style={{ top: 'var(--topbar-h)', width: 'var(--sidebar-w)' }}
+      className="fixed left-0 bottom-0 flex flex-col z-40"
+      style={{
+        top: 'var(--topbar-h)',
+        width: 'var(--sidebar-w)',
+        background: 'rgb(var(--surface))',
+        borderRight: '1px solid rgba(var(--border) / 0.08)',
+      }}
     >
-      <nav className="flex-1 p-2 overflow-y-auto">
+      <nav className="flex-1 p-2.5 overflow-y-auto space-y-0.5">
         {NAV_ITEMS.map(item => {
           const isActive = active === item.id
           return (
             <button
               key={item.id}
               onClick={() => onChange(item.id)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 mb-0.5 rounded-sm text-[13.5px] font-medium transition-all text-left group ${
-                isActive
-                  ? 'bg-accent/10 text-accent'
-                  : 'text-t2 hover:text-t1 hover:bg-hover'
-              }`}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-sm text-[13.5px] font-medium transition-colors text-left relative group"
+              style={{
+                color: isActive ? 'rgb(var(--accent))' : 'rgb(var(--t2))',
+                background: isActive ? 'rgba(var(--accent) / 0.08)' : 'transparent',
+              }}
+              onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'rgb(var(--surface-2))' }}
+              onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent' }}
             >
-              <span className={`flex-shrink-0 transition-colors ${isActive ? 'text-accent' : 'text-t3 group-hover:text-t2'}`}>
+              <span style={{ color: isActive ? 'rgb(var(--accent))' : 'rgb(var(--t3))' }}>
                 {item.icon}
               </span>
               <span>{item.label}</span>
               {isActive && (
-                <span className="ml-auto w-1.5 h-1.5 rounded-full bg-accent flex-shrink-0" />
+                <motion.span
+                  layoutId="sidebar-dot"
+                  className="ml-auto w-1.5 h-1.5 rounded-full flex-shrink-0"
+                  style={{ background: 'rgb(var(--accent))' }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                />
               )}
             </button>
           )
         })}
       </nav>
 
-      <div className="p-3 border-t border-border">
-        <div className="text-[11px] text-t3 text-center">JobsFitAI</div>
+      <div className="p-4 border-t" style={{ borderColor: 'rgba(var(--border) / 0.08)' }}>
+        <div className="text-[11px] text-t3">JobsFitAI</div>
       </div>
     </aside>
   )
