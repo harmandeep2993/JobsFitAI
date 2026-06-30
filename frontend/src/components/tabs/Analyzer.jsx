@@ -1,6 +1,6 @@
 /**
- * Analyzer tab - two-column layout on desktop: inputs left, results right (once scored).
- * Falls back to single-column stacked on mobile.
+ * Analyzer tab - two-column layout: resume upload left, JD + analyse button right.
+ * Results expand below the inputs once scored.
  */
 import { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -97,7 +97,7 @@ function UploadZone({ file, onFile }) {
       onDragOver={e => { e.preventDefault(); setDragging(true) }}
       onDragLeave={() => setDragging(false)}
       onDrop={handleDrop}
-      className="relative border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all select-none"
+      className="border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all select-none"
       style={{
         borderColor: file
           ? 'rgba(22,163,74,0.4)'
@@ -115,11 +115,12 @@ function UploadZone({ file, onFile }) {
         <div className="space-y-1">
           <div className="mx-auto w-10 h-10 rounded-lg flex items-center justify-center mb-2" style={{ background: 'rgba(22,163,74,0.1)' }}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
+              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/>
             </svg>
           </div>
           <div className="text-[13.5px] font-semibold text-t1 truncate px-2">{file.name}</div>
-          <div className="text-[12px] text-t3">{(file.size / 1024).toFixed(0)} KB - click to replace</div>
+          <div className="text-[12px] text-t3">{(file.size / 1024).toFixed(0)} KB</div>
+          <div className="text-[11.5px] mt-1" style={{ color: 'rgb(var(--accent))' }}>Click to replace</div>
         </div>
       ) : (
         <div className="space-y-2">
@@ -140,11 +141,19 @@ function UploadZone({ file, onFile }) {
 // === Results panel ===
 
 function ResultsPanel({ result }) {
+  // breakdown values come as {section: {score, matched, missing}} - extract the score
+  const breakdownScores = Object.fromEntries(
+    Object.entries(result.breakdown || {}).map(([k, v]) => [k, typeof v === 'object' ? v.score : v])
+  )
+
+  const matchedKw = result.keywords?.matched || []
+  const missingKw = result.keywords?.missing || []
+
   return (
     <motion.div
       className="space-y-4"
-      initial={{ opacity: 0, x: 12 }}
-      animate={{ opacity: 1, x: 0 }}
+      initial={{ opacity: 0, y: 14 }}
+      animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.22, ease: [0.25, 0.1, 0.25, 1] }}
     >
       {/* Score + profile */}
@@ -155,32 +164,34 @@ function ResultsPanel({ result }) {
             {result.summary?.profile && (
               <div className="flex-1 min-w-0">
                 <SectionLabel>Profile summary</SectionLabel>
-                <p className="text-[13px] text-t2 leading-relaxed">{result.summary.profile}</p>
+                <p className="text-[13px] text-t2 leading-relaxed">
+                  {Array.isArray(result.summary.profile) ? result.summary.profile.join(' ') : result.summary.profile}
+                </p>
               </div>
             )}
           </div>
-          {result.breakdown && Object.keys(result.breakdown).length > 0 && (
+          {Object.keys(breakdownScores).length > 0 && (
             <div className="mt-5 pt-4 space-y-2.5" style={{ borderTop: '1px solid rgba(var(--border) / 0.08)' }}>
               <SectionLabel>Section breakdown</SectionLabel>
-              {Object.entries(result.breakdown).map(([k, v]) => <ScoreBar key={k} label={k} value={v} />)}
+              {Object.entries(breakdownScores).map(([k, v]) => <ScoreBar key={k} label={k} value={v} />)}
             </div>
           )}
         </CardBody>
       </Card>
 
       {/* Keywords */}
-      {(result.matched_keywords?.length > 0 || result.missing_keywords?.length > 0) && (
+      {(matchedKw.length > 0 || missingKw.length > 0) && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {[
-            { label: 'Matched', items: result.matched_keywords, matched: true },
-            { label: 'Missing',  items: result.missing_keywords, matched: false },
+            { label: 'Matched keywords', items: matchedKw, matched: true },
+            { label: 'Missing keywords',  items: missingKw, matched: false },
           ].map(({ label, items, matched }) => (
-            <CardSection key={label} title={`${label} keywords`} action={
+            <CardSection key={label} title={label} action={
               <span className="text-[11px] font-bold" style={{ color: matched ? '#16a34a' : '#dc2626' }}>
-                {items?.length || 0}
+                {items.length}
               </span>
             }>
-              {items?.length > 0
+              {items.length > 0
                 ? <div className="flex flex-wrap gap-1.5">{items.map(k => <KeywordChip key={k} text={k} matched={matched} />)}</div>
                 : <p className="text-[13px] text-t3">{matched ? 'No matches found.' : 'All keywords covered!'}</p>
               }
@@ -195,22 +206,14 @@ function ResultsPanel({ result }) {
           {[
             {
               label: 'Strengths',
-              items: result.summary?.strengths,
-              icon: (
-                <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="2,6 5,9 10,3"/>
-                </svg>
-              ),
+              items: result.summary.strengths,
+              icon: <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="2,6 5,9 10,3"/></svg>,
               style: { background: 'rgba(22,163,74,0.08)', borderColor: 'rgba(22,163,74,0.25)', color: '#16a34a' },
             },
             {
               label: 'Gaps to address',
-              items: result.summary?.gaps,
-              icon: (
-                <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M6 3v3M6 8v.5"/>
-                </svg>
-              ),
+              items: result.summary.gaps,
+              icon: <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3v3M6 8v.5"/></svg>,
               style: { background: 'rgba(217,119,6,0.08)', borderColor: 'rgba(217,119,6,0.25)', color: '#d97706' },
             },
           ].filter(s => s.items?.length > 0).map(s => (
@@ -231,11 +234,13 @@ function ResultsPanel({ result }) {
       )}
 
       {/* Focus */}
-      {result.summary?.focus && (
+      {result.summary?.focus && (result.summary.focus.length > 0 || typeof result.summary.focus === 'string') && (
         <Card>
           <CardBody>
             <SectionLabel>Recommended focus</SectionLabel>
-            <p className="text-[13px] text-t2 leading-relaxed">{result.summary.focus}</p>
+            <p className="text-[13px] text-t2 leading-relaxed">
+              {Array.isArray(result.summary.focus) ? result.summary.focus.join(' ') : result.summary.focus}
+            </p>
           </CardBody>
         </Card>
       )}
@@ -252,11 +257,11 @@ export default function Analyzer() {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState(null)
 
-  const canAnalyze = file && jd.trim().length >= 100
+  const canAnalyze = file && jd.trim().length >= 50
 
   async function analyze() {
-    if (!file) { toast('Upload a resume file', 'warn'); return }
-    if (jd.trim().length < 100) { toast('Job description is too short (100 chars min)', 'warn'); return }
+    if (!file) { toast('Upload a resume file first', 'warn'); return }
+    if (jd.trim().length < 50) { toast('Job description is too short', 'warn'); return }
     setLoading(true)
     setResult(null)
     try {
@@ -264,14 +269,20 @@ export default function Analyzer() {
       fd.append('file', file)
       const up = await apiFetch('/api/upload', { method: 'POST', body: fd })
       if (!up?.ok) { toast('Upload failed', 'error'); return }
-      const { tmp } = await up.json()
+      const upData = await up.json()
+      if (!upData.ok) { toast(upData.detail || 'Upload failed', 'error'); return }
+
       const res = await apiFetch('/api/analyze', {
         method: 'POST',
-        body: JSON.stringify({ tmp_path: tmp, jd_text: jd }),
+        body: JSON.stringify({ tmp: upData.tmp, jd: jd }),
       })
-      if (!res?.ok) { toast('Analysis failed', 'error'); return }
+      if (!res?.ok) {
+        const errData = await res.json().catch(() => ({}))
+        toast(errData.error || errData.detail || 'Analysis failed', 'error')
+        return
+      }
       const data = await res.json()
-      if (!data.ok) { toast(data.error || 'Analysis failed', 'error'); return }
+      if (!data.ok) { toast(data.error || data.message || 'Analysis failed', 'error'); return }
       setResult(data)
     } catch (e) {
       toast('Error: ' + e.message, 'error')
@@ -285,78 +296,77 @@ export default function Analyzer() {
       <PageHeader
         title="Resume Analyser"
         description="Upload your resume and paste a job description to get an AI-powered match score."
-        action={
-          <button onClick={analyze} disabled={loading || !canAnalyze} className="btn-primary">
-            {loading ? <><Spinner size={14} /> Analysing...</> : 'Analyse'}
-          </button>
-        }
       />
 
-      {/* Two-column layout: inputs always visible, results slide in on the right */}
-      <div className={`grid gap-5 ${result || loading ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1 max-w-2xl'}`}>
-        {/* Left: inputs */}
-        <div className="space-y-4">
-          <Card>
-            <div className="px-5 py-3.5 border-b" style={{ borderColor: 'rgba(var(--border) / 0.08)' }}>
-              <span className="text-[13px] font-semibold text-t1">Resume</span>
-            </div>
-            <CardBody>
-              <UploadZone file={file} onFile={setFile} />
-            </CardBody>
-          </Card>
+      {/* Input row: always side by side */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Resume upload */}
+        <Card>
+          <div className="px-5 py-3.5 border-b" style={{ borderColor: 'rgba(var(--border) / 0.08)' }}>
+            <span className="text-[13px] font-semibold text-t1">Resume</span>
+          </div>
+          <CardBody>
+            <UploadZone file={file} onFile={setFile} />
+          </CardBody>
+        </Card>
 
-          <Card>
-            <div className="px-5 py-3.5 border-b flex items-center justify-between" style={{ borderColor: 'rgba(var(--border) / 0.08)' }}>
-              <span className="text-[13px] font-semibold text-t1">Job Description</span>
-              <span className={`text-[11px] font-medium ${jd.length >= 100 ? 'text-green' : 'text-t3'}`}>
-                {jd.length < 100 ? `${100 - jd.length} more chars needed` : `${jd.length} chars`}
-              </span>
+        {/* JD + Analyse button */}
+        <Card>
+          <div className="px-5 py-3.5 border-b flex items-center justify-between" style={{ borderColor: 'rgba(var(--border) / 0.08)' }}>
+            <span className="text-[13px] font-semibold text-t1">Job Description</span>
+            <span className={`text-[11px] font-medium ${jd.length >= 50 ? 'text-green' : 'text-t3'}`}>
+              {jd.length < 50 ? `${50 - jd.length} more chars` : `${jd.length} chars`}
+            </span>
+          </div>
+          <CardBody className="flex flex-col gap-3">
+            <textarea
+              value={jd}
+              onChange={e => setJd(e.target.value)}
+              placeholder="Paste the full job description here..."
+              className="input-base resize-none"
+              style={{ height: '180px' }}
+            />
+            <div className="flex justify-end">
+              <button onClick={analyze} disabled={loading || !canAnalyze} className="btn-primary">
+                {loading ? <><Spinner size={14} /> Analysing...</> : 'Analyse Resume'}
+              </button>
             </div>
-            <CardBody>
-              <textarea
-                value={jd}
-                onChange={e => setJd(e.target.value)}
-                placeholder="Paste the full job description here..."
-                className="input-base resize-none"
-                style={{ height: '200px' }}
-              />
-            </CardBody>
-          </Card>
-        </div>
-
-        {/* Right: loading or results */}
-        <AnimatePresence mode="wait">
-          {loading && (
-            <motion.div
-              key="loading"
-              initial={{ opacity: 0, x: 12 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.18 }}
-            >
-              <Card>
-                <CardBody className="py-20 flex flex-col items-center gap-4 text-center">
-                  <div
-                    className="w-12 h-12 rounded-full"
-                    style={{
-                      border: '3px solid rgba(var(--border) / 0.1)',
-                      borderTopColor: 'rgb(var(--accent))',
-                      animation: 'spin 0.9s linear infinite',
-                    }}
-                  />
-                  <div>
-                    <div className="text-[14px] font-semibold text-t1">Analysing your resume</div>
-                    <div className="text-[13px] text-t2 mt-1">This takes 15-30 seconds</div>
-                  </div>
-                </CardBody>
-              </Card>
-            </motion.div>
-          )}
-          {result && !loading && (
-            <ResultsPanel key="results" result={result} />
-          )}
-        </AnimatePresence>
+          </CardBody>
+        </Card>
       </div>
+
+      {/* Loading state */}
+      <AnimatePresence>
+        {loading && (
+          <motion.div
+            key="loading"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+          >
+            <Card>
+              <CardBody className="py-14 flex flex-col items-center gap-4 text-center">
+                <div
+                  className="w-12 h-12 rounded-full"
+                  style={{
+                    border: '3px solid rgba(var(--border) / 0.1)',
+                    borderTopColor: 'rgb(var(--accent))',
+                    animation: 'spin 0.9s linear infinite',
+                  }}
+                />
+                <div>
+                  <div className="text-[14px] font-semibold text-t1">Analysing your resume</div>
+                  <div className="text-[13px] text-t2 mt-1">This takes 15-30 seconds</div>
+                </div>
+              </CardBody>
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Results */}
+      {result && !loading && <ResultsPanel result={result} />}
     </div>
   )
 }
