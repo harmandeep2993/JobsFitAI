@@ -1,17 +1,18 @@
 /**
- * ATS Check tab - resume text and JD side by side, action buttons below aligned right.
+ * ATS Check tab - resume picker (stored or new upload) + JD side by side.
  */
 import { useState } from 'react'
 import { apiFetch } from '../../lib/auth.js'
 import { useToast } from '../Toast.jsx'
+import { ResumePicker } from '../ResumePicker.jsx'
 import {
   PageHeader, Card, CardBody, CardSection, SectionLabel,
   Spinner,
 } from '../ui.jsx'
 
-const INNER_BG = 'rgba(99,102,241,0.04)'
+const INNER_BG     = 'rgba(99,102,241,0.04)'
 const INNER_BORDER = 'rgba(99,102,241,0.18)'
-const BOX_HEIGHT = '218px'
+const BOX_HEIGHT   = '218px'
 
 function ClearBtn({ onClick }) {
   return (
@@ -47,30 +48,61 @@ function SectionFlag({ label, ok }) {
   )
 }
 
+async function getResumeText(resumeSrc, toast) {
+  if (resumeSrc.resumeId) {
+    const res = await apiFetch('/api/resume-preview', {
+      method: 'POST',
+      body: JSON.stringify({ resume_id: resumeSrc.resumeId }),
+    })
+    if (!res?.ok) { toast('Could not load resume text', 'error'); return null }
+    const d = await res.json()
+    return d.text || null
+  }
+  // New file upload - upload temp then preview
+  const fd = new FormData()
+  fd.append('file', resumeSrc.file)
+  const up = await apiFetch('/api/upload', { method: 'POST', body: fd })
+  if (!up?.ok) { toast('Upload failed', 'error'); return null }
+  const upData = await up.json()
+  if (!upData.ok) { toast(upData.detail || 'Upload failed', 'error'); return null }
+
+  const res = await apiFetch('/api/resume-preview', {
+    method: 'POST',
+    body: JSON.stringify({ tmp: upData.tmp }),
+  })
+  if (!res?.ok) { toast('Could not extract resume text', 'error'); return null }
+  const d = await res.json()
+  return d.text || null
+}
+
 export default function ATS() {
   const toast = useToast()
-  const [resumeText, setResumeText] = useState('')
+  const [resumeSrc, setResumeSrc] = useState(null)
   const [jd, setJd] = useState('')
   const [checkResult, setCheckResult] = useState(null)
   const [optimResult, setOptimResult] = useState(null)
   const [loading, setLoading] = useState('')
 
   async function check() {
-    if (resumeText.trim().length < 50) { toast('Paste your resume text first', 'warn'); return }
+    if (!resumeSrc) { toast('Select or upload a resume first', 'warn'); return }
     setLoading('check'); setCheckResult(null)
     try {
-      const res = await apiFetch('/api/ats/check', { method: 'POST', body: JSON.stringify({ resume_text: resumeText }) })
+      const text = await getResumeText(resumeSrc, toast)
+      if (!text) return
+      const res = await apiFetch('/api/ats/check', { method: 'POST', body: JSON.stringify({ resume_text: text }) })
       if (!res?.ok) { toast('Check failed', 'error'); return }
       setCheckResult(await res.json())
     } finally { setLoading('') }
   }
 
   async function optimise() {
-    if (resumeText.trim().length < 50) { toast('Paste your resume text first', 'warn'); return }
+    if (!resumeSrc) { toast('Select or upload a resume first', 'warn'); return }
     if (jd.trim().length < 100) { toast('Paste a job description to optimise against', 'warn'); return }
     setLoading('optimise'); setOptimResult(null)
     try {
-      const res = await apiFetch('/api/ats/optimise', { method: 'POST', body: JSON.stringify({ resume_text: resumeText, jd_text: jd }) })
+      const text = await getResumeText(resumeSrc, toast)
+      if (!text) return
+      const res = await apiFetch('/api/ats/optimise', { method: 'POST', body: JSON.stringify({ resume_text: text, jd_text: jd }) })
       if (!res?.ok) { toast('Optimise failed', 'error'); return }
       setOptimResult(await res.json())
     } finally { setLoading('') }
@@ -85,25 +117,23 @@ export default function ATS() {
     <div className="space-y-5">
       <PageHeader
         title="ATS Check"
-        description="Scan your resume for ATS compatibility issues and use AI-powered optimisation to improve your chances."
+        description="Choose a stored resume or upload a new one to scan for ATS compatibility issues."
       />
 
-      {/* Input boxes + actions */}
       <div className="space-y-3">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Resume text box */}
+          {/* Resume picker */}
           <Card>
             <div className="px-5 py-3 border-b flex items-center justify-between" style={{ borderColor: 'rgba(0,0,0,0.06)' }}>
-              <span className="text-[13px] font-semibold text-t1">Resume text</span>
-              {resumeText && <ClearBtn onClick={() => { setResumeText(''); setCheckResult(null); setOptimResult(null) }} />}
+              <span className="text-[13px] font-semibold text-t1">Resume</span>
+              {resumeSrc && <ClearBtn onClick={() => { setResumeSrc(null); setCheckResult(null); setOptimResult(null) }} />}
             </div>
             <CardBody className="p-4">
-              <textarea
-                value={resumeText}
-                onChange={e => setResumeText(e.target.value)}
-                placeholder="Paste your full resume text here..."
-                className="input-base resize-none"
-                style={{ height: BOX_HEIGHT, background: INNER_BG, border: `2px dashed ${INNER_BORDER}` }}
+              <ResumePicker
+                selected={resumeSrc}
+                onSelect={src => { setResumeSrc(src); setCheckResult(null); setOptimResult(null) }}
+                onClear={() => { setResumeSrc(null); setCheckResult(null); setOptimResult(null) }}
+                height={BOX_HEIGHT}
               />
             </CardBody>
           </Card>
@@ -118,13 +148,31 @@ export default function ATS() {
               </div>
             </div>
             <CardBody className="p-4">
-              <textarea
-                value={jd}
-                onChange={e => setJd(e.target.value)}
-                placeholder="Paste the job description to optimise against..."
-                className="input-base resize-none"
-                style={{ height: BOX_HEIGHT, background: INNER_BG, border: `2px dashed ${INNER_BORDER}` }}
-              />
+              <div className="relative" style={{ height: BOX_HEIGHT }}>
+                {!jd && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 pointer-events-none select-none rounded-lg"
+                    style={{ background: INNER_BG, border: `2px dashed ${INNER_BORDER}` }}>
+                    <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: 'rgba(99,102,241,0.1)' }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--accent))" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/><line x1="8" y1="9" x2="10" y2="9"/>
+                      </svg>
+                    </div>
+                    <div className="text-[13px] font-semibold text-t2">Paste job description</div>
+                    <div className="text-[12px] text-t3 text-center px-6">Paste the full job description here...</div>
+                  </div>
+                )}
+                <textarea
+                  value={jd}
+                  onChange={e => setJd(e.target.value)}
+                  className="input-base resize-none w-full h-full"
+                  style={{
+                    background: jd ? INNER_BG : 'transparent',
+                    border: jd ? `2px dashed ${INNER_BORDER}` : '2px dashed transparent',
+                    position: 'relative',
+                    zIndex: 1,
+                  }}
+                />
+              </div>
             </CardBody>
           </Card>
         </div>

@@ -1,10 +1,11 @@
 /**
  * Analyzer tab - two upload boxes side by side, analyse button below aligned right.
  */
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { apiFetch } from '../../lib/auth.js'
 import { useToast } from '../Toast.jsx'
+import { ResumePicker } from '../ResumePicker.jsx'
 import {
   PageHeader, Card, CardBody, CardSection, SectionLabel,
   Spinner, ScoreLabel,
@@ -82,65 +83,6 @@ function KeywordChip({ text, matched }) {
     : { background: 'rgba(220,38,38,0.08)', borderColor: 'rgba(220,38,38,0.25)', color: '#dc2626' }
   return (
     <span className="px-2.5 py-0.5 rounded-sm text-[12px] font-medium border" style={style}>{text}</span>
-  )
-}
-
-// === Upload drop zone ===
-function UploadZone({ file, onFile, onClear }) {
-  const fileRef = useRef(null)
-  const [dragging, setDragging] = useState(false)
-
-  function handleDrop(e) {
-    e.preventDefault(); setDragging(false)
-    const f = e.dataTransfer.files[0]
-    if (f) onFile(f)
-  }
-
-  return (
-    <div
-      onClick={() => !file && fileRef.current?.click()}
-      onDragOver={e => { e.preventDefault(); setDragging(true) }}
-      onDragLeave={() => setDragging(false)}
-      onDrop={handleDrop}
-      className="relative flex flex-col items-center justify-center rounded-lg transition-all select-none"
-      style={{
-        background: INNER_BG,
-        border: `2px dashed ${file ? 'rgba(22,163,74,0.4)' : dragging ? 'rgb(var(--accent))' : INNER_BORDER}`,
-        cursor: file ? 'default' : 'pointer',
-        height: BOX_HEIGHT,
-        padding: '20px',
-      }}
-    >
-      {file ? (
-        <div className="flex flex-col items-center gap-2 w-full">
-          <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: 'rgba(99,102,241,0.12)' }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--accent))" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/>
-            </svg>
-          </div>
-          <div className="text-[13.5px] font-semibold text-t1 truncate max-w-full px-2 text-center">{file.name}</div>
-          <div className="text-[12px] text-t3">{(file.size / 1024).toFixed(0)} KB</div>
-          <button
-            onClick={e => { e.stopPropagation(); fileRef.current?.click() }}
-            className="mt-1 text-[11.5px] font-medium underline underline-offset-2"
-            style={{ color: 'rgb(var(--accent))' }}
-          >
-            Click here to change file
-          </button>
-        </div>
-      ) : (
-        <div className="flex flex-col items-center gap-2 text-center">
-          <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: 'rgba(99,102,241,0.1)' }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--accent))" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
-            </svg>
-          </div>
-          <div className="text-[13.5px] font-semibold text-t2">Drop resume here</div>
-          <div className="text-[12px] text-t3">PDF or DOCX, max 10 MB</div>
-        </div>
-      )}
-      <input ref={fileRef} type="file" accept=".pdf,.docx" className="hidden" onChange={e => onFile(e.target.files[0])} />
-    </div>
   )
 }
 
@@ -237,29 +179,32 @@ function ResultsPanel({ result }) {
 // === Main ===
 export default function Analyzer() {
   const toast = useToast()
-  const [file, setFile] = useState(null)
+  const [resumeSrc, setResumeSrc] = useState(null)   // {file, resumeId, name}
   const [jd, setJd] = useState('')
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState(null)
 
-  const canAnalyze = file && jd.trim().length >= 50
+  const canAnalyze = resumeSrc && jd.trim().length >= 50
 
   async function analyze() {
-    if (!file) { toast('Upload a resume file first', 'warn'); return }
+    if (!resumeSrc) { toast('Select or upload a resume first', 'warn'); return }
     if (jd.trim().length < 50) { toast('Job description is too short', 'warn'); return }
     setLoading(true); setResult(null)
     try {
-      const fd = new FormData()
-      fd.append('file', file)
-      const up = await apiFetch('/api/upload', { method: 'POST', body: fd })
-      if (!up?.ok) { toast('Upload failed', 'error'); return }
-      const upData = await up.json()
-      if (!upData.ok) { toast(upData.detail || 'Upload failed', 'error'); return }
+      let body = { jd }
+      if (resumeSrc.file) {
+        const fd = new FormData()
+        fd.append('file', resumeSrc.file)
+        const up = await apiFetch('/api/upload', { method: 'POST', body: fd })
+        if (!up?.ok) { toast('Upload failed', 'error'); return }
+        const upData = await up.json()
+        if (!upData.ok) { toast(upData.detail || 'Upload failed', 'error'); return }
+        body.tmp = upData.tmp
+      } else {
+        body.resume_id = resumeSrc.resumeId
+      }
 
-      const res = await apiFetch('/api/analyze', {
-        method: 'POST',
-        body: JSON.stringify({ tmp: upData.tmp, jd }),
-      })
+      const res = await apiFetch('/api/analyze', { method: 'POST', body: JSON.stringify(body) })
       if (!res?.ok) {
         const errData = await res.json().catch(() => ({}))
         toast(errData.error || errData.detail || 'Analysis failed', 'error'); return
@@ -278,21 +223,25 @@ export default function Analyzer() {
     <div className="space-y-5">
       <PageHeader
         title="Resume Analyser"
-        description="Upload your resume and paste a job description to get an AI-powered match score."
+        description="Choose a stored resume or upload a new one, then paste a job description to get an AI-powered match score."
       />
 
       {/* Input boxes + action row */}
       <div className="space-y-3">
-        {/* Two boxes side by side */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Resume box */}
           <Card>
             <div className="px-5 py-3 border-b flex items-center justify-between" style={{ borderColor: 'rgba(0,0,0,0.06)' }}>
               <span className="text-[13px] font-semibold text-t1">Resume</span>
-              {file && <ClearBtn onClick={() => { setFile(null); setResult(null) }} />}
+              {resumeSrc && <ClearBtn onClick={() => { setResumeSrc(null); setResult(null) }} />}
             </div>
             <CardBody className="p-4">
-              <UploadZone file={file} onFile={f => { setFile(f); setResult(null) }} onClear={() => { setFile(null); setResult(null) }} />
+              <ResumePicker
+                selected={resumeSrc}
+                onSelect={src => { setResumeSrc(src); setResult(null) }}
+                onClear={() => { setResumeSrc(null); setResult(null) }}
+                height={BOX_HEIGHT}
+              />
             </CardBody>
           </Card>
 
@@ -338,7 +287,6 @@ export default function Analyzer() {
           </Card>
         </div>
 
-        {/* Analyse button - bottom right */}
         <div className="flex justify-end">
           <button onClick={analyze} disabled={loading || !canAnalyze} className="btn-primary px-6">
             {loading ? <><Spinner size={14} /> Analysing...</> : 'Analyse Resume'}
