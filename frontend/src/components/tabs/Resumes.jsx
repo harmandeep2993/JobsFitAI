@@ -128,7 +128,42 @@ function ResumeSlot({ slot, resume, onUpload, onDelete, onLabel, onUseForMatchin
           {slot + 1}
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-[13px] font-semibold text-t1 truncate">{SLOT_NAMES[slot]}</div>
+          {/* Slot type label always visible as subtitle */}
+          <div className="text-[10.5px] font-semibold uppercase tracking-wide text-t3">{SLOT_NAMES[slot]}</div>
+          {/* Resume name as the main title, with inline edit */}
+          {resume && (
+            editing ? (
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <input
+                  autoFocus
+                  value={labelVal}
+                  onChange={e => setLabelVal(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') { onLabel(resume.id, labelVal.trim()); setEditing(false) }
+                    if (e.key === 'Escape') setEditing(false)
+                  }}
+                  className="input-base flex-1 py-0.5 text-[12px]"
+                  placeholder="Resume name..."
+                />
+                <button onClick={() => { onLabel(resume.id, labelVal.trim()); setEditing(false) }} className="btn-primary py-0.5 px-2 text-[11px]">Save</button>
+                <button onClick={() => setEditing(false)} className="btn-secondary py-0.5 px-2 text-[11px]">Cancel</button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1 group mt-0.5">
+                <span className="text-[13px] font-semibold text-t1 truncate">{resume.label || resume.original_name}</span>
+                <button onClick={startEdit}
+                  className="opacity-0 group-hover:opacity-100 w-5 h-5 flex items-center justify-center rounded-sm transition-all flex-shrink-0"
+                  style={{ color: 'rgb(var(--t3))' }}
+                  onMouseEnter={e => e.currentTarget.style.color = 'rgb(var(--accent))'}
+                  onMouseLeave={e => e.currentTarget.style.color = 'rgb(var(--t3))'}
+                  title="Rename">
+                  <svg width="10" height="10" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M10 2l2 2-7 7H3V9l7-7z"/>
+                  </svg>
+                </button>
+              </div>
+            )
+          )}
         </div>
         {resume && (
           <span className="px-2 py-0.5 text-[10.5px] font-semibold rounded-sm flex-shrink-0"
@@ -152,40 +187,8 @@ function ResumeSlot({ slot, resume, onUpload, onDelete, onLabel, onUseForMatchin
                 </svg>
               </div>
               <div className="flex-1 min-w-0">
-                {editing ? (
-                  <div className="flex items-center gap-1.5">
-                    <input
-                      autoFocus
-                      value={labelVal}
-                      onChange={e => setLabelVal(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') { onLabel(resume.id, labelVal.trim()); setEditing(false) }
-                        if (e.key === 'Escape') setEditing(false)
-                      }}
-                      className="input-base flex-1 py-1 text-[12px]"
-                      placeholder="Resume label..."
-                    />
-                    <button onClick={() => { onLabel(resume.id, labelVal.trim()); setEditing(false) }} className="btn-primary py-0.5 px-2 text-[11.5px]">Save</button>
-                    <button onClick={() => setEditing(false)} className="btn-secondary py-0.5 px-2 text-[11.5px]">Cancel</button>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-1 group">
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[12.5px] font-semibold text-t1 truncate">{resume.label || resume.original_name}</div>
-                      <div className="text-[11.5px] text-t3">{Math.round(resume.file_size_kb)} KB</div>
-                    </div>
-                    <button onClick={startEdit}
-                      className="opacity-0 group-hover:opacity-100 w-5 h-5 flex items-center justify-center text-t3 rounded-sm transition-all flex-shrink-0"
-                      style={{ color: 'rgb(var(--t3))' }}
-                      onMouseEnter={e => e.currentTarget.style.color = 'rgb(var(--accent))'}
-                      onMouseLeave={e => e.currentTarget.style.color = 'rgb(var(--t3))'}
-                      title="Rename">
-                      <svg width="10" height="10" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M10 2l2 2-7 7H3V9l7-7z"/>
-                      </svg>
-                    </button>
-                  </div>
-                )}
+                <div className="text-[12.5px] font-semibold text-t1 truncate">{resume.original_name}</div>
+                <div className="text-[11.5px] text-t3">{Math.round(resume.file_size_kb)} KB</div>
               </div>
             </div>
 
