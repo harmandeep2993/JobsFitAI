@@ -56,40 +56,61 @@ export function ResumePicker({ selected, onSelect, onClear, height = '218px' }) 
     )
   }
 
-  // === Picker: stored resumes + upload zone ===
+  // === Picker: dropdown + upload zone ===
   const readyResumes = resumes.filter(r => r.extracted_json)
 
   return (
-    <div className="flex flex-col gap-2" style={{ height }}>
-      {/* Stored resumes (if any) */}
+    <div className="flex flex-col gap-3" style={{ height }}>
+      {/* Dropdown - only shown when there are stored resumes */}
       {readyResumes.length > 0 && (
-        <div className="flex flex-col gap-1.5">
-          {readyResumes.map(r => (
-            <button key={r.id} onClick={() => pickStored(r)}
-              className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-left transition-all"
-              style={{ background: INNER_BG, border: `1.5px solid ${INNER_BORDER}` }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.09)'; e.currentTarget.style.borderColor = 'rgba(99,102,241,0.35)' }}
-              onMouseLeave={e => { e.currentTarget.style.background = INNER_BG; e.currentTarget.style.borderColor = INNER_BORDER }}
-            >
-              <div className="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0"
-                style={{ background: 'rgba(99,102,241,0.12)' }}>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--accent))" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
-                </svg>
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-[12.5px] font-semibold text-t1 truncate">{r.label || r.original_name}</div>
-                <div className="text-[11px] text-t3">{Math.round(r.file_size_kb)} KB</div>
-              </div>
-              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="rgb(var(--accent))" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
-                <path d="M3 8h10M9 4l4 4-4 4"/>
-              </svg>
-            </button>
-          ))}
+        <div className="relative">
+          <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+            style={{ color: 'rgb(var(--accent))' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
+            </svg>
+          </div>
+          <select
+            defaultValue=""
+            onChange={e => {
+              const r = readyResumes.find(r => r.id === e.target.value)
+              if (r) pickStored(r)
+            }}
+            className="w-full pl-9 pr-8 py-2.5 rounded-lg text-[13px] font-medium appearance-none cursor-pointer transition-colors"
+            style={{
+              background: INNER_BG,
+              border: `1.5px solid ${INNER_BORDER}`,
+              color: 'rgb(var(--t1))',
+              outline: 'none',
+              fontFamily: 'inherit',
+            }}
+            onFocus={e => e.currentTarget.style.borderColor = 'rgb(var(--accent))'}
+            onBlur={e => e.currentTarget.style.borderColor = INNER_BORDER}
+          >
+            <option value="" disabled>Choose a stored resume...</option>
+            {readyResumes.map(r => (
+              <option key={r.id} value={r.id}>{r.label || r.original_name}</option>
+            ))}
+          </select>
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"
+            style={{ color: 'rgb(var(--t3))' }}>
+            <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M2 5l5 5 5-5"/>
+            </svg>
+          </div>
         </div>
       )}
 
-      {/* Upload new file drop zone */}
+      {/* Divider with "or" when both options exist */}
+      {readyResumes.length > 0 && (
+        <div className="flex items-center gap-3">
+          <div className="flex-1 h-px" style={{ background: INNER_BORDER }} />
+          <span className="text-[11px] font-medium text-t3">or upload new</span>
+          <div className="flex-1 h-px" style={{ background: INNER_BORDER }} />
+        </div>
+      )}
+
+      {/* Upload drop zone */}
       <div
         onClick={() => fileRef.current?.click()}
         onDragOver={e => { e.preventDefault(); setDragging(true) }}
@@ -99,7 +120,7 @@ export function ResumePicker({ selected, onSelect, onClear, height = '218px' }) 
         style={{
           background: dragging ? 'rgba(99,102,241,0.08)' : INNER_BG,
           border: `2px dashed ${dragging ? 'rgba(99,102,241,0.5)' : INNER_BORDER}`,
-          minHeight: readyResumes.length > 0 ? '70px' : '100%',
+          minHeight: '80px',
           padding: '16px',
         }}
         onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.08)'; e.currentTarget.style.borderColor = 'rgba(99,102,241,0.35)' }}
