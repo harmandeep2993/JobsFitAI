@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react'
 import { apiFetch } from '../../lib/auth.js'
 import { useToast } from '../Toast.jsx'
+import { PageHeader, CardSection, FieldLabel, PageSpinner } from '../ui.jsx'
 
 export default function Settings() {
   const toast = useToast()
   const [state, setState] = useState(null)
   const [llm, setLlm] = useState(null)
-  const [saving, setSaving] = useState(false)
+  const [saving, setSaving] = useState('')
 
   useEffect(() => {
     apiFetch('/api/match/state').then(r => r?.json()).then(d => setState(d))
@@ -15,37 +16,31 @@ export default function Settings() {
 
   async function saveFilters(e) {
     e.preventDefault()
-    setSaving(true)
+    setSaving('filters')
     const fd = new FormData(e.target)
-    const titles = (fd.get('titles') || '').split('\n').map(t => t.trim()).filter(Boolean)
-    const location = (fd.get('location') || '').trim()
+    const titles    = (fd.get('titles') || '').split('\n').map(t => t.trim()).filter(Boolean)
+    const location  = (fd.get('location') || '').trim()
     const countries = (fd.get('countries') || '').split(',').map(c => c.trim()).filter(Boolean)
-    const res = await apiFetch('/api/match/filters', {
-      method: 'POST',
-      body: JSON.stringify({ titles, location, countries }),
-    })
-    setSaving(false)
-    if (res?.ok) toast('Settings saved', 'success')
+    const res = await apiFetch('/api/match/filters', { method: 'POST', body: JSON.stringify({ titles, location, countries }) })
+    setSaving('')
+    if (res?.ok) toast('Job search settings saved', 'success')
     else toast('Save failed', 'error')
   }
 
   async function toggleScheduler() {
     if (!state) return
     const enabled = !state.scheduler_enabled
-    const res = await apiFetch('/api/match/scheduler', {
-      method: 'POST',
-      body: JSON.stringify({ enabled }),
-    })
+    const res = await apiFetch('/api/match/scheduler', { method: 'POST', body: JSON.stringify({ enabled }) })
     if (res?.ok) setState(s => ({ ...s, scheduler_enabled: enabled }))
+    else toast('Could not update scheduler', 'error')
   }
 
   async function saveLlm(e) {
     e.preventDefault()
+    setSaving('llm')
     const fd = new FormData(e.target)
-    const res = await apiFetch('/api/llm-settings', {
-      method: 'POST',
-      body: JSON.stringify({ provider: fd.get('provider'), model: fd.get('model') }),
-    })
+    const res = await apiFetch('/api/llm-settings', { method: 'POST', body: JSON.stringify({ provider: fd.get('provider'), model: fd.get('model') }) })
+    setSaving('')
     if (res?.ok) toast('LLM settings saved', 'success')
     else toast('Save failed', 'error')
   }
@@ -53,129 +48,109 @@ export default function Settings() {
   async function pingLlm() {
     const res = await apiFetch('/api/llm-ping')
     const d = await res?.json()
-    toast(d?.ok ? `Connected (${d.provider})` : 'LLM unreachable', d?.ok ? 'success' : 'error')
+    toast(d?.ok ? `Connected to ${d.provider}` : 'LLM unreachable', d?.ok ? 'success' : 'error')
   }
 
-  if (!state && !llm) return <div className="text-sm text-t3">Loading...</div>
+  if (!state && !llm) return (
+    <div className="space-y-5">
+      <PageHeader title="Settings" description="Configure job search targets, scheduler, and AI provider." />
+      <PageSpinner />
+    </div>
+  )
 
   return (
-    <div className="space-y-6 max-w-2xl">
-      <h1 className="text-lg font-bold">Settings</h1>
+    <div className="space-y-5 max-w-2xl">
+      <PageHeader
+        title="Settings"
+        description="Configure job search targets, auto scheduler, and your AI provider."
+      />
 
-      {/* Job search settings */}
-      <form onSubmit={saveFilters} className="bg-surface border border-border rounded p-5 space-y-4">
-        <div className="text-sm font-semibold">Job Search</div>
-
-        <div className="space-y-1.5">
-          <label className="text-xs font-semibold text-t2">Job titles (one per line)</label>
-          <textarea
-            name="titles"
-            defaultValue={(state?.filters?.titles || []).join('\n')}
-            rows={4}
-            placeholder="Software Engineer&#10;Backend Developer&#10;Python Developer"
-            className="w-full px-3 py-2 bg-bg border border-border rounded-xs text-[13px] text-t1 placeholder:text-t3 focus:outline-none focus:border-accent resize-none transition-colors"
-          />
-        </div>
-
-        <div className="space-y-1.5">
-          <label className="text-xs font-semibold text-t2">Location</label>
-          <input
-            type="text"
-            name="location"
-            defaultValue={state?.filters?.location || ''}
-            placeholder="Berlin, Munich, Remote..."
-            className="w-full px-3 py-2 bg-bg border border-border rounded-xs text-[13px] text-t1 placeholder:text-t3 focus:outline-none focus:border-accent transition-colors"
-          />
-        </div>
-
-        <div className="space-y-1.5">
-          <label className="text-xs font-semibold text-t2">Countries (comma separated)</label>
-          <input
-            type="text"
-            name="countries"
-            defaultValue={(state?.filters?.countries || []).join(', ')}
-            placeholder="de, at, ch"
-            className="w-full px-3 py-2 bg-bg border border-border rounded-xs text-[13px] text-t1 placeholder:text-t3 focus:outline-none focus:border-accent transition-colors"
-          />
-        </div>
-
-        <button
-          type="submit"
-          disabled={saving}
-          className="px-5 py-2 bg-accent text-white rounded-s text-sm font-semibold hover:bg-accent-h disabled:opacity-60 transition-colors"
-        >
-          {saving ? 'Saving...' : 'Save'}
-        </button>
-      </form>
+      {/* Job search */}
+      {state && (
+        <form onSubmit={saveFilters}>
+          <CardSection
+            title="Job Search"
+            action={
+              <button type="submit" disabled={saving === 'filters'} className="btn-primary h-7 px-3.5 text-[12.5px]">
+                {saving === 'filters' ? 'Saving...' : 'Save'}
+              </button>
+            }
+          >
+            <div className="space-y-4">
+              <div>
+                <FieldLabel hint="(one per line)">Job titles</FieldLabel>
+                <textarea
+                  name="titles"
+                  defaultValue={(state.filters?.titles || []).join('\n')}
+                  rows={4}
+                  placeholder={"Software Engineer\nBackend Developer\nPython Developer"}
+                  className="input-base resize-none"
+                />
+              </div>
+              <div>
+                <FieldLabel>Location</FieldLabel>
+                <input type="text" name="location" defaultValue={state.filters?.location || ''} placeholder="Berlin, Munich, Remote..." className="input-base" />
+              </div>
+              <div>
+                <FieldLabel hint="(comma separated ISO codes)">Countries</FieldLabel>
+                <input type="text" name="countries" defaultValue={(state.filters?.countries || []).join(', ')} placeholder="de, at, ch" className="input-base" />
+              </div>
+            </div>
+          </CardSection>
+        </form>
+      )}
 
       {/* Scheduler */}
-      <div className="bg-surface border border-border rounded p-5 space-y-3">
-        <div className="text-sm font-semibold">Auto Scheduler</div>
-        <p className="text-xs text-t2">Automatically fetch and score new jobs on a set interval.</p>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={toggleScheduler}
-            className={`relative w-10 h-5 rounded-full transition-colors ${
-              state?.scheduler_enabled ? 'bg-accent' : 'bg-border'
-            }`}
-          >
-            <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
-              state?.scheduler_enabled ? 'translate-x-5' : 'translate-x-0.5'
-            }`} />
-          </button>
-          <span className="text-sm text-t2">{state?.scheduler_enabled ? 'Enabled' : 'Disabled'}</span>
-          {state?.scheduler_interval && (
-            <span className="text-xs text-t3">every {state.scheduler_interval} min</span>
-          )}
-        </div>
-      </div>
-
-      {/* LLM settings */}
-      {llm && (
-        <form onSubmit={saveLlm} className="bg-surface border border-border rounded p-5 space-y-4">
-          <div className="text-sm font-semibold">LLM Provider</div>
-
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-t2">Provider</label>
-            <select
-              name="provider"
-              defaultValue={llm.active_provider}
-              className="w-full px-3 py-2 bg-bg border border-border rounded-xs text-[13px] text-t1 focus:outline-none focus:border-accent"
-            >
-              {llm.catalog?.map(p => (
-                <option key={p.name} value={p.name}>
-                  {p.name} {!p.has_key && p.needs_key ? '(no key)' : ''}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-t2">Model</label>
-            <input
-              type="text"
-              name="model"
-              defaultValue={llm.active_model}
-              placeholder="Leave blank for default"
-              className="w-full px-3 py-2 bg-bg border border-border rounded-xs text-[13px] text-t1 placeholder:text-t3 focus:outline-none focus:border-accent transition-colors"
-            />
-          </div>
-
-          <div className="flex gap-2">
-            <button
-              type="submit"
-              className="px-5 py-2 bg-accent text-white rounded-s text-sm font-semibold hover:bg-accent-h transition-colors"
-            >
-              Save
-            </button>
+      {state && (
+        <CardSection title="Auto Scheduler">
+          <p className="text-[13px] text-t2 mb-4">Automatically fetch and score new jobs in the background on a set interval.</p>
+          <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={pingLlm}
-              className="px-4 py-2 border border-border rounded-s text-sm text-t2 hover:text-t1 hover:bg-hover transition-colors"
+              onClick={toggleScheduler}
+              className={`relative w-10 h-6 rounded-full transition-colors flex-shrink-0 ${state.scheduler_enabled ? 'bg-accent' : 'bg-border'}`}
             >
-              Test connection
+              <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${state.scheduler_enabled ? 'translate-x-5' : 'translate-x-1'}`} />
             </button>
+            <span className="text-[13.5px] font-medium text-t1">{state.scheduler_enabled ? 'Enabled' : 'Disabled'}</span>
+            {state.scheduler_interval && (
+              <span className="text-[12px] text-t3">- runs every {state.scheduler_interval} min</span>
+            )}
           </div>
+        </CardSection>
+      )}
+
+      {/* LLM */}
+      {llm && (
+        <form onSubmit={saveLlm}>
+          <CardSection
+            title="LLM Provider"
+            action={
+              <div className="flex gap-1.5">
+                <button type="button" onClick={pingLlm} className="btn-secondary h-7 px-3 text-[12.5px]">Test</button>
+                <button type="submit" disabled={saving === 'llm'} className="btn-primary h-7 px-3.5 text-[12.5px]">
+                  {saving === 'llm' ? 'Saving...' : 'Save'}
+                </button>
+              </div>
+            }
+          >
+            <div className="space-y-4">
+              <div>
+                <FieldLabel>Provider</FieldLabel>
+                <select name="provider" defaultValue={llm.active_provider} className="input-base">
+                  {llm.catalog?.map(p => (
+                    <option key={p.name} value={p.name}>
+                      {p.name}{!p.has_key && p.needs_key ? ' (no API key)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <FieldLabel hint="(leave blank for default)">Model</FieldLabel>
+                <input type="text" name="model" defaultValue={llm.active_model || ''} placeholder="e.g. gpt-4o-mini, llama3-8b-8192" className="input-base" />
+              </div>
+            </div>
+          </CardSection>
         </form>
       )}
     </div>

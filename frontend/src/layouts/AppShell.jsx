@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { ToastProvider } from '../components/Toast.jsx'
 import TopBar from '../components/TopBar.jsx'
 import Sidebar from '../components/Sidebar.jsx'
@@ -9,31 +10,49 @@ import ATS from '../components/tabs/ATS.jsx'
 import History from '../components/tabs/History.jsx'
 import Settings from '../components/tabs/Settings.jsx'
 
-const TAB_COMPONENTS = {
+const TABS = {
   analyzer: Analyzer,
+  ats:      ATS,
   matches:  JobMatches,
   resumes:  Resumes,
-  ats:      ATS,
   history:  History,
   settings: Settings,
 }
 
-export default function AppShell({ dark, onToggleDark }) {
+const pageVariants = {
+  initial: { opacity: 0, y: 10 },
+  enter:   { opacity: 1, y: 0, transition: { duration: 0.18, ease: [0.25, 0.1, 0.25, 1] } },
+  exit:    { opacity: 0, y: -6, transition: { duration: 0.12 } },
+}
+
+export default function AppShell() {
   const [tab, setTab] = useState('analyzer')
-  const TabContent = TAB_COMPONENTS[tab] || Analyzer
+  const TabContent = TABS[tab] || Analyzer
 
   return (
     <ToastProvider>
       <div className="min-h-screen bg-bg text-t1">
-        <TopBar dark={dark} onToggleDark={onToggleDark} />
+        <TopBar />
         <Sidebar active={tab} onChange={setTab} />
         <main
-          className="pt-topbar pl-sidebar min-h-screen"
-          style={{ paddingLeft: 'var(--sidebar-w)' }}
+          style={{
+            paddingTop: 'var(--topbar-h)',
+            paddingLeft: 'var(--sidebar-w)',
+            minHeight: '100vh',
+          }}
         >
-          <div className="p-6 max-w-5xl mx-auto">
-            <TabContent />
-          </div>
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={tab}
+              variants={pageVariants}
+              initial="initial"
+              animate="enter"
+              exit="exit"
+              className="max-w-5xl mx-auto px-6 py-8"
+            >
+              <TabContent />
+            </motion.div>
+          </AnimatePresence>
         </main>
       </div>
     </ToastProvider>

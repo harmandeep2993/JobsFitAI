@@ -118,8 +118,13 @@ _AUTH_USER = os.getenv("APP_USERNAME", "admin").strip()
 _AUTH_PASS = os.getenv("APP_PASSWORD", "").strip()
 _SESSION_SECRET = os.getenv("SESSION_SECRET") or _secrets.token_hex(32)
 _SESSION_COOKIE = "jfai_sess"
-_LOGIN_HTML = (_ROOT_DIR / "frontend" / "login-app-password.html").read_text(
-    encoding="utf-8"
+_LOGIN_HTML_PATH = _ROOT_DIR / "frontend" / "login-app-password.html"
+# Only read the file when APP_PASSWORD auth is actually enabled; avoids a crash
+# if the file is absent (which is the normal case when using JWT auth).
+_LOGIN_HTML = (
+    _LOGIN_HTML_PATH.read_text(encoding="utf-8")
+    if _AUTH_ENABLED and _LOGIN_HTML_PATH.exists()
+    else ""
 )
 
 _OPEN_PATHS = {"/login", "/logout"}

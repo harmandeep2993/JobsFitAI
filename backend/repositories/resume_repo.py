@@ -101,6 +101,7 @@ def list_all(user_id: str) -> list[dict]:
         rows = conn.execute(
             """SELECT r.id, r.slot, r.label, r.original_name, r.file_path, r.mime_type,
                       r.file_size_kb, r.uploaded_at,
+                      CASE WHEN r.extracted_json IS NOT NULL THEN 1 ELSE 0 END AS extracted_json,
                       a.score      AS last_score,
                       a.label      AS last_label,
                       a.jd_snippet AS last_jd,

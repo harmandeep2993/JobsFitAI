@@ -39,5 +39,5 @@ export async function apiFetch(url, options = {}) {
 
 export function logout() {
   clearToken()
-  window.location.href = '/login'
+  window.location.href = '/'
 }
