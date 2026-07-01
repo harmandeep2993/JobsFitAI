@@ -113,8 +113,8 @@ function UploadZone({ file, onFile, onClear }) {
     >
       {file ? (
         <div className="flex flex-col items-center gap-2 w-full">
-          <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: 'rgba(22,163,74,0.12)' }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: 'rgba(99,102,241,0.12)' }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--accent))" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/>
             </svg>
           </div>
@@ -308,13 +308,32 @@ export default function Analyzer() {
               </div>
             </div>
             <CardBody className="p-4">
-              <textarea
-                value={jd}
-                onChange={e => setJd(e.target.value)}
-                placeholder="Paste the full job description here..."
-                className="input-base resize-none"
-                style={{ height: BOX_HEIGHT, background: INNER_BG, border: `2px dashed ${INNER_BORDER}` }}
-              />
+              <div className="relative" style={{ height: BOX_HEIGHT }}>
+                {!jd && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 pointer-events-none select-none rounded-lg"
+                    style={{ background: INNER_BG, border: `2px dashed ${INNER_BORDER}` }}>
+                    <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: 'rgba(99,102,241,0.1)' }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--accent))" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/><line x1="8" y1="9" x2="10" y2="9"/>
+                      </svg>
+                    </div>
+                    <div className="text-[13px] font-semibold text-t2">Paste job description</div>
+                    <div className="text-[12px] text-t3 text-center px-6">Paste the full job description here...</div>
+                  </div>
+                )}
+                <textarea
+                  value={jd}
+                  onChange={e => setJd(e.target.value)}
+                  className="input-base resize-none w-full h-full"
+                  style={{
+                    background: jd ? INNER_BG : 'transparent',
+                    border: jd ? `2px dashed ${INNER_BORDER}` : '2px dashed transparent',
+                    color: 'rgb(var(--t1))',
+                    position: 'relative',
+                    zIndex: 1,
+                  }}
+                />
+              </div>
             </CardBody>
           </Card>
         </div>
