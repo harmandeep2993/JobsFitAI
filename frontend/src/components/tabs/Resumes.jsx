@@ -12,14 +12,103 @@ const INNER_BORDER = 'rgba(99,102,241,0.18)'
 const SLOT_NAMES = ['Base Resume', 'Tailored 1', 'Tailored 2']
 const SLOT_DESC  = ['Your primary resume', 'Tailored for a specific role', 'Tailored for a specific role']
 
-async function previewResume(id) {
-  const res = await apiFetch(`/api/resumes/${id}/file`)
-  if (!res?.ok) return
-  const blob = await res.blob()
-  window.open(URL.createObjectURL(blob), '_blank')
+// === Preview modal ===
+function PreviewModal({ resume, onClose }) {
+  const [url, setUrl] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const isPdf = resume?.original_name?.toLowerCase().endsWith('.pdf')
+
+  useEffect(() => {
+    let objectUrl
+    apiFetch(`/api/resumes/${resume.id}/file`).then(async res => {
+      if (!res?.ok) { setError('Could not load file'); setLoading(false); return }
+      const blob = await res.blob()
+      objectUrl = URL.createObjectURL(blob)
+      setUrl(objectUrl)
+      setLoading(false)
+    })
+    return () => { if (objectUrl) URL.revokeObjectURL(objectUrl) }
+  }, [resume.id])
+
+  // Close on backdrop click or Escape
+  useEffect(() => {
+    function onKey(e) { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  return (
+    <div
+      className="fixed inset-0 z-[300] flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+      onClick={onClose}
+    >
+      <div
+        className="relative flex flex-col rounded-xl overflow-hidden shadow-2xl"
+        style={{ width: 'min(860px, 100%)', height: 'min(90vh, 900px)', background: 'rgb(var(--surface))' }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-3.5 border-b flex-shrink-0" style={{ borderColor: 'rgba(0,0,0,0.06)' }}>
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(99,102,241,0.1)' }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--accent))" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
+              </svg>
+            </div>
+            <span className="text-[13.5px] font-semibold text-t1 truncate max-w-xs">{resume.label || resume.original_name}</span>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 flex items-center justify-center rounded-lg transition-colors flex-shrink-0"
+            style={{ color: 'rgb(var(--t2))' }}
+            onMouseEnter={e => e.currentTarget.style.background = 'rgb(var(--surface-2))'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M2 2l10 10M12 2L2 12"/>
+            </svg>
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-hidden">
+          {loading && (
+            <div className="h-full flex flex-col items-center justify-center gap-3">
+              <Spinner size={24} />
+              <span className="text-[13px] text-t2">Loading preview...</span>
+            </div>
+          )}
+          {error && (
+            <div className="h-full flex items-center justify-center text-[13px] text-t2">{error}</div>
+          )}
+          {url && isPdf && (
+            <iframe src={url} className="w-full h-full border-0" title="Resume preview" />
+          )}
+          {url && !isPdf && (
+            <div className="h-full flex flex-col items-center justify-center gap-4 p-8 text-center">
+              <div className="w-14 h-14 rounded-xl flex items-center justify-center" style={{ background: 'rgba(99,102,241,0.1)' }}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--accent))" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
+                </svg>
+              </div>
+              <div>
+                <div className="text-[14px] font-semibold text-t1">DOCX files cannot be previewed inline</div>
+                <div className="text-[13px] text-t2 mt-1">Download the file to open it in Word or Google Docs.</div>
+              </div>
+              <a href={url} download={resume.original_name} className="btn-primary px-5">
+                Download file
+              </a>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
 }
 
-function ResumeSlot({ slot, resume, onUpload, onDelete, onLabel, onUseForMatching }) {
+function ResumeSlot({ slot, resume, onUpload, onDelete, onLabel, onUseForMatching, onPreview }) {
   const fileRef = useRef(null)
   const [editing, setEditing] = useState(false)
   const [labelVal, setLabelVal] = useState('')
@@ -128,7 +217,7 @@ function ResumeSlot({ slot, resume, onUpload, onDelete, onLabel, onUseForMatchin
                 Use for matching
               </button>
               <button
-                onClick={() => previewResume(resume.id)}
+                onClick={() => onPreview(resume)}
                 className="btn-secondary py-1.5 px-3 text-[12px]"
               >
                 Preview
@@ -179,6 +268,7 @@ function ResumeSlot({ slot, resume, onUpload, onDelete, onLabel, onUseForMatchin
 export default function Resumes() {
   const toast = useToast()
   const [resumes, setResumes] = useState([])
+  const [previewing, setPreviewing] = useState(null)
 
   async function load() {
     const res = await apiFetch('/api/resumes')
@@ -239,9 +329,12 @@ export default function Resumes() {
             onDelete={del}
             onLabel={saveLabel}
             onUseForMatching={useForMatching}
+            onPreview={r => setPreviewing(r)}
           />
         ))}
       </div>
+
+      {previewing && <PreviewModal resume={previewing} onClose={() => setPreviewing(null)} />}
     </div>
   )
 }
