@@ -9,7 +9,9 @@ import {
   Spinner,
 } from '../ui.jsx'
 
-const INNER_BG = 'rgb(var(--surface-2))'
+const INNER_BG = 'rgba(99,102,241,0.04)'
+const INNER_BORDER = 'rgba(99,102,241,0.18)'
+const BOX_HEIGHT = '218px'
 
 function ClearBtn({ onClick }) {
   return (
@@ -17,9 +19,9 @@ function ClearBtn({ onClick }) {
       onClick={onClick}
       className="w-6 h-6 flex items-center justify-center rounded-sm transition-colors flex-shrink-0"
       title="Clear"
-      style={{ color: 'rgb(var(--t3))' }}
-      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(220,38,38,0.08)'; e.currentTarget.style.color = '#dc2626' }}
-      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgb(var(--t3))' }}
+      style={{ color: 'rgb(var(--accent))', background: 'rgba(99,102,241,0.08)' }}
+      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.16)' }}
+      onMouseLeave={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.08)' }}
     >
       <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M2 2l10 10M12 2L2 12"/>
@@ -101,7 +103,7 @@ export default function ATS() {
                 onChange={e => setResumeText(e.target.value)}
                 placeholder="Paste your full resume text here..."
                 className="input-base resize-none"
-                style={{ height: '210px', background: INNER_BG, border: '2px dashed rgba(0,0,0,0.1)' }}
+                style={{ height: BOX_HEIGHT, background: INNER_BG, border: `2px dashed ${INNER_BORDER}` }}
               />
             </CardBody>
           </Card>
@@ -121,7 +123,7 @@ export default function ATS() {
                 onChange={e => setJd(e.target.value)}
                 placeholder="Paste the job description to optimise against..."
                 className="input-base resize-none"
-                style={{ height: '210px', background: INNER_BG, border: '2px dashed rgba(0,0,0,0.1)' }}
+                style={{ height: BOX_HEIGHT, background: INNER_BG, border: `2px dashed ${INNER_BORDER}` }}
               />
             </CardBody>
           </Card>

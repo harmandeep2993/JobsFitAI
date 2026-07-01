@@ -10,19 +10,21 @@ import {
   Spinner, ScoreLabel,
 } from '../ui.jsx'
 
-// === Shared inner background for both input boxes ===
-const INNER_BG = 'rgb(var(--surface-2))'
+// Soft indigo tint - same for upload zone and textarea
+const INNER_BG = 'rgba(99,102,241,0.04)'
+const INNER_BORDER = 'rgba(99,102,241,0.18)'
+const BOX_HEIGHT = '218px'
 
-// === Clear button ===
+// === Clear button - accent coloured ===
 function ClearBtn({ onClick }) {
   return (
     <button
       onClick={onClick}
       className="w-6 h-6 flex items-center justify-center rounded-sm transition-colors flex-shrink-0"
       title="Clear"
-      style={{ color: 'rgb(var(--t3))' }}
-      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(220,38,38,0.08)'; e.currentTarget.style.color = '#dc2626' }}
-      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgb(var(--t3))' }}
+      style={{ color: 'rgb(var(--accent))', background: 'rgba(99,102,241,0.08)' }}
+      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.16)' }}
+      onMouseLeave={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.08)' }}
     >
       <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M2 2l10 10M12 2L2 12"/>
@@ -100,13 +102,13 @@ function UploadZone({ file, onFile, onClear }) {
       onDragOver={e => { e.preventDefault(); setDragging(true) }}
       onDragLeave={() => setDragging(false)}
       onDrop={handleDrop}
-      className="relative h-full flex flex-col items-center justify-center rounded-lg transition-all select-none"
+      className="relative flex flex-col items-center justify-center rounded-lg transition-all select-none"
       style={{
         background: INNER_BG,
-        border: `2px dashed ${file ? 'rgba(22,163,74,0.4)' : dragging ? 'rgb(var(--accent))' : 'rgba(0,0,0,0.1)'}`,
+        border: `2px dashed ${file ? 'rgba(22,163,74,0.4)' : dragging ? 'rgb(var(--accent))' : INNER_BORDER}`,
         cursor: file ? 'default' : 'pointer',
-        minHeight: '160px',
-        padding: '28px 20px',
+        height: BOX_HEIGHT,
+        padding: '20px',
       }}
     >
       {file ? (
@@ -119,17 +121,17 @@ function UploadZone({ file, onFile, onClear }) {
           <div className="text-[13.5px] font-semibold text-t1 truncate max-w-full px-2 text-center">{file.name}</div>
           <div className="text-[12px] text-t3">{(file.size / 1024).toFixed(0)} KB</div>
           <button
-            onClick={e => { e.stopPropagation(); onClear() }}
+            onClick={e => { e.stopPropagation(); fileRef.current?.click() }}
             className="mt-1 text-[11.5px] font-medium underline underline-offset-2"
             style={{ color: 'rgb(var(--accent))' }}
           >
-            Replace file
+            Click here to change file
           </button>
         </div>
       ) : (
         <div className="flex flex-col items-center gap-2 text-center">
-          <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.06)' }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--t3))" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: 'rgba(99,102,241,0.1)' }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--accent))" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
             </svg>
           </div>
@@ -311,7 +313,7 @@ export default function Analyzer() {
                 onChange={e => setJd(e.target.value)}
                 placeholder="Paste the full job description here..."
                 className="input-base resize-none"
-                style={{ height: '210px', background: INNER_BG, border: '2px dashed rgba(0,0,0,0.1)' }}
+                style={{ height: BOX_HEIGHT, background: INNER_BG, border: `2px dashed ${INNER_BORDER}` }}
               />
             </CardBody>
           </Card>
