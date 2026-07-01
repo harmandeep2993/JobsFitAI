@@ -37,8 +37,13 @@ DetectorFactory.seed = 0
 ADZUNA_APP_ID = os.getenv("ADZUNA_APP_ID")
 ADZUNA_APP_KEY = os.getenv("ADZUNA_APP_KEY")
 
-# Country code is part of the path; default to Germany ("de").
-BASE_URL_TEMPLATE = "https://api.adzuna.com/v1/api/jobs/{country}/search/1"
+# Country code and page number are path components; Adzuna pages are 1-indexed.
+BASE_URL_TEMPLATE = "https://api.adzuna.com/v1/api/jobs/{country}/search/{page}"
+
+# Hard ceiling on results fetched per query to avoid runaway pagination.
+MAX_RESULTS_PER_QUERY = 200
+# Adzuna API maximum per single page request.
+ADZUNA_PAGE_SIZE = 50
 
 _TAG_RE = re.compile(r"<[^>]+>")
 
@@ -135,19 +140,71 @@ def _parse_job(raw: dict) -> Job:
     )
 
 
+def _fetch_page(query: str, location: str, country: str, page: int) -> tuple[list, int]:
+    """
+    Fetch a single Adzuna results page.
+
+    Returns (raw_results, total_count). On failure returns ([], 0).
+    """
+    url = BASE_URL_TEMPLATE.format(country=country, page=page)
+    params = {
+        "app_id": ADZUNA_APP_ID,
+        "app_key": ADZUNA_APP_KEY,
+        "what": query,
+        "where": location,
+        "results_per_page": ADZUNA_PAGE_SIZE,
+        "content-type": "application/json",
+    }
+
+    response = None
+    for attempt in range(3):
+        try:
+            response = requests.get(url, params=params, timeout=15)
+            if response.status_code in (429, 500, 502, 503, 504) and attempt < 2:
+                logger.warning(
+                    "Adzuna %s for '%s' page %d - retry %d",
+                    response.status_code,
+                    query,
+                    page,
+                    attempt + 1,
+                )
+                time.sleep(1.5 * (attempt + 1))
+                continue
+            response.raise_for_status()
+            break
+        except requests.RequestException as e:
+            if attempt < 2:
+                time.sleep(1.5 * (attempt + 1))
+                continue
+            logger.error("Adzuna request failed (page %d): %s", page, e)
+            return [], 0
+
+    if response is None:
+        return [], 0
+
+    try:
+        data = response.json()
+    except ValueError as e:
+        logger.error("Adzuna JSON parse failed (page %d): %s", page, e)
+        return [], 0
+
+    return data.get("results", []), data.get("count", 0)
+
+
 def fetch_adzuna_jobs(
     query: str = "machine learning engineer",
     location: str = "berlin",
-    results: int = 5,
+    results: int = 50,
     country: str = "de",
 ) -> list[Job]:
     """
-    Fetch job postings from the Adzuna API.
+    Fetch job postings from the Adzuna API, paginating automatically when
+    the total result count exceeds one page (50 jobs).
 
     Args:
         query (str):    Search terms (Adzuna ``what`` parameter).
         location (str): Location filter (Adzuna ``where`` parameter).
-        results (int):  Number of results per page.
+        results (int):  Maximum jobs to return (capped at MAX_RESULTS_PER_QUERY).
         country (str):  Adzuna country code used in the request path.
 
     Returns:
@@ -158,60 +215,47 @@ def fetch_adzuna_jobs(
         logger.error("Missing ADZUNA_APP_ID / ADZUNA_APP_KEY - cannot fetch jobs")
         return []
 
-    url = BASE_URL_TEMPLATE.format(country=country)
-    params = {
-        "app_id": ADZUNA_APP_ID,
-        "app_key": ADZUNA_APP_KEY,
-        "what": query,
-        "where": location,
-        "results_per_page": results,
-        "content-type": "application/json",
-    }
+    want = min(results, MAX_RESULTS_PER_QUERY)
+    all_raw: list[dict] = []
+    page = 1
 
-    # Retry on transient rate-limit / server errors (429, 5xx).
-    response = None
-    for attempt in range(3):
-        try:
-            response = requests.get(url, params=params, timeout=15)
-            if response.status_code in (429, 500, 502, 503, 504) and attempt < 2:
-                logger.warning(
-                    "Adzuna %s for '%s' - retry %d",
-                    response.status_code,
-                    query,
-                    attempt + 1,
-                )
-                time.sleep(1.0 * (attempt + 1))
-                continue
-            response.raise_for_status()
+    while len(all_raw) < want:
+        raw_jobs, total = _fetch_page(query, location, country, page)
+
+        if not raw_jobs:
             break
-        except requests.RequestException as e:
-            if attempt < 2:
-                time.sleep(1.0 * (attempt + 1))
-                continue
-            logger.error("Adzuna request failed: %s", e)
-            return []
 
-    if response is None:
-        return []
+        all_raw.extend(raw_jobs)
+        logger.info(
+            "Adzuna page %d: got %d jobs (total available: %d, fetched so far: %d)",
+            page,
+            len(raw_jobs),
+            total,
+            len(all_raw),
+        )
 
-    try:
-        data = response.json()
-    except ValueError as e:
-        logger.error("Adzuna JSON parse failed: %s", e)
-        return []
-    raw_jobs = data.get("results", [])
+        # Stop if we have enough or there are no more pages.
+        if len(all_raw) >= want or len(all_raw) >= total:
+            break
+
+        page += 1
+        time.sleep(0.4)  # gentle inter-page throttle
+
+    jobs = [_parse_job(j) for j in all_raw[:want]]
     logger.info(
-        "Adzuna returned %d of %d total jobs", len(raw_jobs), data.get("count", 0)
+        "Adzuna '%s': returning %d jobs (total available: %d)",
+        query,
+        len(jobs),
+        total if all_raw else 0,
     )
-
-    return [_parse_job(job) for job in raw_jobs]
+    return jobs
 
 
 def fetch_adzuna_multi(
     titles: list[str],
     location: str = "",
     country: str = "de",
-    per_title: int = 5,
+    per_title: int = MAX_RESULTS_PER_QUERY,
 ) -> list[Job]:
     """
     Run one Adzuna search per target title and merge the results.
