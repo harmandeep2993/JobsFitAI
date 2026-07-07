@@ -5,6 +5,7 @@ Auth endpoints: /api/auth/register, /api/auth/login, /api/auth/me
 Protected routes read the current user via get_current_user() dependency.
 """
 
+import os
 import threading
 import time
 
@@ -19,6 +20,20 @@ from schemas.auth import LoginRequest, RegisterRequest
 router = APIRouter()
 
 _bearer = HTTPBearer()
+
+# === Admin role ===
+# ADMIN_EMAILS in .env: comma-separated list of emails that get admin rights.
+# Role is derived from the email at request time, so the same account is admin
+# both locally and in production without any database flag or migration.
+_ADMIN_EMAILS = {
+    e.strip().lower() for e in os.getenv("ADMIN_EMAILS", "").split(",") if e.strip()
+}
+
+
+def is_admin_email(email: str) -> bool:
+    """Return True if this email is configured as an admin in .env."""
+    return (email or "").strip().lower() in _ADMIN_EMAILS
+
 
 # === Rate limiting ===
 # Sliding window per client IP on credential endpoints. In-memory: resets on
@@ -67,6 +82,14 @@ def get_current_user(
     if not user:
         raise HTTPException(status_code=401, detail="user_not_found")
 
+    user["is_admin"] = is_admin_email(user["email"])
+    return user
+
+
+def require_admin(user: dict = Depends(get_current_user)) -> dict:
+    """Dependency for admin-only routes; 403 for everyone else."""
+    if not user.get("is_admin"):
+        raise HTTPException(status_code=403, detail="admin_required")
     return user
 
 
@@ -103,5 +126,6 @@ async def me(user: dict = Depends(get_current_user)) -> JSONResponse:
             "user_id": user["id"],
             "email": user["email"],
             "created_at": user["created_at"],
+            "is_admin": user["is_admin"],
         }
     )

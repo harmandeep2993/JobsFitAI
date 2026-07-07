@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 
-from api.routes.auth import get_current_user
+from api.routes.auth import get_current_user, require_admin
 from core import database as db, state as session
 from core.logger import get_logger
 from services.llm.caller import check_llm
@@ -47,9 +47,13 @@ async def api_get_llm_settings(
 @router.post("/llm-settings")
 async def api_set_llm_settings(
     body: LlmSettingsRequest,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_admin),
 ) -> JSONResponse:
-    """Switch the active LLM provider and/or model; verifies connectivity after switching."""
+    """Switch the active LLM provider and/or model; verifies connectivity after switching.
+
+    Admin only - the provider selection is app-wide, so a regular user
+    changing it would affect every other user's analyses.
+    """
     provider = (body.provider or "").strip()
     model = (body.model or "").strip()
 
