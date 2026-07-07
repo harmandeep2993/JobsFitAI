@@ -198,6 +198,7 @@ _SCHEMA_STMTS = [
     )""",
     """CREATE TABLE IF NOT EXISTS analyses (
         id         TEXT PRIMARY KEY,
+        user_id    TEXT NOT NULL DEFAULT 'local',
         resume_id  TEXT NOT NULL,
         jd_snippet TEXT,
         score      REAL,
@@ -237,6 +238,11 @@ _MIGRATION_STMTS = [
     "ALTER TABLE matches   ADD COLUMN user_id TEXT NOT NULL DEFAULT 'local'",
     "ALTER TABLE events    ADD COLUMN user_id TEXT NOT NULL DEFAULT 'local'",
     "ALTER TABLE seen_jobs ADD COLUMN user_id TEXT NOT NULL DEFAULT 'local'",
+    "ALTER TABLE analyses  ADD COLUMN user_id TEXT NOT NULL DEFAULT 'local'",
+    # Claim pre-migration rows for their owner via the resume they belong to
+    """UPDATE analyses SET user_id = COALESCE(
+        (SELECT r.user_id FROM resumes r WHERE r.id = analyses.resume_id), user_id
+    ) WHERE user_id = 'local'""",
 ]
 
 

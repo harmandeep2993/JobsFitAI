@@ -9,7 +9,6 @@ import asyncio
 import csv
 import io
 import json
-import os
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -19,7 +18,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from api.routes.auth import get_current_user
 from core.config import MAX_AGE_DAYS, SEARCH_PER_TITLE
 from core.logger import get_logger
-from core import state
+from core import state, uploads
 from core.state import sched_last_ref
 from services.extractors.jd_extractor import extract_jd
 from services.matcher.engine import match
@@ -101,10 +100,10 @@ async def api_match_resume(
 ) -> JSONResponse:
     """Parse + extract an uploaded resume and store it for this user's matching session."""
     user_id = current_user["id"]
-    tmp = (body.tmp or "").strip()
+    tmp = uploads.resolve(user_id, (body.tmp or "").strip())
     name = (body.name or "resume").strip()
 
-    if not tmp or not os.path.exists(tmp):
+    if not tmp:
         raise HTTPException(status_code=400, detail="resume file not found")
 
     def _process() -> dict:

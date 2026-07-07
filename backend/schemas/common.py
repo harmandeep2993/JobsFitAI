@@ -11,8 +11,3 @@ class OkResponse(BaseModel):
 class LlmSettingsRequest(BaseModel):
     provider: str
     model: str
-
-
-class LlmKeyRequest(BaseModel):
-    provider: str
-    api_key: str

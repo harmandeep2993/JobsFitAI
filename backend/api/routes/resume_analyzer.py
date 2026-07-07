@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, JSONResponse
 
+from core import uploads
 from core.config import JD_MAX_CHARS, MAX_FILE_SIZE_MB, SUPPORTED_EXTENSIONS
 from core.logger import get_logger
 from services.extractors import extract_all
@@ -40,11 +41,15 @@ _PREVIEW_TYPES = {
 
 
 @router.post("/upload")
-async def api_upload(file: UploadFile = File(...)) -> JSONResponse:
+async def api_upload(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user),
+) -> JSONResponse:
     """
     Handle resume file uploads.
 
-    Returns {ok, name, tmp, kb, ext} on success.
+    Returns {ok, name, tmp, kb, ext} on success. `tmp` is an opaque token
+    resolved server-side - never a filesystem path.
     """
     if file is None:
         raise HTTPException(status_code=400, detail="no file uploaded")
@@ -69,11 +74,13 @@ async def api_upload(file: UploadFile = File(...)) -> JSONResponse:
         tmp_file.write(data)
         temp_path = tmp_file.name
 
+    token = uploads.register(current_user["id"], temp_path)
+
     return JSONResponse(
         {
             "ok": True,
             "name": filename,
-            "tmp": temp_path,
+            "tmp": token,
             "kb": round(len(data) / 1024, 1),
             "ext": suffix.upper()[1:],
         }
@@ -81,15 +88,18 @@ async def api_upload(file: UploadFile = File(...)) -> JSONResponse:
 
 
 @router.get("/resume-file")
-async def api_resume_file(tmp: str) -> FileResponse:
-    """Serve a temp-path resume file for inline preview in the browser."""
-    tmp = tmp.strip()
-    if not tmp or not os.path.exists(tmp):
+async def api_resume_file(
+    tmp: str,
+    current_user: dict = Depends(get_current_user),
+) -> FileResponse:
+    """Serve an uploaded temp resume for inline preview, resolved by token."""
+    path = uploads.resolve(current_user["id"], tmp)
+    if not path:
         return JSONResponse({"ok": False, "error": "file not found"}, status_code=404)
-    suffix = Path(tmp).suffix.lower()
+    suffix = Path(path).suffix.lower()
     if suffix not in _PREVIEW_TYPES:
         return JSONResponse({"ok": False, "error": "unsupported type"}, status_code=400)
-    return FileResponse(tmp, media_type=_PREVIEW_TYPES[suffix])
+    return FileResponse(path, media_type=_PREVIEW_TYPES[suffix])
 
 
 @router.post("/resume-preview")
@@ -108,8 +118,12 @@ async def api_resume_preview(
                 {"ok": False, "error": "file not found"}, status_code=404
             )
         tmp = row["file_path"]
-    elif not tmp or not os.path.exists(tmp):
-        return JSONResponse({"ok": False, "error": "file not found"}, status_code=400)
+    else:
+        tmp = uploads.resolve(current_user["id"], tmp)
+        if not tmp:
+            return JSONResponse(
+                {"ok": False, "error": "file not found"}, status_code=400
+            )
 
     text = await run_in_threadpool(lambda: extract_all_text(tmp))
     if not text:
@@ -201,10 +215,12 @@ async def api_analyze(
                 {"ok": False, "error": "resume file not found"}, status_code=400
             )
         tmp = row["file_path"]
-    elif not tmp or not os.path.exists(tmp):
-        return JSONResponse(
-            {"ok": False, "error": "resume file not found"}, status_code=400
-        )
+    else:
+        tmp = uploads.resolve(current_user["id"], tmp)
+        if not tmp:
+            return JSONResponse(
+                {"ok": False, "error": "resume file not found"}, status_code=400
+            )
 
     if len(jd_text) < 50:
         return JSONResponse(
@@ -279,6 +295,7 @@ async def api_analyze(
     if resume_id:
         try:
             analysis_store.save(
+                current_user["id"],
                 resume_id,
                 jd_text,
                 results.get("overall_score", 0),

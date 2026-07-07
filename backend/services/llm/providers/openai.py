@@ -30,12 +30,6 @@ _API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
 _MODEL = OPENAI_CONFIG.get("model", "gpt-4o-mini")
 
 
-def set_api_key(key: str) -> None:
-    global _API_KEY
-    _API_KEY = key.strip()
-    os.environ["OPENAI_API_KEY"] = _API_KEY
-
-
 def has_key() -> bool:
     return bool(_API_KEY)
 

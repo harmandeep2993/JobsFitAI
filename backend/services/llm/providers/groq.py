@@ -27,12 +27,6 @@ _API_KEY = os.getenv("GROQ_API_KEY", "").strip()
 _MODEL = GROQ_CONFIG.get("model", "llama-3.1-8b-instant")
 
 
-def set_api_key(key: str) -> None:
-    global _API_KEY
-    _API_KEY = key.strip()
-    os.environ["GROQ_API_KEY"] = _API_KEY
-
-
 def has_key() -> bool:
     return bool(_API_KEY)
 

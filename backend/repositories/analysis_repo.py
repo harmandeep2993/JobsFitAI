@@ -18,14 +18,16 @@ from core import database as db
 _SNIPPET_MAX = 120
 
 
-def save(resume_id: str, jd_snippet: str, score: float, label: str) -> None:
+def save(
+    user_id: str, resume_id: str, jd_snippet: str, score: float, label: str
+) -> None:
     """Upsert an analysis result; update score/label if the same resume+JD pair already exists."""
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
     snippet = (jd_snippet or "")[:_SNIPPET_MAX]
     with db.connect() as conn:
         existing = conn.execute(
-            "SELECT id FROM analyses WHERE resume_id=? AND jd_snippet=?",
-            (resume_id, snippet),
+            "SELECT id FROM analyses WHERE user_id=? AND resume_id=? AND jd_snippet=?",
+            (user_id, resume_id, snippet),
         ).fetchone()
         if existing:
             conn.execute(
@@ -34,9 +36,17 @@ def save(resume_id: str, jd_snippet: str, score: float, label: str) -> None:
             )
         else:
             conn.execute(
-                """INSERT INTO analyses (id, resume_id, jd_snippet, score, label, scored_at)
-                   VALUES (?,?,?,?,?,?)""",
-                (str(uuid.uuid4()), resume_id, snippet, round(score), label, now),
+                """INSERT INTO analyses (id, user_id, resume_id, jd_snippet, score, label, scored_at)
+                   VALUES (?,?,?,?,?,?,?)""",
+                (
+                    str(uuid.uuid4()),
+                    user_id,
+                    resume_id,
+                    snippet,
+                    round(score),
+                    label,
+                    now,
+                ),
             )
 
 

@@ -58,11 +58,18 @@ _sched_last_ref = session.sched_last_ref
 
 app = FastAPI(title="JobsFitAI")
 
-# Allow all origins in dev so the frontend served from /app can reach /api/*.
-# In production, restrict origins to the actual domain.
+# Origins default to the local dev servers; production sets ALLOWED_ORIGINS
+# in .env as a comma-separated list of real domains. Wildcard origins with
+# credentials enabled would let any site ride authenticated sessions.
+_DEFAULT_ORIGINS = "http://localhost:5173,http://localhost:8080"
+_ALLOWED_ORIGINS = [
+    o.strip()
+    for o in os.getenv("ALLOWED_ORIGINS", _DEFAULT_ORIGINS).split(",")
+    if o.strip()
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
