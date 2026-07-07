@@ -7,6 +7,7 @@ from pydantic import BaseModel, EmailStr, field_validator
 class RegisterRequest(BaseModel):
     email: EmailStr
     password: str
+    invite_code: str = ""
 
     @field_validator("password")
     @classmethod

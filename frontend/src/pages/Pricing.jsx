@@ -50,21 +50,22 @@ const MATRIX = [
     { label: 'ATS compatibility scan',        free: true,  pro: true },
     { label: 'Section completeness check',    free: true,  pro: true },
     { label: 'Formatting warnings',           free: true,  pro: true },
-    { label: 'AI-powered ATS optimise',       free: false, pro: true },
+    { label: 'AI-powered ATS optimise',       free: true,  pro: true },
+    { label: 'DOCX download of optimised resume', free: true, pro: true },
   ]},
-  { section: 'AI / LLM', rows: [
-    { label: 'OpenAI GPT-4o',                 free: true,  pro: true },
-    { label: 'Groq (fast, free tier)',        free: true,  pro: true },
-    { label: 'Local Ollama model',            free: true,  pro: true },
-    { label: 'Priority LLM routing',          free: false, pro: true },
+  { section: 'AI', rows: [
+    { label: 'AI bullet improvement from your experience', free: true, pro: true },
+    { label: 'Powered by OpenAI GPT-4o-mini', free: true,  pro: true },
+    { label: 'Automatic fallback provider',   free: true,  pro: true },
+    { label: 'Priority analysis',             free: false, pro: true },
   ]},
 ]
 
 const FAQ_PRICING = [
-  { q: 'Can I cancel my Pro subscription at any time?', a: 'Yes. You can cancel from your account settings with one click. Your Pro features stay active until the end of the billing period.' },
+  { q: 'How do I get access during the beta?', a: 'Access is invite-only right now. If you have an invite code, register with it on the sign-up page - everything is free during the beta.' },
   { q: 'Is the free plan really free forever?', a: 'Yes. The free plan includes the full analyzer, ATS check, and resume storage with no time limit. We do not require a credit card to sign up.' },
-  { q: 'What payment methods are accepted?', a: 'We accept all major credit cards (Visa, Mastercard, Amex) and SEPA direct debit for users in Germany and the EU.' },
-  { q: 'Do you offer student or non-profit discounts?', a: 'Yes - send us a short note from your university or organisation email and we will apply a 50% discount to the Pro plan.' },
+  { q: 'When does the Pro plan launch?', a: 'Pro launches after the beta, with scheduled auto-fetching and export features. Beta users will get early access before public launch.' },
+  { q: 'Do you offer student or non-profit discounts?', a: 'Yes - once Pro launches, send us a short note from your university or organisation email and we will apply a 50% discount.' },
 ]
 
 export default function Pricing() {
@@ -89,7 +90,7 @@ export default function Pricing() {
             style={{ background: 'rgb(99,102,241)' }}
             onMouseEnter={e => e.currentTarget.style.background='rgb(79,70,229)'}
             onMouseLeave={e => e.currentTarget.style.background='rgb(99,102,241)'}>
-            Get started
+            Join the beta
           </Link>
         </div>
       </header>
@@ -130,10 +131,10 @@ export default function Pricing() {
                 style={{ color: 'rgb(99,102,241)', borderColor: 'rgba(99,102,241,0.3)', background: 'rgba(99,102,241,0.05)' }}
                 onMouseEnter={e => e.currentTarget.style.background='rgba(99,102,241,0.1)'}
                 onMouseLeave={e => e.currentTarget.style.background='rgba(99,102,241,0.05)'}>
-                Get started free
+                Join the beta
               </Link>
               <ul className="space-y-2.5 flex-1">
-                {['Resume analyzer (unlimited)', 'ATS compatibility check', 'Keyword gap analysis', 'AI profile summary', '3 resume slots', 'Manual job search', 'All LLM providers'].map(f => (
+                {['Resume analyzer (unlimited)', 'ATS check and AI optimise', 'AI bullet improvement', 'Keyword gap analysis', 'AI profile summary', '3 resume slots', 'Live job matching'].map(f => (
                   <li key={f} className="flex items-center gap-2.5 text-[13.5px]" style={{ color: 'rgb(55,65,81)' }}>
                     {CHECK} {f}
                   </li>
@@ -153,15 +154,13 @@ export default function Pricing() {
                 9 <span className="text-[18px] font-semibold" style={{ color: 'rgba(255,255,255,0.7)' }}>EUR/mo</span>
               </div>
               <p className="text-[13px] mb-7" style={{ color: 'rgba(255,255,255,0.7)' }}>Automated job hunting on autopilot.</p>
-              <Link to="/login"
-                className="w-full h-11 flex items-center justify-center rounded-xl font-bold text-[14px] mb-7 transition-all"
-                style={{ background: 'white', color: 'rgb(99,102,241)' }}
-                onMouseEnter={e => e.currentTarget.style.boxShadow='0 4px 20px rgba(0,0,0,0.2)'}
-                onMouseLeave={e => e.currentTarget.style.boxShadow='none'}>
-                Start Pro trial
-              </Link>
+              <div
+                className="w-full h-11 flex items-center justify-center rounded-xl font-bold text-[14px] mb-7 cursor-default"
+                style={{ background: 'rgba(255,255,255,0.25)', color: 'white' }}>
+                Coming soon
+              </div>
               <ul className="space-y-2.5 flex-1">
-                {['Everything in Free', 'Scheduled auto-fetch (hourly / daily)', 'Live job board scan (200+ per run)', 'Priority LLM routing', 'AI-powered ATS optimise', 'CSV export of all matches', 'Early access to new features'].map(f => (
+                {['Everything in Free', 'Scheduled auto-fetch (hourly / daily)', 'Live job board scan (200+ per run)', 'Priority analysis', 'DOCX resume export', 'CSV export of all matches', 'Early access to new features'].map(f => (
                   <li key={f} className="flex items-center gap-2.5 text-[13.5px] text-white">
                     {PROCHECK} {f}
                   </li>

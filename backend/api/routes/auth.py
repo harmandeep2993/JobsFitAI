@@ -21,6 +21,12 @@ router = APIRouter()
 
 _bearer = HTTPBearer()
 
+# === Invite gate ===
+# When INVITE_CODE is set in .env, registration requires it. Leave unset
+# to allow open registration (local development).
+_INVITE_CODE = os.getenv("INVITE_CODE", "").strip()
+
+
 # === Admin role ===
 # ADMIN_EMAILS in .env: comma-separated list of emails that get admin rights.
 # Role is derived from the email at request time, so the same account is admin
@@ -96,6 +102,8 @@ def require_admin(user: dict = Depends(get_current_user)) -> dict:
 @router.post("/register")
 async def register(body: RegisterRequest, request: Request) -> JSONResponse:
     _check_rate_limit(request)
+    if _INVITE_CODE and (body.invite_code or "").strip() != _INVITE_CODE:
+        raise HTTPException(status_code=403, detail="invalid_invite_code")
     if user_model.email_exists(body.email):
         raise HTTPException(status_code=409, detail="email_already_registered")
 

@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { saveToken } from '../lib/auth.js'
+import { errMsg } from '../lib/errors.js'
 
 export default function Login() {
   const [mode, setMode] = useState('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [inviteCode, setInviteCode] = useState('')
   const [err, setErr] = useState('')
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
@@ -23,10 +25,12 @@ export default function Login() {
       const res = await fetch(path, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify(mode === 'register'
+          ? { email, password, invite_code: inviteCode }
+          : { email, password }),
       })
       const data = await res.json()
-      if (!res.ok) { setErr(data.detail || 'Something went wrong.'); return }
+      if (!res.ok) { setErr(errMsg(data, 'Something went wrong.')); return }
       saveToken(data.token)
       navigate('/app', { replace: true })
     } catch {
@@ -63,7 +67,7 @@ export default function Login() {
             <p className="text-[13.5px] text-t2">
               {mode === 'login'
                 ? 'Sign in to continue to your dashboard.'
-                : 'Start analyzing your resume against job listings.'}
+                : 'JobsFitAI is in invite-only beta. Enter your invite code to join.'}
             </p>
           </div>
 
@@ -100,6 +104,22 @@ export default function Login() {
                 className="input-base"
               />
             </div>
+
+            {mode === 'register' && (
+              <div className="space-y-1.5">
+                <label className="block text-[12.5px] font-medium text-t2">
+                  Invite code
+                  <span className="font-normal text-t3"> (required during beta)</span>
+                </label>
+                <input
+                  type="text"
+                  value={inviteCode}
+                  onChange={e => setInviteCode(e.target.value)}
+                  placeholder="Enter your invite code"
+                  className="input-base"
+                />
+              </div>
+            )}
 
             {err && (
               <div className="flex items-start gap-2 text-[12.5px] text-red bg-red-bg border border-red-bd rounded-sm px-3 py-2.5">

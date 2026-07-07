@@ -23,6 +23,7 @@ const MESSAGES = {
   too_many_attempts_try_again_later: 'Too many attempts - wait a minute and try again.',
   admin_required: 'Only the admin can change this setting.',
   invalid_or_expired_token: 'Your session expired - please log in again.',
+  invalid_invite_code: 'That invite code is not valid. JobFitAI is currently invite-only - contact us to get access.',
   no_data: 'No stored resume data found - upload a resume in the Resumes tab first.',
   llm_failed: 'The AI provider did not respond - try again in a minute.',
   parse_failed: 'The AI response could not be processed - please try again.',
