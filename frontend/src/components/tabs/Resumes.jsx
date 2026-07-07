@@ -108,11 +108,17 @@ function PreviewModal({ resume, onClose }) {
   )
 }
 
+// After this many ms without extracted data, treat extraction as stuck
+// and offer a manual retry (normal extraction finishes in under a minute).
+const EXTRACTION_STUCK_MS = 2 * 60 * 1000
+
 // === Uploaded resume card ===
-function ResumeCard({ resume, index, onDelete, onLabel, onUseForMatching, onPreview }) {
+function ResumeCard({ resume, index, onDelete, onLabel, onUseForMatching, onPreview, onRetry, retrying }) {
   const [editing, setEditing] = useState(false)
   const [labelVal, setLabelVal] = useState('')
   const hasExtracted = Boolean(resume.extracted_json)
+  const uploadedMs = resume.uploaded_at ? Date.now() - new Date(resume.uploaded_at).getTime() : 0
+  const extractionStuck = !hasExtracted && uploadedMs > EXTRACTION_STUCK_MS
 
   function startEdit() {
     setLabelVal(resume.label || resume.original_name || '')
@@ -181,13 +187,25 @@ function ResumeCard({ resume, index, onDelete, onLabel, onUseForMatching, onPrev
 
         {/* Extraction status */}
         <div className="flex items-center gap-2 text-[12px]"
-          style={{ color: hasExtracted ? '#16a34a' : 'rgb(var(--t3))' }}>
+          style={{ color: hasExtracted ? '#16a34a' : extractionStuck ? '#dc2626' : 'rgb(var(--t3))' }}>
           {hasExtracted ? (
             <>
               <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M2.5 7l3 3 6-6"/>
               </svg>
               Data extracted
+            </>
+          ) : extractionStuck ? (
+            <>
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <path d="M8 3v5M8 11v.5"/><path d="M8 1L1 13h14L8 1z"/>
+              </svg>
+              Extraction failed
+              <button onClick={() => onRetry(resume.id)} disabled={retrying}
+                className="ml-1 px-2 py-0.5 text-[11px] font-medium rounded-sm transition-colors"
+                style={{ color: 'rgb(var(--accent))', background: 'rgba(99,102,241,0.08)' }}>
+                {retrying ? 'Retrying...' : 'Retry'}
+              </button>
             </>
           ) : (
             <><Spinner size={11} /> Extracting data...</>
@@ -252,6 +270,7 @@ export default function Resumes() {
   const toast = useToast()
   const [resumes, setResumes] = useState([])
   const [previewing, setPreviewing] = useState(null)
+  const [retryingId, setRetryingId] = useState(null)
 
   async function load() {
     const res = await apiFetch('/api/resumes')
@@ -286,6 +305,15 @@ export default function Resumes() {
     if (res?.ok) { toast('Label saved', 'success'); load() }
   }
 
+  async function retryExtraction(id) {
+    setRetryingId(id)
+    try {
+      const res = await apiFetch(`/api/resumes/${id}/re-extract`, { method: 'POST' })
+      if (res?.ok) { toast('Extraction complete', 'success'); load() }
+      else toast('Extraction failed again - the file may be image-based. Try re-saving it as a text-based PDF.', 'error')
+    } finally { setRetryingId(null) }
+  }
+
   async function useForMatching(id) {
     const res = await apiFetch(`/api/resumes/${id}/use-for-matching`, { method: 'POST' })
     if (res?.ok) {
@@ -307,8 +335,9 @@ export default function Resumes() {
         description="Store up to 3 resume versions. Activate any slot as your active resume for job matching."
         action={
           <span className="text-[13px] font-semibold px-3 py-1.5 rounded-lg"
+            title="The free plan includes 3 resume slots - delete one to make room for another version."
             style={{ background: 'rgba(99,102,241,0.08)', color: 'rgb(var(--accent))' }}>
-            {resumes.length} / {MAX_SLOTS}
+            {resumes.length} / {MAX_SLOTS} slots
           </span>
         }
       />
@@ -323,6 +352,8 @@ export default function Resumes() {
             onLabel={saveLabel}
             onUseForMatching={useForMatching}
             onPreview={setPreviewing}
+            onRetry={retryExtraction}
+            retrying={retryingId === r.id}
           />
         ))}
         {canAddMore && (

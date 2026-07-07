@@ -3,12 +3,14 @@
 /api/history endpoint - per-user history of analyses, fetcher runs, applications.
 """
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from fastapi.responses import JSONResponse
 
 from api.routes.auth import get_current_user
 from core import database as db
 from core.logger import get_logger
+from repositories import analysis_repo as analysis_store
+from repositories import cache_repo as cache_store
 
 logger = get_logger(__name__)
 
@@ -26,7 +28,7 @@ async def api_history(
     user_id = current_user["id"]
     with db.connect() as conn:
         analyses = conn.execute(
-            """SELECT a.jd_snippet, a.score, a.label, a.scored_at,
+            """SELECT a.jd_snippet, a.score, a.label, a.scored_at, a.cache_hash,
                       r.label AS resume_label, r.slot
                FROM analyses a
                LEFT JOIN resumes r ON r.id = a.resume_id
@@ -60,3 +62,21 @@ async def api_history(
             "applications": [dict(r) for r in applications],
         }
     )
+
+
+@router.get("/history/analysis")
+async def api_history_analysis(
+    hash: str = Query(default=""),
+    current_user: dict = Depends(get_current_user),
+) -> JSONResponse:
+    """Reopen a past analysis: return the full cached payload for a history row."""
+    cache_hash = hash.strip()
+    if not cache_hash or not analysis_store.owns_hash(current_user["id"], cache_hash):
+        return JSONResponse({"ok": False, "error": "not_found"}, status_code=404)
+
+    payload = cache_store.get(cache_hash)
+    if not payload:
+        # Cache entry was purged - the summary row still exists but the
+        # full result is gone; the user must re-run the analysis.
+        return JSONResponse({"ok": False, "error": "expired"}, status_code=410)
+    return JSONResponse({"ok": True, **payload})

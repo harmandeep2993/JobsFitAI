@@ -105,6 +105,11 @@ export default function Pricing() {
           <p className="text-[16px] leading-relaxed" style={{ color: 'rgb(107,114,128)' }}>
             Start free and upgrade when you are ready to automate your job search.
           </p>
+          <div className="mt-5 inline-flex items-center gap-2 px-4 py-2 rounded-full text-[13px] font-medium"
+            style={{ background: 'rgba(99,102,241,0.08)', color: 'rgb(99,102,241)' }}>
+            <span className="w-2 h-2 rounded-full" style={{ background: 'rgb(99,102,241)' }} />
+            JobFitAI is currently in beta: everything is free while we test with invited users. Paid plans launch later.
+          </div>
         </motion.div>
       </section>
 

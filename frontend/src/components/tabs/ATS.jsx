@@ -1,13 +1,15 @@
 /**
  * ATS Check tab - resume picker (stored or new upload) + JD side by side.
+ * Check runs the deterministic scan; Optimise rewrites via LLM with a
+ * before/after coverage comparison and DOCX download.
  */
 import { useState } from 'react'
 import { apiFetch } from '../../lib/auth.js'
+import { errMsg } from '../../lib/errors.js'
 import { useToast } from '../Toast.jsx'
 import { ResumePicker } from '../ResumePicker.jsx'
 import {
-  PageHeader, Card, CardBody, CardSection, SectionLabel,
-  Spinner,
+  PageHeader, Card, CardBody, SectionLabel, Spinner,
 } from '../ui.jsx'
 
 const INNER_BG     = 'rgba(99,102,241,0.04)'
@@ -31,9 +33,10 @@ function ClearBtn({ onClick }) {
   )
 }
 
-function SectionFlag({ label, ok }) {
+function SectionFlag({ label, ok, suggestion }) {
   return (
-    <div className="flex items-center gap-2 px-3 py-2 rounded-sm border text-[12.5px] font-medium capitalize"
+    <div className="flex items-center gap-2 px-3 py-2 rounded-sm border text-[12.5px] font-medium"
+      title={suggestion || ''}
       style={ok
         ? { background: 'rgba(22,163,74,0.08)', borderColor: 'rgba(22,163,74,0.25)', color: '#16a34a' }
         : { background: 'rgba(220,38,38,0.08)', borderColor: 'rgba(220,38,38,0.25)', color: '#dc2626' }
@@ -48,31 +51,39 @@ function SectionFlag({ label, ok }) {
   )
 }
 
-async function getResumeText(resumeSrc, toast) {
-  if (resumeSrc.resumeId) {
-    const res = await apiFetch('/api/resume-preview', {
-      method: 'POST',
-      body: JSON.stringify({ resume_id: resumeSrc.resumeId }),
-    })
-    if (!res?.ok) { toast('Could not load resume text', 'error'); return null }
-    const d = await res.json()
-    return d.text || null
-  }
-  // New file upload - upload temp then preview
+function CoverageChips({ coverage }) {
+  if (!coverage) return null
+  return (
+    <div className="space-y-2">
+      {coverage.matched?.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {coverage.matched.map(k => (
+            <span key={k} className="px-2 py-0.5 text-[11px] font-medium rounded-sm border"
+              style={{ background: 'rgba(22,163,74,0.08)', borderColor: 'rgba(22,163,74,0.25)', color: '#16a34a' }}>{k}</span>
+          ))}
+        </div>
+      )}
+      {coverage.missing?.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {coverage.missing.map(k => (
+            <span key={k} className="px-2 py-0.5 text-[11px] font-medium rounded-sm border"
+              style={{ background: 'rgba(220,38,38,0.08)', borderColor: 'rgba(220,38,38,0.25)', color: '#dc2626' }}>{k}</span>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Resolve the request body identifying the selected resume: stored id or temp token
+async function resumeBody(resumeSrc, toast) {
+  if (resumeSrc.resumeId) return { resume_id: resumeSrc.resumeId }
   const fd = new FormData()
   fd.append('file', resumeSrc.file)
   const up = await apiFetch('/api/upload', { method: 'POST', body: fd })
-  if (!up?.ok) { toast('Upload failed', 'error'); return null }
-  const upData = await up.json()
-  if (!upData.ok) { toast(upData.detail || 'Upload failed', 'error'); return null }
-
-  const res = await apiFetch('/api/resume-preview', {
-    method: 'POST',
-    body: JSON.stringify({ tmp: upData.tmp }),
-  })
-  if (!res?.ok) { toast('Could not extract resume text', 'error'); return null }
-  const d = await res.json()
-  return d.text || null
+  const upData = await up?.json().catch(() => ({}))
+  if (!up?.ok || !upData.ok) { toast(errMsg(upData, 'Upload failed'), 'error'); return null }
+  return { tmp: upData.tmp }
 }
 
 export default function ATS() {
@@ -87,11 +98,12 @@ export default function ATS() {
     if (!resumeSrc) { toast('Select or upload a resume first', 'warn'); return }
     setLoading('check'); setCheckResult(null)
     try {
-      const text = await getResumeText(resumeSrc, toast)
-      if (!text) return
-      const res = await apiFetch('/api/ats/check', { method: 'POST', body: JSON.stringify({ resume_text: text }) })
-      if (!res?.ok) { toast('Check failed', 'error'); return }
-      setCheckResult(await res.json())
+      const ident = await resumeBody(resumeSrc, toast)
+      if (!ident) return
+      const res = await apiFetch('/api/ats/check', { method: 'POST', body: JSON.stringify({ ...ident, jd }) })
+      const data = await res?.json().catch(() => ({}))
+      if (!res?.ok || !data.ok) { toast(errMsg(data, 'Check failed'), 'error'); return }
+      setCheckResult(data)
     } finally { setLoading('') }
   }
 
@@ -100,18 +112,41 @@ export default function ATS() {
     if (jd.trim().length < 100) { toast('Paste a job description to optimise against', 'warn'); return }
     setLoading('optimise'); setOptimResult(null)
     try {
-      const text = await getResumeText(resumeSrc, toast)
-      if (!text) return
-      const res = await apiFetch('/api/ats/optimise', { method: 'POST', body: JSON.stringify({ resume_text: text, jd_text: jd }) })
-      if (!res?.ok) { toast('Optimise failed', 'error'); return }
-      setOptimResult(await res.json())
+      const ident = await resumeBody(resumeSrc, toast)
+      if (!ident) return
+      const res = await apiFetch('/api/ats/optimise', { method: 'POST', body: JSON.stringify({ ...ident, jd }) })
+      const data = await res?.json().catch(() => ({}))
+      if (!res?.ok || !data.ok) { toast(errMsg(data, 'Optimise failed'), 'error'); return }
+      setOptimResult(data)
     } finally { setLoading('') }
   }
 
+  async function downloadDocx() {
+    if (!optimResult?.resume) return
+    const res = await apiFetch('/api/ats/docx', { method: 'POST', body: JSON.stringify({ resume: optimResult.resume }) })
+    if (!res?.ok) { toast('Download failed', 'error'); return }
+    const blob = await res.blob()
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = 'ats_optimised_resume.docx'
+    a.click()
+    URL.revokeObjectURL(a.href)
+  }
+
+  function copyText() {
+    if (!optimResult?.plain_text) return
+    navigator.clipboard.writeText(optimResult.plain_text)
+    toast('Copied to clipboard', 'success')
+  }
+
+  const atsScore = checkResult?.ats_score
   const scoreColor =
-    checkResult?.score >= 80 ? '#16a34a' :
-    checkResult?.score >= 60 ? '#6366f1' :
-    checkResult?.score >= 40 ? '#d97706' : '#dc2626'
+    atsScore?.score >= 80 ? '#16a34a' :
+    atsScore?.score >= 60 ? '#6366f1' :
+    atsScore?.score >= 40 ? '#d97706' : '#dc2626'
+
+  const covBefore = optimResult?.coverage_before?.pct
+  const covAfter = optimResult?.coverage_after?.pct
 
   return (
     <div className="space-y-5">
@@ -143,7 +178,7 @@ export default function ATS() {
             <div className="px-5 py-3 border-b flex items-center justify-between" style={{ borderColor: 'rgba(0,0,0,0.06)' }}>
               <span className="text-[13px] font-semibold text-t1">Job Description</span>
               <div className="flex items-center gap-2">
-                <span className="text-[11px] text-t3">Optional - needed for AI Optimise</span>
+                <span className="text-[11px] text-t3">Optional for Check - required for AI Optimise</span>
                 {jd && <ClearBtn onClick={() => { setJd(''); setOptimResult(null) }} />}
               </div>
             </div>
@@ -183,29 +218,51 @@ export default function ATS() {
             {loading === 'check' ? <><Spinner size={13} /> Checking...</> : 'ATS Check'}
           </button>
           <button onClick={optimise} disabled={!!loading} className="btn-primary px-5">
-            {loading === 'optimise' ? <><Spinner size={13} /> Optimising...</> : 'AI Optimise'}
+            {loading === 'optimise' ? <><Spinner size={13} /> Optimising (30-60s)...</> : 'AI Optimise'}
           </button>
         </div>
       </div>
 
-      {/* ATS result */}
+      {/* ATS check result */}
       {checkResult && (
         <Card>
           <CardBody className="space-y-5">
             <div className="flex items-center gap-3">
-              <SectionLabel>ATS Score</SectionLabel>
-              <span className="text-2xl font-bold" style={{ color: scoreColor }}>
-                {Math.round(checkResult.score || 0)}
-                <span className="text-[13px] font-normal text-t3 ml-1">/ 100</span>
-              </span>
+              <SectionLabel>ATS keyword score</SectionLabel>
+              {atsScore?.has_jd ? (
+                <span className="text-2xl font-bold" style={{ color: scoreColor }}>
+                  {Math.round(atsScore.score || 0)}
+                  <span className="text-[13px] font-normal text-t3 ml-1">/ 100</span>
+                </span>
+              ) : (
+                <span className="text-[12.5px] text-t3">Paste a job description to get a keyword score</span>
+              )}
             </div>
 
-            {checkResult.section_flags && Object.keys(checkResult.section_flags).length > 0 && (
+            {checkResult.coverage && (
+              <div>
+                <SectionLabel>
+                  Keyword coverage - {checkResult.coverage.matched?.length || 0} of {checkResult.coverage.total || 0} found
+                </SectionLabel>
+                <CoverageChips coverage={checkResult.coverage} />
+              </div>
+            )}
+
+            {checkResult.section_flags?.length > 0 && (
               <div>
                 <SectionLabel>Section presence</SectionLabel>
                 <div className="flex flex-wrap gap-2">
-                  {Object.entries(checkResult.section_flags).map(([k, v]) => <SectionFlag key={k} label={k} ok={v} />)}
+                  {checkResult.section_flags.map(f => (
+                    <SectionFlag key={f.name} label={f.name} ok={f.found} suggestion={f.suggestion} />
+                  ))}
                 </div>
+                {checkResult.section_flags.some(f => !f.found) && (
+                  <ul className="mt-3 space-y-1">
+                    {checkResult.section_flags.filter(f => !f.found && f.suggestion).map(f => (
+                      <li key={f.name} className="text-[12.5px] text-t2">- {f.suggestion}</li>
+                    ))}
+                  </ul>
+                )}
               </div>
             )}
 
@@ -237,21 +294,32 @@ export default function ATS() {
       {optimResult && (
         <Card>
           <CardBody className="space-y-4">
-            <SectionLabel>Optimised Resume</SectionLabel>
+            <div className="flex items-center justify-between">
+              <SectionLabel>Optimised Resume</SectionLabel>
+              <div className="flex gap-2">
+                <button onClick={copyText} className="btn-secondary h-7 px-3 text-[12.5px]">Copy text</button>
+                <button onClick={downloadDocx} className="btn-primary h-7 px-3 text-[12.5px]">Download DOCX</button>
+              </div>
+            </div>
 
-            {optimResult.coverage_before !== undefined && optimResult.coverage_after !== undefined && (
+            {covBefore !== undefined && covAfter !== undefined && (
               <div className="flex items-center gap-3 rounded-lg px-4 py-3" style={{ background: 'rgb(var(--surface-2))' }}>
                 <span className="text-[12.5px] text-t2">Keyword coverage:</span>
-                <span className="font-bold" style={{ color: '#dc2626' }}>{Math.round(optimResult.coverage_before)}%</span>
+                <span className="font-bold" style={{ color: '#dc2626' }}>{Math.round(covBefore)}%</span>
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="rgb(var(--t3))" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
-                <span className="font-bold" style={{ color: '#16a34a' }}>{Math.round(optimResult.coverage_after)}%</span>
+                <span className="font-bold" style={{ color: '#16a34a' }}>{Math.round(covAfter)}%</span>
+                {optimResult.coverage_after?.missing?.length > 0 && (
+                  <span className="text-[12px] text-t3 ml-2">
+                    Still missing: {optimResult.coverage_after.missing.slice(0, 5).join(', ')}
+                  </span>
+                )}
               </div>
             )}
 
-            {optimResult.resume_text && (
+            {optimResult.plain_text && (
               <pre className="rounded-lg p-4 text-[12px] text-t1 whitespace-pre-wrap overflow-auto max-h-96 leading-relaxed"
                 style={{ background: 'rgb(var(--surface-2))', border: '1px solid rgba(0,0,0,0.06)' }}>
-                {optimResult.resume_text}
+                {optimResult.plain_text}
               </pre>
             )}
           </CardBody>

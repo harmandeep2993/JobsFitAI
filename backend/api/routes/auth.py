@@ -15,7 +15,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from core.security import create_token, decode_token, hash_password, verify_password
 from models import user as user_model
-from schemas.auth import LoginRequest, RegisterRequest
+from schemas.auth import ChangePasswordRequest, LoginRequest, RegisterRequest
 
 router = APIRouter()
 
@@ -117,6 +117,20 @@ async def login(body: LoginRequest, request: Request) -> JSONResponse:
 
     token = create_token(user["id"], user["email"])
     return JSONResponse({"token": token, "user_id": user["id"], "email": user["email"]})
+
+
+@router.post("/change-password")
+async def change_password(
+    body: ChangePasswordRequest,
+    user: dict = Depends(get_current_user),
+) -> JSONResponse:
+    """Change the current user's password after verifying the old one."""
+    full = user_model.get_by_email(user["email"])
+    if not full or not verify_password(body.current_password, full["hashed_password"]):
+        raise HTTPException(status_code=401, detail="wrong_current_password")
+
+    user_model.set_password(user["id"], hash_password(body.new_password))
+    return JSONResponse({"ok": True})
 
 
 @router.get("/me")

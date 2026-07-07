@@ -544,6 +544,11 @@ export default function Landing() {
           <p className="mt-3 text-[14px] max-w-md mx-auto" style={{ color: 'rgb(107,114,128)' }}>
             Start free. Upgrade when you need scheduled job fetching and priority analysis.
           </p>
+          <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-full text-[13px] font-medium"
+            style={{ background: 'rgba(99,102,241,0.08)', color: 'rgb(99,102,241)' }}>
+            <span className="w-2 h-2 rounded-full" style={{ background: 'rgb(99,102,241)' }} />
+            Currently in beta: all features are free for invited users
+          </div>
         </FadeIn>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Free */}

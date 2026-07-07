@@ -41,6 +41,15 @@ def get_by_id(user_id: str) -> dict | None:
     return dict(row) if row else None
 
 
+def set_password(user_id: str, hashed_password: str) -> None:
+    """Update the stored password hash for a user."""
+    with db.connect() as conn:
+        conn.execute(
+            "UPDATE users SET hashed_password = ? WHERE id = ?",
+            (hashed_password, user_id),
+        )
+
+
 def email_exists(email: str) -> bool:
     """Return True if the email is already registered, False otherwise."""
     with db.connect() as conn:

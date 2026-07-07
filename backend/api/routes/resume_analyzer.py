@@ -300,6 +300,7 @@ async def api_analyze(
                 jd_text,
                 results.get("overall_score", 0),
                 results.get("label", ""),
+                cache_hash=cache_key,
             )
         except Exception as e:
             logger.error("analysis_store.save failed: %s", e)

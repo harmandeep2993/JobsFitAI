@@ -203,6 +203,7 @@ _SCHEMA_STMTS = [
         jd_snippet TEXT,
         score      REAL,
         label      TEXT,
+        cache_hash TEXT,
         scored_at  TEXT NOT NULL
     )""",
     """CREATE TABLE IF NOT EXISTS analysis_cache (
@@ -239,6 +240,7 @@ _MIGRATION_STMTS = [
     "ALTER TABLE events    ADD COLUMN user_id TEXT NOT NULL DEFAULT 'local'",
     "ALTER TABLE seen_jobs ADD COLUMN user_id TEXT NOT NULL DEFAULT 'local'",
     "ALTER TABLE analyses  ADD COLUMN user_id TEXT NOT NULL DEFAULT 'local'",
+    "ALTER TABLE analyses  ADD COLUMN cache_hash TEXT",
     # Claim pre-migration rows for their owner via the resume they belong to
     """UPDATE analyses SET user_id = COALESCE(
         (SELECT r.user_id FROM resumes r WHERE r.id = analyses.resume_id), user_id
