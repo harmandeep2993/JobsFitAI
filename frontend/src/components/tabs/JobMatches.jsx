@@ -59,7 +59,7 @@ function Switch({ on, onClick }) {
       style={{ background: on ? 'rgb(var(--accent))' : 'rgba(var(--t3) / 0.35)' }}
     >
       <span
-        className="absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform"
+        className="absolute left-0 top-1 w-4 h-4 bg-white rounded-full shadow transition-transform"
         style={{ transform: on ? 'translateX(20px)' : 'translateX(4px)' }}
       />
     </button>
