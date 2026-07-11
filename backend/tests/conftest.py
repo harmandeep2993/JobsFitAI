@@ -40,8 +40,9 @@ auth_route._INVITE_CODE = ""
 
 @pytest.fixture(autouse=True)
 def reset_rate_limiter():
-    """The suite makes many auth calls from one IP; clear the limiter per test."""
+    """The suite makes many calls from one IP/user; clear both limiters per test."""
     auth_route._attempts.clear()
+    auth_route._llm_attempts.clear()
 
 
 @pytest.fixture(scope="session")

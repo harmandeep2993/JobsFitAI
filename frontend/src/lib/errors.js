@@ -28,6 +28,8 @@ const MESSAGES = {
   llm_failed: 'The AI provider did not respond - try again in a minute.',
   parse_failed: 'The AI response could not be processed - please try again.',
   expired: 'The full result of this analysis is no longer stored - re-run it from the Analyser.',
+  rate_limited: 'You have used a lot of AI requests in a short time - wait a few minutes and try again.',
+  payload_too_large: 'That request is too large - the maximum upload size is 10 MB.',
 }
 
 const FALLBACK = 'Something went wrong - please try again.'

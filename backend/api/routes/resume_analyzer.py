@@ -26,7 +26,7 @@ from repositories import resume_repo as resume_store
 from services.profile_summary import generate_summary
 from services.llm.caller import check_llm
 from schemas.analyzer import AnalyzeRequest, ResumePreviewRequest
-from api.routes.auth import get_current_user
+from api.routes.auth import get_current_user, get_current_user_llm_limited
 
 logger = get_logger(__name__)
 
@@ -197,7 +197,7 @@ def _build_breakdown(results: dict) -> dict:
 @router.post("/analyze")
 async def api_analyze(
     body: AnalyzeRequest,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user_llm_limited),
 ) -> JSONResponse:
     """
     Full analysis pipeline: parse resume -> extract -> score -> summarize.

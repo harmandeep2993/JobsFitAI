@@ -87,6 +87,29 @@ if _DIST.exists():
     )
 
 
+# === Body size cap + security headers middleware ===
+
+# Reject request bodies larger than the biggest legitimate payload (a resume
+# upload plus multipart overhead) before reading them into memory.
+_MAX_BODY_BYTES = (MAX_FILE_SIZE_MB + 2) * 1024 * 1024
+
+
+@app.middleware("http")
+async def _body_limit_and_security_headers(request: Request, call_next):
+    """Cap declared request body size and attach standard security headers."""
+    if request.url.path.startswith("/api/"):
+        length = request.headers.get("content-length", "")
+        if length.isdigit() and int(length) > _MAX_BODY_BYTES:
+            return JSONResponse(
+                {"ok": False, "error": "payload_too_large"}, status_code=413
+            )
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    return response
+
+
 # === Request logging middleware ===
 
 # High-frequency poll endpoints logged at DEBUG to avoid console spam.
@@ -272,6 +295,16 @@ app.include_router(ats_maker.router, prefix="/api/ats")
 app.include_router(resume_improve.router, prefix="/api")
 app.include_router(history.router, prefix="/api")
 app.include_router(settings.router, prefix="/api")
+
+
+# Registered after the API routers so every /api path wins first. Serves the
+# SPA for client-routed pages (/about, /pricing, /privacy, ...) so a hard
+# refresh or direct link does not 404 in production.
+@app.get("/{full_path:path}")
+async def spa_catch_all(full_path: str):
+    if full_path.startswith("api/"):
+        return JSONResponse({"ok": False, "error": "not_found"}, status_code=404)
+    return _serve_spa()
 
 
 # === Background scheduler ===

@@ -11,8 +11,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from api.routes.auth import get_current_user
+from api.routes.auth import get_current_user, get_current_user_llm_limited
 from core import uploads
+from core.config import JD_MAX_CHARS
 from core.logger import get_logger
 from repositories import resume_repo as resume_store
 from schemas.ats import AtsCheckRequest, AtsDocxRequest, AtsOptimiseRequest
@@ -55,7 +56,7 @@ def _resolve_resume_text(user_id: str, resume_id: str, tmp: str) -> str:
 @router.post("/check")
 async def api_ats_check(
     body: AtsCheckRequest,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user_llm_limited),
 ) -> JSONResponse:
     """
     Lightweight ATS scan - no LLM, no keyword injection.
@@ -70,7 +71,7 @@ async def api_ats_check(
         (body.tmp or "").strip(),
     )
 
-    jd_text = (body.jd or "").strip()
+    jd_text = (body.jd or "").strip()[:JD_MAX_CHARS]
     required_skills = None
     if jd_text and len(jd_text) >= 50:
         jd_json = await run_in_threadpool(extract_jd, jd_text)
@@ -84,7 +85,7 @@ async def api_ats_check(
 @router.post("/optimise")
 async def api_ats_optimise(
     body: AtsOptimiseRequest,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user_llm_limited),
 ) -> JSONResponse:
     """
     Full ATS optimization pipeline with LLM.
@@ -92,7 +93,7 @@ async def api_ats_optimise(
     Accepts {resume_id | tmp, jd}. Returns a complete ATS-optimised resume
     with coverage before/after, section flags, and formatting warnings.
     """
-    jd_text = (body.jd or "").strip()
+    jd_text = (body.jd or "").strip()[:JD_MAX_CHARS]
     if len(jd_text) < 50:
         raise HTTPException(status_code=400, detail="jd_required")
 

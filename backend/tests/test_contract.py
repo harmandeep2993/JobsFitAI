@@ -327,7 +327,42 @@ def test_protected_endpoints_reject_anonymous(client):
         ("get", "/api/resumes"),
         ("get", "/api/match/state"),
         ("get", "/api/llm-settings"),
+        ("get", "/api/llm-ping"),
         ("post", "/api/upload"),
     ]:
         r = getattr(client, method)(path)
         assert r.status_code in (401, 403), f"{path} not protected: {r.status_code}"
+
+
+def test_llm_endpoints_rate_limited_per_user(client, auth, tmp_token, monkeypatch):
+    """LLM-backed endpoints return 429 rate_limited once the user budget is spent."""
+    import api.routes.auth as auth_route
+
+    monkeypatch.setattr(auth_route, "_LLM_RATE_LIMIT_ATTEMPTS", 1)
+    r = client.post("/api/ats/check", headers=auth, json={"tmp": tmp_token, "jd": ""})
+    assert r.status_code == 200
+
+    r = client.post("/api/ats/check", headers=auth, json={"tmp": tmp_token, "jd": ""})
+    assert r.status_code == 429
+    assert r.json()["detail"] == "rate_limited"
+
+
+def test_spa_catch_all_serves_client_routes(client):
+    """Hard refresh on a client-routed page serves the SPA, never a JSON 404."""
+    for path in ["/about", "/pricing", "/privacy"]:
+        r = client.get(path)
+        # 200 when frontend/dist exists, 503 hint when it was never built
+        assert r.status_code in (200, 503), f"{path}: {r.status_code}"
+        assert "text/html" in r.headers["content-type"]
+
+    r = client.get("/api/does-not-exist")
+    assert r.status_code == 404
+    assert r.json()["error"] == "not_found"
+
+
+def test_security_headers_present(client, auth):
+    """Every response carries the baseline security headers set by middleware."""
+    r = client.get("/api/resumes", headers=auth)
+    assert r.headers.get("x-content-type-options") == "nosniff"
+    assert r.headers.get("x-frame-options") == "SAMEORIGIN"
+    assert r.headers.get("referrer-policy") == "strict-origin-when-cross-origin"

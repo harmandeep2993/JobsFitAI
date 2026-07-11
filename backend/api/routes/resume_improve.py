@@ -7,7 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 
-from api.routes.auth import get_current_user
+from api.routes.auth import get_current_user_llm_limited
+from core.config import JD_MAX_CHARS
 from core.logger import get_logger
 from services.extractors.jd_extractor import extract_jd
 from services.resume_rewriter import improve_resume
@@ -21,7 +22,7 @@ router = APIRouter()
 @router.post("/improve-resume")
 async def api_improve_resume(
     body: ImproveResumeRequest,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user_llm_limited),
 ) -> JSONResponse:
     """
     Generate JD-aligned bullets from all stored resumes.
@@ -30,7 +31,7 @@ async def api_improve_resume(
     resume slot, merges the data, and returns before/after bullet pairs
     grouped by source (Experience, Education, Certifications, Projects).
     """
-    jd_text = (body.jd or "").strip()
+    jd_text = (body.jd or "").strip()[:JD_MAX_CHARS]
     gaps = body.gaps or []
     strengths = body.strengths or []
 

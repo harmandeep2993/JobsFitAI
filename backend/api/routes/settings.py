@@ -19,7 +19,9 @@ router = APIRouter()
 
 
 @router.get("/llm-ping")
-async def api_llm_ping() -> JSONResponse:
+async def api_llm_ping(
+    current_user: dict = Depends(get_current_user),
+) -> JSONResponse:
     """Quick check whether the active LLM provider is reachable."""
     try:
         online = await run_in_threadpool(check_llm)

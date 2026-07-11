@@ -15,8 +15,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from api.routes.auth import get_current_user
-from core.config import MAX_AGE_DAYS, SEARCH_PER_TITLE
+from api.routes.auth import get_current_user, get_current_user_llm_limited
+from core.config import JD_MAX_CHARS, MAX_AGE_DAYS, SEARCH_PER_TITLE
 from core.logger import get_logger
 from core import state, uploads
 from core.state import sched_last_ref
@@ -96,7 +96,7 @@ def _resume_diff(old: dict, new: dict) -> dict:
 @router.post("/resume")
 async def api_match_resume(
     body: MatchResumeRequest,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user_llm_limited),
 ) -> JSONResponse:
     """Parse + extract an uploaded resume and store it for this user's matching session."""
     user_id = current_user["id"]
@@ -396,12 +396,12 @@ async def api_match_filters(
 @router.post("/score-jd")
 async def api_score_jd(
     body: ScoreJdRequest,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user_llm_limited),
 ) -> JSONResponse:
     """Score a jd_unavailable job using a manually pasted JD."""
     user_id = current_user["id"]
     job_id = (body.id or "").strip()
-    jd_text = (body.jd_text or "").strip()
+    jd_text = (body.jd_text or "").strip()[:JD_MAX_CHARS]
 
     if not job_id:
         raise HTTPException(status_code=400, detail="id required")
