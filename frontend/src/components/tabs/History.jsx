@@ -1,17 +1,78 @@
 /**
  * History tab - past analyses (clickable to reopen the full result),
- * fetcher runs, and tracked applications.
+ * fetcher runs, and tracked applications, grouped by day.
  */
 import { useState, useEffect, useCallback } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { apiFetch } from '../../lib/auth.js'
 import { errMsg } from '../../lib/errors.js'
 import { useToast } from '../Toast.jsx'
 import { ResultsPanel } from '../AnalysisResults.jsx'
-import { PageHeader, PageSpinner, EmptyState, ListRow, ScorePill, ScoreLabel, Spinner } from '../ui.jsx'
+import { PageHeader, PageSpinner, EmptyState, ScorePill, ScoreLabel, Spinner } from '../ui.jsx'
 
-function formatDate(str) {
+function formatTime(str) {
   if (!str) return ''
-  return str.slice(0, 16).replace('T', ' ')
+  return str.slice(11, 16)
+}
+
+function dayKey(str) {
+  return (str || '').slice(0, 10)
+}
+
+function dayLabel(key) {
+  if (!key) return 'Unknown date'
+  const today = new Date().toISOString().slice(0, 10)
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
+  if (key === today) return 'Today'
+  if (key === yesterday) return 'Yesterday'
+  const d = new Date(key)
+  if (isNaN(d.getTime())) return key
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+// Group rows into [{ key, label, rows }] by calendar day of dateField.
+function groupByDay(rows, dateField) {
+  const groups = []
+  const index = {}
+  for (const row of rows) {
+    const key = dayKey(row[dateField])
+    if (!(key in index)) {
+      index[key] = groups.length
+      groups.push({ key, label: dayLabel(key), rows: [] })
+    }
+    groups[index[key]].rows.push(row)
+  }
+  return groups
+}
+
+const listVariants = { show: { transition: { staggerChildren: 0.03 } } }
+const itemVariants = {
+  hidden: { opacity: 0, y: 8 },
+  show:   { opacity: 1, y: 0, transition: { duration: 0.16, ease: [0.25, 0.1, 0.25, 1] } },
+}
+
+function DayHeader({ label }) {
+  return (
+    <div className="flex items-center gap-3 pt-2">
+      <span className="text-[11px] font-semibold text-t3 uppercase tracking-[0.07em] flex-shrink-0">{label}</span>
+      <span className="flex-1 h-px" style={{ background: 'rgba(var(--border) / 0.08)' }} />
+    </div>
+  )
+}
+
+function Row({ children, onClick, title }) {
+  return (
+    <div
+      onClick={onClick}
+      title={title}
+      className={`bg-surface border rounded-lg px-4 py-3 flex items-center gap-3.5 transition-shadow ${
+        onClick ? 'cursor-pointer hover:shadow-md' : ''
+      }`}
+      style={{ borderColor: 'rgba(var(--border) / 0.08)' }}
+    >
+      {children}
+    </div>
+  )
 }
 
 // Application status -> badge styling. Empty status means plain "applied".
@@ -46,43 +107,55 @@ function parseRun(detail) {
 
 function RunRow({ run }) {
   const d = parseRun(run.detail)
-  if (!d) {
-    return (
-      <ListRow>
-        <span className="w-2 h-2 rounded-full bg-accent flex-shrink-0" />
-        <div className="flex-1 text-[13.5px] text-t1">{run.detail || 'Fetch run completed'}</div>
-        <div className="text-[12px] text-t3 flex-shrink-0">{formatDate(run.created_at)}</div>
-      </ListRow>
-    )
-  }
+  const failed = Boolean(d?.error)
+  const dotColor = !d
+    ? 'rgb(var(--accent))'
+    : failed
+      ? 'rgb(var(--red))'
+      : d.stopped ? 'rgb(var(--amber))' : 'rgb(var(--green))'
 
-  const failed = Boolean(d.error)
-  const dotColor = failed
-    ? 'rgb(var(--red))'
-    : d.stopped ? 'rgb(var(--amber))' : 'rgb(var(--green))'
-  const sources = [
-    d.adzuna ? `adzuna ${d.adzuna}` : '',
-    d.arbeitnow ? `arbeitnow ${d.arbeitnow}` : '',
-    d.bundesagentur ? `bundesagentur ${d.bundesagentur}` : '',
-  ].filter(Boolean).join(' · ')
+  const sources = d
+    ? [
+        d.adzuna ? `adzuna ${d.adzuna}` : '',
+        d.arbeitnow ? `arbeitnow ${d.arbeitnow}` : '',
+        d.bundesagentur ? `bundesagentur ${d.bundesagentur}` : '',
+      ].filter(Boolean).join(' · ')
+    : ''
 
   return (
-    <ListRow>
-      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: dotColor }} />
-      <div className="flex-1 min-w-0">
-        <div className="text-[13.5px] text-t1">
-          {failed
-            ? <>Run failed<span className="text-t3"> - {d.error}</span></>
-            : <>{d.fetched || 0} fetched · {d.new || 0} new · <span className="font-semibold">{d.scored || 0} scored</span></>}
-        </div>
-        <div className="text-[12px] text-t3 mt-0.5">
-          {d.manual ? 'Manual run' : 'Auto-fetch'}
-          {d.stopped ? ' · stopped early' : ''}
-          {sources ? ` · ${sources}` : ''}
-        </div>
+    <div className="flex gap-3.5">
+      {/* Timeline rail */}
+      <div className="flex flex-col items-center flex-shrink-0 pt-4">
+        <span className="w-2.5 h-2.5 rounded-full border-2 flex-shrink-0"
+          style={{ borderColor: dotColor, background: 'rgb(var(--surface))' }} />
+        <span className="w-px flex-1 mt-1" style={{ background: 'rgba(var(--border) / 0.1)' }} />
       </div>
-      <div className="text-[12px] text-t3 flex-shrink-0">{formatDate(run.created_at)}</div>
-    </ListRow>
+
+      <div className="flex-1 min-w-0 pb-2.5">
+        <Row>
+          <div className="flex-1 min-w-0">
+            <div className="text-[13.5px] text-t1">
+              {!d && (run.detail || 'Fetch run completed')}
+              {d && failed && <>Run failed<span className="text-t3"> - {d.error}</span></>}
+              {d && !failed && (
+                <>
+                  <span className="font-semibold">{d.scored || 0} scored</span>
+                  <span className="text-t2"> · {d.new || 0} new of {d.fetched || 0} fetched</span>
+                </>
+              )}
+            </div>
+            {d && (
+              <div className="text-[12px] text-t3 mt-0.5">
+                {d.manual ? 'Manual run' : 'Auto-fetch'}
+                {d.stopped ? ' · stopped early' : ''}
+                {sources ? ` · ${sources}` : ''}
+              </div>
+            )}
+          </div>
+          <div className="text-[12px] text-t3 flex-shrink-0">{formatTime(run.created_at)}</div>
+        </Row>
+      </div>
+    </div>
   )
 }
 
@@ -117,7 +190,9 @@ function AnalysisModal({ row, onClose }) {
         <div className="flex items-center justify-between mb-4">
           <div>
             <div className="text-[14px] font-semibold text-t1">Past analysis</div>
-            <div className="text-[12px] text-t3 mt-0.5">{row.resume_label || 'Resume'} · {formatDate(row.scored_at)}</div>
+            <div className="text-[12px] text-t3 mt-0.5">
+              {row.resume_label || 'Resume'} · {dayLabel(dayKey(row.scored_at))} {formatTime(row.scored_at)}
+            </div>
           </div>
           <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg text-t2 hover:bg-surface-2 transition-colors">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -155,12 +230,16 @@ export default function History() {
 
   const tabs = [
     { id: 'analyses',     label: 'Analyses',     count: data?.analyses?.length || 0 },
-    { id: 'runs',         label: 'Fetcher runs',  count: data?.fetcher_runs?.length || 0 },
+    { id: 'runs',         label: 'Fetch runs',    count: data?.fetcher_runs?.length || 0 },
     { id: 'applications', label: 'Applications',  count: data?.applications?.length || 0 },
   ]
 
+  const analysisGroups = data ? groupByDay(data.analyses || [], 'scored_at') : []
+  const runGroups      = data ? groupByDay(data.fetcher_runs || [], 'created_at') : []
+  const appGroups      = data ? groupByDay(data.applications || [], 'applied_at') : []
+
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 max-w-3xl">
       <PageHeader
         title="History"
         description="Your past analyses, job fetch runs, and applications in one place."
@@ -171,21 +250,21 @@ export default function History() {
         }
       />
 
-      {/* Tab bar */}
-      <div className="flex border-b border-border/10 gap-0.5">
+      {/* Segmented tab control */}
+      <div className="inline-flex p-1 rounded-lg gap-0.5" style={{ background: 'rgb(var(--surface-2))' }}>
         {tabs.map(t => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`flex items-center gap-1.5 px-4 py-2.5 text-[13px] font-medium border-b-2 -mb-px transition-colors ${
-              tab === t.id ? 'border-accent text-accent' : 'border-transparent text-t2 hover:text-t1'
+            className={`flex items-center gap-1.5 px-4 h-8 text-[12.5px] font-medium rounded-md transition-all ${
+              tab === t.id ? 'bg-surface text-t1 shadow-sm' : 'text-t2 hover:text-t1'
             }`}
           >
             {t.label}
             {t.count > 0 && (
-              <span className={`px-1.5 py-px text-[11px] rounded-sm ${
-                tab === t.id ? 'bg-accent/10 text-accent' : 'bg-surface-2 text-t3'
-              }`}>
+              <span className={`px-1.5 py-px text-[11px] rounded-sm font-semibold ${
+                tab === t.id ? 'text-accent' : 'text-t3'
+              }`} style={tab === t.id ? { background: 'rgba(var(--accent) / 0.1)' } : {}}>
                 {t.count}
               </span>
             )}
@@ -203,82 +282,108 @@ export default function History() {
         />
       )}
 
-      {/* Analyses */}
-      {data && tab === 'analyses' && (
-        data.analyses?.length
-          ? <div className="space-y-2">
-              {data.analyses.map((a, i) => {
-                const clickable = Boolean(a.cache_hash)
-                return (
-                  <div key={a.cache_hash || i}
-                    onClick={clickable ? () => setOpened(a) : undefined}
-                    className={clickable ? 'cursor-pointer' : ''}
-                    title={clickable ? 'Click to reopen the full result' : ''}>
-                    <ListRow>
-                      <ScorePill score={a.score || 0} />
-                      <div className="flex-1 min-w-0">
-                        <div className="text-[13.5px] font-medium text-t1 truncate">{a.jd_snippet || 'Job description'}</div>
-                        <div className="text-[12px] text-t3 mt-0.5">
-                          {a.resume_label ? `${a.resume_label} · ` : ''}{formatDate(a.scored_at)}
-                        </div>
-                      </div>
-                      <ScoreLabel score={a.score || 0} />
-                      {clickable && (
-                        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="rgb(var(--t3))" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
-                          <path d="M6 4l4 4-4 4"/>
-                        </svg>
-                      )}
-                    </ListRow>
-                  </div>
-                )
-              })}
-            </div>
-          : <EmptyState
-              title="No analyses yet"
-              description="Go to Resume Analyser to run your first analysis."
-            />
-      )}
+      <AnimatePresence mode="wait">
+        {data && (
+          <motion.div key={tab} variants={listVariants} initial="hidden" animate="show" className="space-y-3">
 
-      {/* Fetcher runs */}
-      {data && tab === 'runs' && (
-        data.fetcher_runs?.length
-          ? <div className="space-y-2">
-              {data.fetcher_runs.map((r, i) => <RunRow key={i} run={r} />)}
-            </div>
-          : <EmptyState
-              title="No fetcher runs yet"
-              description="Go to Job Matches and click Fetch Jobs to start pulling listings."
-            />
-      )}
-
-      {/* Applications */}
-      {data && tab === 'applications' && (
-        data.applications?.length
-          ? <div className="space-y-2">
-              {data.applications.map((a, i) => (
-                <ListRow key={i}>
-                  <ScorePill score={a.score || 0} />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[13.5px] font-medium text-t1 truncate">
-                      {a.title || 'Job application'}{a.company ? ` - ${a.company}` : ''}
+            {/* Analyses */}
+            {tab === 'analyses' && (
+              analysisGroups.length
+                ? analysisGroups.map(g => (
+                    <div key={g.key} className="space-y-2">
+                      <DayHeader label={g.label} />
+                      {g.rows.map((a, i) => {
+                        const clickable = Boolean(a.cache_hash)
+                        return (
+                          <motion.div key={a.cache_hash || i} variants={itemVariants}>
+                            <Row
+                              onClick={clickable ? () => setOpened(a) : undefined}
+                              title={clickable ? 'Click to reopen the full result' : ''}
+                            >
+                              <ScorePill score={a.score || 0} />
+                              <div className="flex-1 min-w-0">
+                                <div className="text-[13.5px] font-medium text-t1 truncate">{a.jd_snippet || 'Job description'}</div>
+                                <div className="text-[12px] text-t3 mt-0.5">
+                                  {a.resume_label ? `${a.resume_label} · ` : ''}{formatTime(a.scored_at)}
+                                </div>
+                              </div>
+                              <ScoreLabel score={a.score || 0} />
+                              {clickable && (
+                                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="rgb(var(--t3))" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
+                                  <path d="M6 4l4 4-4 4"/>
+                                </svg>
+                              )}
+                            </Row>
+                          </motion.div>
+                        )
+                      })}
                     </div>
-                    <div className="text-[12px] text-t3 mt-0.5">Applied {formatDate(a.applied_at)}</div>
-                  </div>
-                  <AppStatusBadge status={(a.app_status || '').trim()} />
-                  {a.url && (
-                    <a href={a.url} target="_blank" rel="noreferrer"
-                      className="text-[12px] font-medium flex-shrink-0" style={{ color: 'rgb(var(--accent))' }}>
-                      View posting
-                    </a>
-                  )}
-                </ListRow>
-              ))}
-            </div>
-          : <EmptyState
-              title="No applications tracked yet"
-              description="Mark jobs as applied in the Job Matches tab to track them here."
-            />
-      )}
+                  ))
+                : <EmptyState
+                    title="No analyses yet"
+                    description="Go to Resume Analyser to run your first analysis."
+                  />
+            )}
+
+            {/* Fetch runs - timeline */}
+            {tab === 'runs' && (
+              runGroups.length
+                ? runGroups.map(g => (
+                    <div key={g.key} className="space-y-1">
+                      <DayHeader label={g.label} />
+                      <div className="pt-1.5">
+                        {g.rows.map((r, i) => (
+                          <motion.div key={i} variants={itemVariants}>
+                            <RunRow run={r} />
+                          </motion.div>
+                        ))}
+                      </div>
+                    </div>
+                  ))
+                : <EmptyState
+                    title="No fetch runs yet"
+                    description="Go to Job Matches and click Fetch Jobs to start pulling listings."
+                  />
+            )}
+
+            {/* Applications */}
+            {tab === 'applications' && (
+              appGroups.length
+                ? appGroups.map(g => (
+                    <div key={g.key} className="space-y-2">
+                      <DayHeader label={g.label} />
+                      {g.rows.map((a, i) => (
+                        <motion.div key={i} variants={itemVariants}>
+                          <Row>
+                            <ScorePill score={a.score || 0} />
+                            <div className="flex-1 min-w-0">
+                              <div className="text-[13.5px] font-medium text-t1 truncate">
+                                {a.title || 'Job application'}
+                                {a.company ? <span className="text-t2 font-normal"> · {a.company}</span> : ''}
+                              </div>
+                              <div className="text-[12px] text-t3 mt-0.5">Applied at {formatTime(a.applied_at)}</div>
+                            </div>
+                            <AppStatusBadge status={(a.app_status || '').trim()} />
+                            {a.url && (
+                              <a href={a.url} target="_blank" rel="noreferrer"
+                                onClick={e => e.stopPropagation()}
+                                className="text-[12px] font-medium flex-shrink-0 hover:underline" style={{ color: 'rgb(var(--accent))' }}>
+                                View posting
+                              </a>
+                            )}
+                          </Row>
+                        </motion.div>
+                      ))}
+                    </div>
+                  ))
+                : <EmptyState
+                    title="No applications tracked yet"
+                    description="Mark jobs as applied in the Job Matches tab to track them here."
+                  />
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {opened && <AnalysisModal row={opened} onClose={() => setOpened(null)} />}
     </div>
