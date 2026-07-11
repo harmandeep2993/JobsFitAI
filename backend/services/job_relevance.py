@@ -8,10 +8,28 @@ signals relevance (AI/ML/Data vs unrelated) and seniority (Senior/Lead in
 title). Batch size 30 titles per LLM call keeps cost low.
 """
 
+import re
+
 from core.logger import get_logger
 from services.llm.caller import call_llm, parse_json_response
 
 logger = get_logger(__name__)
+
+# Deterministic seniority guard. The LLM screens relevance, but an explicit
+# seniority word in the title is a hard signal - never let a fail-open
+# default or a sloppy LLM answer mark these as entry level. Covers German
+# compound titles like Teamleiter/Abteilungsleiterin via the leiter suffix.
+_SENIORITY_RE = re.compile(
+    r"\b(senior|sr\.?|lead|principal|staff|head|director|manager|architect)\b"
+    r"|\w*leiter(in)?\b",
+    re.IGNORECASE,
+)
+
+
+def title_is_senior(title: str) -> bool:
+    """True when the job title carries an explicit seniority marker."""
+    return bool(_SENIORITY_RE.search(title or ""))
+
 
 _PROMPT = """Screen a job title for an entry-level AI/ML/Data candidate.
 
@@ -74,6 +92,11 @@ def _classify_chunk(chunk: list) -> dict:
         )
         for j in chunk:
             out.setdefault(j.id, {"relevant": False, "entry_level": False})
+
+    # Hard override: seniority words in the title always win over the LLM.
+    for j in chunk:
+        if title_is_senior(j.title):
+            out[j.id]["entry_level"] = False
     return out
 
 
@@ -108,7 +131,8 @@ def classify(title: str, snippet: str = "") -> dict:
         if isinstance(data, dict) and "relevant" in data:
             return {
                 "relevant": bool(data.get("relevant")),
-                "entry_level": bool(data.get("entry_level")),
+                "entry_level": bool(data.get("entry_level"))
+                and not title_is_senior(title),
                 "reason": str(data.get("reason", ""))[:80],
             }
     except Exception as e:

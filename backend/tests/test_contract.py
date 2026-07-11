@@ -360,6 +360,26 @@ def test_spa_catch_all_serves_client_routes(client):
     assert r.json()["error"] == "not_found"
 
 
+def test_seniority_guard_overrides_llm():
+    """Titles with explicit seniority markers must never pass the entry gate."""
+    from services.job_relevance import title_is_senior
+
+    for title in [
+        "Senior Machine Learning Engineer (m/w/d) - PDR.cloud GmbH",
+        "Sr. Data Scientist",
+        "Lead AI Engineer",
+        "Teamleiter Data Science",
+    ]:
+        assert title_is_senior(title), title
+
+    for title in [
+        "Junior Data Analyst",
+        "Machine Learning Engineer (m/w/d)",
+        "Working Student AI",
+    ]:
+        assert not title_is_senior(title), title
+
+
 def test_security_headers_present(client, auth):
     """Every response carries the baseline security headers set by middleware."""
     r = client.get("/api/resumes", headers=auth)

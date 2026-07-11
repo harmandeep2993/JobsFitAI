@@ -503,21 +503,15 @@ export default function JobMatches() {
           <span>
             Scoring against: <span className="font-medium text-t2">{state.resume_name}</span>
           </span>
-          <button
-            type="button"
-            onClick={toggleAutoFetch}
-            className="flex items-center gap-1.5 px-2 py-0.5 rounded-full border transition-colors hover:bg-hover"
-            style={{ borderColor: 'rgba(var(--border) / 0.12)' }}
-            title="Toggle auto-fetch"
-          >
-            <span
-              className="w-1.5 h-1.5 rounded-full"
-              style={{ background: state.scheduler?.enabled ? 'rgb(var(--green))' : 'rgba(var(--t3) / 0.5)' }}
-            />
-            {state.scheduler?.enabled
-              ? `Auto-fetch on · every ${state.scheduler?.interval || 60} min`
-              : 'Auto-fetch off'}
-          </button>
+          <span className="flex items-center gap-2">
+            <Switch on={Boolean(state.scheduler?.enabled)} onClick={toggleAutoFetch} />
+            <span className="font-medium text-t2">
+              Auto-fetch
+              {state.scheduler?.enabled && (
+                <span className="font-normal text-t3"> · every {state.scheduler?.interval || 60} min</span>
+              )}
+            </span>
+          </span>
         </div>
       )}
 
