@@ -1,6 +1,7 @@
 /**
- * Settings tab - job search targets, scheduler, account profile, and
+ * Settings tab - general settings: account profile, password, and
  * (admin only) the app-wide LLM provider selection.
+ * Job search targets and the scheduler live in the Job Matches tab.
  */
 import { useState, useEffect } from 'react'
 import { apiFetch } from '../../lib/auth.js'
@@ -10,40 +11,14 @@ import { PageHeader, CardSection, FieldLabel, PageSpinner } from '../ui.jsx'
 
 export default function Settings() {
   const toast = useToast()
-  const [state, setState] = useState(null)
   const [llm, setLlm] = useState(null)
   const [me, setMe] = useState(null)
   const [saving, setSaving] = useState('')
 
   useEffect(() => {
-    apiFetch('/api/match/state').then(r => r?.json()).then(d => setState(d))
     apiFetch('/api/llm-settings').then(r => r?.json()).then(d => setLlm(d))
     apiFetch('/api/auth/me').then(r => r?.json()).then(d => setMe(d))
   }, [])
-
-  async function saveFilters(e) {
-    e.preventDefault()
-    setSaving('filters')
-    const fd = new FormData(e.target)
-    const target_titles = (fd.get('titles') || '').split('\n').map(t => t.trim()).filter(Boolean)
-    const location  = (fd.get('location') || '').trim()
-    const countries = (fd.get('countries') || '').split(',').map(c => c.trim()).filter(Boolean)
-    const res = await apiFetch('/api/match/filters', {
-      method: 'POST',
-      body: JSON.stringify({ target_titles, location, countries }),
-    })
-    setSaving('')
-    if (res?.ok) toast('Job search settings saved', 'success')
-    else toast('Save failed', 'error')
-  }
-
-  async function toggleScheduler() {
-    if (!state) return
-    const enabled = !state.scheduler?.enabled
-    const res = await apiFetch('/api/match/scheduler', { method: 'POST', body: JSON.stringify({ enabled }) })
-    if (res?.ok) setState(s => ({ ...s, scheduler: { ...s.scheduler, enabled } }))
-    else toast('Could not update scheduler', 'error')
-  }
 
   async function saveLlm(e) {
     e.preventDefault()
@@ -86,9 +61,9 @@ export default function Settings() {
     else toast(errMsg(data, 'Could not change password'), 'error')
   }
 
-  if (!state && !llm) return (
+  if (!me && !llm) return (
     <div className="space-y-5">
-      <PageHeader title="Settings" description="Configure job search targets, scheduler, and your account." />
+      <PageHeader title="Settings" description="Manage your account and app preferences." />
       <PageSpinner />
     </div>
   )
@@ -99,63 +74,8 @@ export default function Settings() {
     <div className="space-y-5 max-w-2xl">
       <PageHeader
         title="Settings"
-        description="Configure job search targets, auto scheduler, and your account."
+        description="Manage your account and app preferences. Job search targets live in the Job Matches tab."
       />
-
-      {/* Job search */}
-      {state && (
-        <form onSubmit={saveFilters}>
-          <CardSection
-            title="Job Search"
-            action={
-              <button type="submit" disabled={saving === 'filters'} className="btn-primary h-7 px-3.5 text-[12.5px]">
-                {saving === 'filters' ? 'Saving...' : 'Save'}
-              </button>
-            }
-          >
-            <div className="space-y-4">
-              <div>
-                <FieldLabel hint="(one per line)">Job titles</FieldLabel>
-                <textarea
-                  name="titles"
-                  defaultValue={(state.filters?.target_titles || []).join('\n')}
-                  rows={4}
-                  placeholder={"Software Engineer\nBackend Developer\nPython Developer"}
-                  className="input-base resize-none"
-                />
-              </div>
-              <div>
-                <FieldLabel>Location</FieldLabel>
-                <input type="text" name="location" defaultValue={state.filters?.location || ''} placeholder="Berlin, Munich, Remote..." className="input-base" />
-              </div>
-              <div>
-                <FieldLabel hint="(comma separated)">Countries</FieldLabel>
-                <input type="text" name="countries" defaultValue={(state.filters?.countries || []).join(', ')} placeholder="de, at, ch" className="input-base" />
-              </div>
-            </div>
-          </CardSection>
-        </form>
-      )}
-
-      {/* Scheduler */}
-      {state && (
-        <CardSection title="Auto Scheduler">
-          <p className="text-[13px] text-t2 mb-4">Automatically fetch and score new jobs in the background on a set interval.</p>
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={toggleScheduler}
-              className={`relative w-10 h-6 rounded-full transition-colors flex-shrink-0 ${state.scheduler?.enabled ? 'bg-accent' : 'bg-border'}`}
-            >
-              <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${state.scheduler?.enabled ? 'translate-x-5' : 'translate-x-1'}`} />
-            </button>
-            <span className="text-[13.5px] font-medium text-t1">{state.scheduler?.enabled ? 'Enabled' : 'Disabled'}</span>
-            {state.scheduler?.interval && (
-              <span className="text-[12px] text-t3">- runs every {state.scheduler.interval} min</span>
-            )}
-          </div>
-        </CardSection>
-      )}
 
       {/* Account */}
       {me && (

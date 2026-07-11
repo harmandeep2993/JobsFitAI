@@ -8,7 +8,7 @@ import { motion } from 'framer-motion'
 import { apiFetch } from '../../lib/auth.js'
 import { errMsg } from '../../lib/errors.js'
 import { useToast } from '../Toast.jsx'
-import { PageHeader, EmptyState, ScoreBadge, Card, CardBody, Spinner } from '../ui.jsx'
+import { PageHeader, EmptyState, ScoreBadge, Card, CardBody, CardSection, FieldLabel, Spinner } from '../ui.jsx'
 
 const listVariants = {
   show: { transition: { staggerChildren: 0.045 } },
@@ -151,6 +151,90 @@ function JobCard({ job, onApply, onDelete, onPasteJd }) {
   )
 }
 
+// === Search settings panel (titles, location, countries, scheduler) ===
+function SearchSettingsPanel({ state, onSaved, onSchedulerChange }) {
+  const toast = useToast()
+  const [saving, setSaving] = useState(false)
+
+  async function saveFilters(e) {
+    e.preventDefault()
+    setSaving(true)
+    const fd = new FormData(e.target)
+    const target_titles = (fd.get('titles') || '').split('\n').map(t => t.trim()).filter(Boolean)
+    const location  = (fd.get('location') || '').trim()
+    const countries = (fd.get('countries') || '').split(',').map(c => c.trim()).filter(Boolean)
+    const res = await apiFetch('/api/match/filters', {
+      method: 'POST',
+      body: JSON.stringify({ target_titles, location, countries }),
+    })
+    const data = await res?.json().catch(() => ({}))
+    setSaving(false)
+    if (res?.ok && data.ok) { toast('Search settings saved', 'success'); onSaved() }
+    else toast(errMsg(data, 'Save failed'), 'error')
+  }
+
+  async function toggleScheduler() {
+    const enabled = !state.scheduler?.enabled
+    const res = await apiFetch('/api/match/scheduler', { method: 'POST', body: JSON.stringify({ enabled }) })
+    if (res?.ok) onSchedulerChange(enabled)
+    else toast('Could not update scheduler', 'error')
+  }
+
+  return (
+    <div className="space-y-4">
+      <form onSubmit={saveFilters}>
+        <CardSection
+          title="Search Settings"
+          action={
+            <button type="submit" disabled={saving} className="btn-primary h-7 px-3.5 text-[12.5px]">
+              {saving ? 'Saving...' : 'Save'}
+            </button>
+          }
+        >
+          <div className="space-y-4">
+            <div>
+              <FieldLabel hint="(one per line)">Job titles</FieldLabel>
+              <textarea
+                name="titles"
+                defaultValue={(state.filters?.target_titles || []).join('\n')}
+                rows={4}
+                placeholder={"Software Engineer\nBackend Developer\nPython Developer"}
+                className="input-base resize-none"
+              />
+            </div>
+            <div>
+              <FieldLabel>Location</FieldLabel>
+              <input type="text" name="location" defaultValue={state.filters?.location || ''} placeholder="Berlin, Munich, Remote..." className="input-base" />
+            </div>
+            <div>
+              <FieldLabel hint="(comma separated)">Countries</FieldLabel>
+              <input type="text" name="countries" defaultValue={(state.filters?.countries || []).join(', ')} placeholder="de, at, ch" className="input-base" />
+            </div>
+          </div>
+        </CardSection>
+      </form>
+
+      <CardSection title="Auto Scheduler">
+        <p className="text-[13px] text-t2 mb-4">Automatically fetch and score new jobs in the background on a set interval.</p>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={toggleScheduler}
+            className={`relative w-10 h-6 rounded-full transition-colors flex-shrink-0 ${state.scheduler?.enabled ? 'bg-accent' : 'bg-border'}`}
+          >
+            <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${state.scheduler?.enabled ? 'translate-x-5' : 'translate-x-1'}`} />
+          </button>
+          <span className="text-[13.5px] font-medium text-t1">{state.scheduler?.enabled ? 'Enabled' : 'Disabled'}</span>
+          {state.scheduler?.interval && (
+            <span className="text-[12px] text-t3">- runs every {state.scheduler.interval} min</span>
+          )}
+        </div>
+      </CardSection>
+    </div>
+  )
+}
+
+
 // === First-run setup guidance ===
 function FirstRunSetup({ hasResume }) {
   const steps = [
@@ -162,7 +246,7 @@ function FirstRunSetup({ hasResume }) {
     {
       done: false,
       title: 'Set your search targets',
-      desc: 'In Settings, enter the job titles and location you want to search for.',
+      desc: 'Click "Search settings" above and enter the job titles and location you want to search for.',
     },
     {
       done: false,
@@ -202,6 +286,7 @@ export default function JobMatches() {
   const [minScore, setMinScore] = useState(0)
   const [sortBy, setSortBy] = useState('score')
   const [pasteJob, setPasteJob] = useState(null)
+  const [showSettings, setShowSettings] = useState(false)
 
   const load = useCallback(async () => {
     const res = await apiFetch('/api/match/state')
@@ -280,6 +365,12 @@ export default function JobMatches() {
         description="Fetch live job listings from Adzuna, Arbeitnow, and Bundesagentur - automatically scored against your active resume."
         action={
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowSettings(v => !v)}
+              className={`btn-secondary h-8 px-3 text-[12.5px] ${showSettings ? 'text-accent' : ''}`}
+            >
+              {showSettings ? 'Hide settings' : 'Search settings'}
+            </button>
             <button onClick={exportCsv} className="btn-secondary h-8 px-3 text-[12.5px]">Export CSV</button>
             <button onClick={runFetch} disabled={running || !hasResume} className="btn-primary h-8 px-4 text-[12.5px]"
               title={!hasResume ? 'Activate a resume in the Resumes tab first' : ''}>
@@ -296,6 +387,16 @@ export default function JobMatches() {
         <div className="text-[12.5px] text-t3">
           Scoring against: <span className="font-medium text-t2">{state.resume_name}</span>
         </div>
+      )}
+
+      {/* Search settings */}
+      {showSettings && state && (
+        <SearchSettingsPanel
+          state={state}
+          onSaved={load}
+          onSchedulerChange={enabled =>
+            setState(s => s ? { ...s, scheduler: { ...s.scheduler, enabled } } : s)}
+        />
       )}
 
       {/* First-run setup */}
