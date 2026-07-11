@@ -166,7 +166,8 @@ _SCHEMA_STMTS = [
         section_scores   TEXT,
         summary          TEXT,
         status           TEXT DEFAULT 'scored',
-        app_status       TEXT DEFAULT ''
+        app_status       TEXT DEFAULT '',
+        deleted          INTEGER DEFAULT 0
     )""",
     """CREATE TABLE IF NOT EXISTS seen_jobs (
         id         TEXT PRIMARY KEY,
@@ -241,6 +242,8 @@ _MIGRATION_STMTS = [
     "ALTER TABLE seen_jobs ADD COLUMN user_id TEXT NOT NULL DEFAULT 'local'",
     "ALTER TABLE analyses  ADD COLUMN user_id TEXT NOT NULL DEFAULT 'local'",
     "ALTER TABLE analyses  ADD COLUMN cache_hash TEXT",
+    # Soft-delete flag on matches so a removed job can be restored (undo)
+    "ALTER TABLE matches   ADD COLUMN deleted INTEGER DEFAULT 0",
     # Claim pre-migration rows for their owner via the resume they belong to
     """UPDATE analyses SET user_id = COALESCE(
         (SELECT r.user_id FROM resumes r WHERE r.id = analyses.resume_id), user_id

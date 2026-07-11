@@ -203,6 +203,7 @@ def test_match_state_contract(client, auth):
             "has_resume",
             "resume_name",
             "filters",
+            "last_run",
             "run_status",
             "resume",
             "scheduler",
@@ -231,15 +232,133 @@ def test_match_filters_contract(client, auth):
     assert r.json()["target_titles"] == ["data analyst"]
 
 
+def _seed_job(client, auth, job_id="job-1"):
+    """Insert a scored match for the authed user directly via the repo."""
+    from repositories import match_repo
+
+    me = client.get("/api/auth/me", headers=auth).json()
+    match_repo.upsert(
+        me["user_id"],
+        [
+            {
+                "id": job_id,
+                "source": "adzuna",
+                "title": "Junior ML Engineer",
+                "company": "Acme",
+                "location": "Berlin",
+                "url": "https://example.com/job",
+                "language": "en",
+                "posted_at": "1750000000",
+                "score": 72,
+                "label": "good",
+                "matched_required": ["python"],
+                "missing_required": ["docker"],
+                "section_scores": {"required_skills": 70},
+                "scored_at": "2026-07-11T00:00:00+00:00",
+                "jd_json": {"required_skills": ["python"]},
+                "status": "scored",
+            }
+        ],
+    )
+    return me["user_id"]
+
+
 def test_match_applied_requires_flag(client, auth):
     # JobMatches.jsx must send both id and applied - omitting applied is a 422
     r = client.post("/api/match/applied", headers=auth, json={"id": "job-1"})
     assert r.status_code == 422
+    # Unknown job id is a 404, not a silent success
+    r = client.post(
+        "/api/match/applied", headers=auth, json={"id": "no-such-job", "applied": True}
+    )
+    assert r.status_code == 404
+    _seed_job(client, auth)
     r = client.post(
         "/api/match/applied", headers=auth, json={"id": "job-1", "applied": True}
     )
     assert r.status_code == 200
     assert_keys(r.json(), ["ok", "id", "applied"])
+
+
+def test_match_app_status_contract(client, auth):
+    """Detail drawer status dropdown: valid transitions accepted, junk rejected."""
+    _seed_job(client, auth, "job-status")
+    r = client.post(
+        "/api/match/app-status",
+        headers=auth,
+        json={"id": "job-status", "status": "interview"},
+    )
+    assert r.status_code == 200
+    assert r.json()["app_status"] == "interview"
+
+    r = client.post(
+        "/api/match/app-status",
+        headers=auth,
+        json={"id": "job-status", "status": "hired-maybe"},
+    )
+    assert r.status_code == 400
+    assert r.json()["detail"] == "invalid_status"
+
+    r = client.post(
+        "/api/match/app-status",
+        headers=auth,
+        json={"id": "missing", "status": "applied"},
+    )
+    assert r.status_code == 404
+
+
+def test_match_detail_contract(client, auth):
+    """Detail drawer reads job, section_scores, matched/missing, and summary."""
+    from repositories import match_repo
+
+    user_id = _seed_job(client, auth, "job-detail")
+    # Pre-cache a summary so the endpoint does not call the LLM
+    match_repo.set_summary(user_id, "job-detail", "Strong python match.")
+
+    r = client.get("/api/match/detail?id=job-detail", headers=auth)
+    assert r.status_code == 200
+    body = r.json()
+    assert_keys(
+        body,
+        [
+            "ok",
+            "job",
+            "section_scores",
+            "matched_required",
+            "missing_required",
+            "summary",
+        ],
+    )
+    assert_keys(body["job"], ["id", "title", "company", "score", "label", "url"])
+
+    r = client.get("/api/match/detail?id=missing", headers=auth)
+    assert r.status_code == 404
+
+
+def test_match_delete_restore_contract(client, auth):
+    """Deleting a job hides it from state; restore brings it back."""
+    _seed_job(client, auth, "job-del")
+
+    r = client.post("/api/match/delete", headers=auth, json={"id": "job-del"})
+    assert r.status_code == 200
+    ids = [
+        j["id"] for j in client.get("/api/match/state", headers=auth).json()["results"]
+    ]
+    assert "job-del" not in ids
+
+    # Second delete of the same job is a 404 (already gone)
+    r = client.post("/api/match/delete", headers=auth, json={"id": "job-del"})
+    assert r.status_code == 404
+
+    r = client.post("/api/match/restore", headers=auth, json={"id": "job-del"})
+    assert r.status_code == 200
+    ids = [
+        j["id"] for j in client.get("/api/match/state", headers=auth).json()["results"]
+    ]
+    assert "job-del" in ids
+
+    r = client.post("/api/match/restore", headers=auth, json={"id": "job-del"})
+    assert r.status_code == 404
 
 
 def test_match_scheduler_contract(client, auth):

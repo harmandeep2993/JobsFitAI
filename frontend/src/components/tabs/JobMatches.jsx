@@ -22,6 +22,9 @@ const itemVariants = {
 // Jobs posted within this many days get the "New" badge and count as fresh.
 const NEW_JOB_DAYS = 3
 
+// Cards rendered before the "Show more" button - keeps long lists fast.
+const PAGE_SIZE = 50
+
 function parsePostedAt(postedAt) {
   if (!postedAt) return null
   const d = /^\d+$/.test(String(postedAt))
@@ -135,7 +138,250 @@ function ScoreJdModal({ job, onClose, onScored }) {
   )
 }
 
-function JobCard({ job, onApply, onDelete, onPasteJd }) {
+// Time since an ISO timestamp with hour granularity for the last-run line.
+function agoTime(iso) {
+  const d = parsePostedAt(iso)
+  if (!d) return ''
+  const mins = Math.floor((Date.now() - d.getTime()) / 60000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  if (mins < 1440) return `${Math.floor(mins / 60)}h ago`
+  return relTime(iso)
+}
+
+const SECTION_LABELS = {
+  required_skills:  'Required skills',
+  preferred_skills: 'Preferred skills',
+  responsibilities: 'Responsibilities',
+  experience:       'Experience',
+  education:        'Education',
+  languages:        'Languages',
+  certifications:   'Certifications',
+}
+
+const APP_STATUSES = [
+  { value: '',          label: 'Not applied' },
+  { value: 'applied',   label: 'Applied' },
+  { value: 'interview', label: 'Interview' },
+  { value: 'offer',     label: 'Offer' },
+  { value: 'rejected',  label: 'Rejected' },
+]
+
+function scoreHex(score) {
+  if (score >= 80) return '#16a34a'
+  if (score >= 60) return '#6366f1'
+  if (score >= 40) return '#d97706'
+  return '#dc2626'
+}
+
+function SectionBar({ name, score }) {
+  const pct = Math.max(0, Math.min(100, Math.round(score)))
+  return (
+    <div className="flex items-center gap-3">
+      <span className="w-32 flex-shrink-0 text-[12px] text-t2">{name}</span>
+      <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(var(--border) / 0.08)' }}>
+        <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: scoreHex(pct) }} />
+      </div>
+      <span className="w-8 text-right text-[12px] font-semibold" style={{ color: scoreHex(pct) }}>{pct}</span>
+    </div>
+  )
+}
+
+// The AI summary may be a plain sentence or a JSON blob from the profile
+// summariser - render whichever we got without breaking.
+function SummaryBlock({ summary }) {
+  if (!summary) return null
+  let parsed = null
+  if (typeof summary === 'string') {
+    try { parsed = JSON.parse(summary) } catch { parsed = null }
+  } else if (typeof summary === 'object') {
+    parsed = summary
+  }
+  if (parsed && (parsed.profile || parsed.strengths || parsed.gaps || parsed.focus)) {
+    const lists = [
+      { title: 'Strengths', items: parsed.strengths },
+      { title: 'Gaps',      items: parsed.gaps },
+      { title: 'Focus',     items: parsed.focus },
+    ].filter(l => Array.isArray(l.items) && l.items.length)
+    return (
+      <div className="space-y-3">
+        {Array.isArray(parsed.profile) && parsed.profile.length > 0 && (
+          <p className="text-[13px] text-t2 leading-relaxed">{parsed.profile.join(' ')}</p>
+        )}
+        {lists.map(l => (
+          <div key={l.title}>
+            <div className="text-[11px] font-semibold text-t3 uppercase tracking-wide mb-1">{l.title}</div>
+            <ul className="space-y-1">
+              {l.items.map((it, i) => (
+                <li key={i} className="text-[12.5px] text-t2 leading-relaxed pl-3 relative">
+                  <span className="absolute left-0 top-[7px] w-1 h-1 rounded-full" style={{ background: 'rgb(var(--accent))' }} />
+                  {it}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    )
+  }
+  return <p className="text-[13px] text-t2 leading-relaxed whitespace-pre-wrap">{String(summary)}</p>
+}
+
+// === Job detail drawer ===
+function JobDetailModal({ jobId, onClose, onStatusChange }) {
+  const toast = useToast()
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      try {
+        const res = await apiFetch(`/api/match/detail?id=${encodeURIComponent(jobId)}`)
+        const d = await res?.json().catch(() => ({}))
+        if (!alive) return
+        if (!res?.ok || !d.ok) {
+          toast(errMsg(d, 'Could not load job details'), 'error')
+          onClose()
+          return
+        }
+        setData(d)
+      } catch {
+        if (alive) { toast('Network error loading job details', 'error'); onClose() }
+      } finally {
+        if (alive) setLoading(false)
+      }
+    })()
+    return () => { alive = false }
+  }, [jobId])  // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function setStatus(e) {
+    const status = e.target.value
+    const res = await apiFetch('/api/match/app-status', {
+      method: 'POST',
+      body: JSON.stringify({ id: jobId, status }),
+    })
+    const d = await res?.json().catch(() => ({}))
+    if (!res?.ok || !d.ok) { toast(errMsg(d, 'Could not update the status'), 'error'); return }
+    setData(x => x ? { ...x, job: { ...x.job, app_status: status, applied: status ? 1 : 0 } } : x)
+    onStatusChange(jobId, status)
+    toast(status ? `Status set to ${status}` : 'Status cleared', 'success')
+  }
+
+  const job = data?.job
+  const sections = data?.section_scores || {}
+  const matched = data?.matched_required || []
+  const missing = data?.missing_required || []
+
+  return (
+    <div className="fixed inset-0 z-[300] flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }} onClick={onClose}>
+      <div
+        className="w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-xl p-6 space-y-5"
+        style={{ background: 'rgb(var(--surface))' }}
+        onClick={e => e.stopPropagation()}
+      >
+        {loading && (
+          <div className="py-16 flex flex-col items-center gap-3">
+            <Spinner size={22} />
+            <span className="text-[13px] text-t2">Loading job details...</span>
+          </div>
+        )}
+
+        {!loading && job && (
+          <>
+            {/* Header */}
+            <div className="flex items-start gap-4">
+              <ScoreBadge score={job.score || 0} />
+              <div className="flex-1 min-w-0">
+                <div className="text-[15px] font-semibold text-t1">{job.title}</div>
+                <div className="text-[12.5px] text-t2 mt-0.5">
+                  {job.company}
+                  {job.location && <span className="text-t3"> · {job.location}</span>}
+                  {job.posted_at && <span className="text-t3"> · {relTime(job.posted_at)}</span>}
+                  {job.source && <span className="text-t3"> · via {job.source}</span>}
+                </div>
+              </div>
+              <button onClick={onClose} className="w-7 h-7 flex items-center justify-center text-t3 hover:text-t1 hover:bg-hover rounded-sm transition-colors" title="Close">
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                  <path d="M3 3l10 10M13 3L3 13"/>
+                </svg>
+              </button>
+            </div>
+
+            {/* Status + link */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <select
+                value={job.app_status || ''}
+                onChange={setStatus}
+                className="h-8 px-3 bg-surface border rounded-sm text-[12.5px] text-t1 focus:outline-none focus:border-accent"
+                style={{ borderColor: 'rgba(var(--border) / 0.12)' }}
+              >
+                {APP_STATUSES.map(s => (
+                  <option key={s.value} value={s.value}>{s.label}</option>
+                ))}
+              </select>
+              {job.url && (
+                <a href={job.url} target="_blank" rel="noreferrer" className="btn-secondary h-8 px-3.5 text-[12.5px] flex items-center">
+                  Open posting
+                </a>
+              )}
+            </div>
+
+            {/* Section scores */}
+            {Object.keys(sections).length > 0 && (
+              <div>
+                <div className="text-[11px] font-semibold text-t3 uppercase tracking-wide mb-2.5">Score breakdown</div>
+                <div className="space-y-2">
+                  {Object.entries(SECTION_LABELS)
+                    .filter(([key]) => sections[key] !== undefined)
+                    .map(([key, name]) => (
+                      <SectionBar key={key} name={name} score={sections[key] || 0} />
+                    ))}
+                </div>
+              </div>
+            )}
+
+            {/* Matched / missing keywords */}
+            {(matched.length > 0 || missing.length > 0) && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <div className="text-[11px] font-semibold text-t3 uppercase tracking-wide mb-2">Matched ({matched.length})</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {matched.map(k => (
+                      <span key={k} className="px-2 py-0.5 text-[11px] font-medium rounded-sm bg-green-bg border border-green-bd text-green">{k}</span>
+                    ))}
+                    {matched.length === 0 && <span className="text-[12px] text-t3">None</span>}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[11px] font-semibold text-t3 uppercase tracking-wide mb-2">Missing ({missing.length})</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {missing.map(k => (
+                      <span key={k} className="px-2 py-0.5 text-[11px] font-medium rounded-sm bg-red-bg border border-red-bd text-red">{k}</span>
+                    ))}
+                    {missing.length === 0 && <span className="text-[12px] text-t3">None</span>}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* AI summary */}
+            {data.summary && (
+              <div>
+                <div className="text-[11px] font-semibold text-t3 uppercase tracking-wide mb-2">AI fit summary</div>
+                <SummaryBlock summary={data.summary} />
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+
+function JobCard({ job, onOpen, onApply, onDelete, onPasteJd }) {
   const chips = (job.matched_required || []).slice(0, 5)
   const extra = (job.matched_required || []).length - chips.length
   const jdUnavailable = job.status === 'jd_unavailable'
@@ -143,9 +389,13 @@ function JobCard({ job, onApply, onDelete, onPasteJd }) {
   const fresh = isNewJob(job.posted_at)
 
   return (
-    <div className={`bg-surface border rounded-lg p-4 flex items-start gap-4 transition-shadow hover:shadow-md ${
-      job.applied ? 'border-green-bd' : 'border-border'
-    }`}>
+    <div
+      onClick={() => onOpen(job)}
+      className={`bg-surface border rounded-lg p-4 flex items-start gap-4 transition-shadow hover:shadow-md cursor-pointer ${
+        job.applied ? 'border-green-bd' : 'border-border'
+      }`}
+      title="View match details"
+    >
       <ScoreBadge score={job.score || 0} />
 
       <div className="flex-1 min-w-0">
@@ -164,6 +414,7 @@ function JobCard({ job, onApply, onDelete, onPasteJd }) {
               {job.company}
               {job.location && <span className="text-t3"> · {job.location}</span>}
               {posted && <span className="text-t3"> · {posted}</span>}
+              {job.source && <span className="text-t3"> · via {job.source}</span>}
             </div>
           </div>
           {jdUnavailable && (
@@ -189,7 +440,7 @@ function JobCard({ job, onApply, onDelete, onPasteJd }) {
         )}
       </div>
 
-      <div className="flex items-center gap-1.5 flex-shrink-0">
+      <div className="flex items-center gap-1.5 flex-shrink-0" onClick={e => e.stopPropagation()}>
         {jdUnavailable && (
           <button onClick={() => onPasteJd(job)}
             className="h-7 px-2.5 text-[12px] font-medium rounded-sm border transition-colors flex items-center"
@@ -455,6 +706,9 @@ export default function JobMatches() {
   const [hideApplied, setHideApplied] = useState(false)
   const [pasteJob, setPasteJob] = useState(null)
   const [showSettings, setShowSettings] = useState(false)
+  const [detailJobId, setDetailJobId] = useState(null)
+  const [appliedOnly, setAppliedOnly] = useState(false)
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
 
   const load = useCallback(async () => {
     const res = await apiFetch('/api/match/state')
@@ -519,8 +773,27 @@ export default function JobMatches() {
   }
 
   async function deleteJob(id) {
-    await apiFetch('/api/match/delete', { method: 'POST', body: JSON.stringify({ id }) })
+    const res = await apiFetch('/api/match/delete', { method: 'POST', body: JSON.stringify({ id }) })
+    const data = await res?.json().catch(() => ({}))
+    if (!res?.ok || !data.ok) { toast(errMsg(data, 'Could not remove the job'), 'error'); return }
     setState(s => s ? { ...s, results: s.results.filter(r => r.id !== id) } : s)
+    toast('Job removed', 'info', 6000, { label: 'Undo', onClick: () => restoreJob(id) })
+  }
+
+  async function restoreJob(id) {
+    const res = await apiFetch('/api/match/restore', { method: 'POST', body: JSON.stringify({ id }) })
+    const data = await res?.json().catch(() => ({}))
+    if (!res?.ok || !data.ok) { toast(errMsg(data, 'Could not restore the job'), 'error'); return }
+    await load()
+    toast('Job restored', 'success')
+  }
+
+  function onStatusChange(id, status) {
+    setState(s => s ? {
+      ...s,
+      results: s.results.map(r =>
+        r.id === id ? { ...r, app_status: status, applied: status ? 1 : 0 } : r),
+    } : s)
   }
 
   async function exportCsv() {
@@ -532,11 +805,17 @@ export default function JobMatches() {
     toast('Exported', 'success')
   }
 
+  // Collapse the list back to one page whenever the filters change.
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE)
+  }, [minScore, sortBy, hideApplied, appliedOnly])
+
   const allResults = state?.results || []
   const newCount = allResults.filter(r => isNewJob(r.posted_at)).length
   const results = allResults
     .filter(r => (r.score || 0) >= minScore)
     .filter(r => !hideApplied || !r.applied)
+    .filter(r => !appliedOnly || r.applied)
     .sort((a, b) => {
       if (sortBy === 'score') return (b.score || 0) - (a.score || 0)
       // Newest first: compare parsed dates so ISO strings and unix
@@ -596,6 +875,12 @@ export default function JobMatches() {
               )}
             </span>
           </span>
+          {state?.last_run && (
+            <span className="text-t3">
+              Last fetch: {agoTime(state.last_run.at)} · {state.last_run.scored} scored
+              {state.last_run.stopped ? ' (stopped early)' : ''}
+            </span>
+          )}
         </div>
       )}
 
@@ -615,22 +900,45 @@ export default function JobMatches() {
       {/* First-run setup */}
       {showSetup && <FirstRunSetup hasResume={Boolean(hasResume)} />}
 
-      {/* Stats */}
+      {/* Stats - each tile applies its filter on click */}
       {allResults.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
-            { label: 'Total scored',                    value: allResults.length },
-            { label: `New (last ${NEW_JOB_DAYS} days)`, value: newCount, accent: true },
-            { label: 'Good matches (60+)',              value: allResults.filter(r => r.score >= 60).length },
-            { label: 'Applied',                         value: allResults.filter(r => r.applied).length },
+            {
+              label: 'Total scored',
+              value: allResults.length,
+              onClick: () => { setMinScore(0); setSortBy('score'); setHideApplied(false); setAppliedOnly(false) },
+            },
+            {
+              label: `New (last ${NEW_JOB_DAYS} days)`,
+              value: newCount,
+              accent: true,
+              onClick: () => { setMinScore(0); setSortBy('date'); setAppliedOnly(false) },
+            },
+            {
+              label: 'Good matches (60+)',
+              value: allResults.filter(r => r.score >= 60).length,
+              onClick: () => { setMinScore(60); setAppliedOnly(false) },
+            },
+            {
+              label: 'Applied',
+              value: allResults.filter(r => r.applied).length,
+              active: appliedOnly,
+              onClick: () => { setAppliedOnly(v => !v); setHideApplied(false) },
+            },
           ].map(s => (
-            <div key={s.label} className="bg-surface border rounded-lg px-4 py-3"
-              style={{ borderColor: 'rgba(var(--border) / 0.08)' }}>
-              <div className="text-xl font-bold" style={{ color: s.accent && s.value > 0 ? 'rgb(var(--accent))' : 'rgb(var(--t1))' }}>
+            <button
+              key={s.label}
+              type="button"
+              onClick={s.onClick}
+              className="bg-surface border rounded-lg px-4 py-3 text-left transition-shadow hover:shadow-md"
+              style={{ borderColor: s.active ? 'rgba(var(--accent) / 0.4)' : 'rgba(var(--border) / 0.08)' }}
+            >
+              <div className="text-xl font-bold" style={{ color: (s.accent && s.value > 0) || s.active ? 'rgb(var(--accent))' : 'rgb(var(--t1))' }}>
                 {s.value}
               </div>
               <div className="text-[12px] text-t2 mt-0.5">{s.label}</div>
-            </div>
+            </button>
           ))}
         </div>
       )}
@@ -696,7 +1004,7 @@ export default function JobMatches() {
       {results.length > 0 && (
         <motion.div className="space-y-2.5" variants={listVariants} initial="hidden" animate="show">
           <AnimatePresence initial={false}>
-            {results.map(r => (
+            {results.slice(0, visibleCount).map(r => (
               <motion.div
                 key={r.id}
                 layout
@@ -705,15 +1013,34 @@ export default function JobMatches() {
                 animate="show"
                 exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.15 } }}
               >
-                <JobCard job={r} onApply={toggleApplied} onDelete={deleteJob} onPasteJd={setPasteJob} />
+                <JobCard job={r} onOpen={j => setDetailJobId(j.id)} onApply={toggleApplied} onDelete={deleteJob} onPasteJd={setPasteJob} />
               </motion.div>
             ))}
           </AnimatePresence>
+          {results.length > visibleCount && (
+            <div className="pt-1 text-center">
+              <button
+                type="button"
+                onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
+                className="btn-secondary h-8 px-5 text-[12.5px]"
+              >
+                Show {Math.min(PAGE_SIZE, results.length - visibleCount)} more of {results.length - visibleCount}
+              </button>
+            </div>
+          )}
         </motion.div>
       )}
 
       {pasteJob && (
         <ScoreJdModal job={pasteJob} onClose={() => setPasteJob(null)} onScored={load} />
+      )}
+
+      {detailJobId && (
+        <JobDetailModal
+          jobId={detailJobId}
+          onClose={() => setDetailJobId(null)}
+          onStatusChange={onStatusChange}
+        />
       )}
     </div>
   )
