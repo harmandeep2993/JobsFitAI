@@ -326,8 +326,10 @@ async def _auto_fetch_loop() -> None:
                 _sched_last_ref[uid] = time.monotonic()
 
                 def _run(user_id=uid) -> dict:
+                    titles = settings_store.get_titles(user_id)
+                    entry_only = settings_store.get_entry_only(user_id)
                     jobs = fetch_combined(
-                        settings_store.get_titles(user_id),
+                        titles,
                         location=settings_store.get_location(user_id),
                         countries=settings_store.get_countries(user_id),
                         per_title=SEARCH_PER_TITLE,
@@ -335,11 +337,13 @@ async def _auto_fetch_loop() -> None:
                         bundesagentur_limit=settings_store.get_bundesagentur_limit(
                             user_id
                         ),
+                        entry_only=entry_only,
                     )
                     return discover_and_score(
                         jobs,
                         user_id=user_id,
-                        entry_only=settings_store.get_entry_only(user_id),
+                        entry_only=entry_only,
+                        titles=titles,
                     )
 
                 out = await run_in_threadpool(_run)

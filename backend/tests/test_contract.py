@@ -369,6 +369,39 @@ def test_match_stop_contract(client, auth):
     assert body["stopped"] is False
 
 
+def test_entry_search_expansion():
+    """Plain titles combine with entry keywords; qualified titles pass as-is."""
+    from services.title_expander import entry_search_queries
+
+    queries = entry_search_queries(["ml engineer"])
+    assert "ml engineer" in queries
+    assert "junior ml engineer" in queries
+    assert "intern ml engineer" in queries
+    assert len(queries) > 3
+
+    # Already qualified - searched exactly as typed, no expansion
+    assert entry_search_queries(["junior ml engineer"]) == ["junior ml engineer"]
+
+
+def test_entry_exclude_terms():
+    """Entry-only blocks seniority + student posts unless the user asks for them."""
+    from services.title_expander import exclude_terms, title_blocked
+
+    # Off: nothing blocked
+    assert exclude_terms(["ml engineer"], entry_only=False) == []
+
+    # On with a junior title: werkstudent posts are blocked
+    terms = exclude_terms(["junior ml engineer"], entry_only=True)
+    assert title_blocked("Werkstudent Machine Learning (m/w/d)", terms)
+    assert title_blocked("Senior ML Engineer", terms)
+    assert not title_blocked("Junior ML Engineer", terms)
+
+    # On with an explicit werkstudent title: student posts allowed, seniors not
+    terms = exclude_terms(["werkstudent ml"], entry_only=True)
+    assert not title_blocked("Werkstudent Machine Learning (m/w/d)", terms)
+    assert title_blocked("Senior ML Engineer", terms)
+
+
 def test_seniority_guard_overrides_llm():
     """Titles with explicit seniority markers must never pass the entry gate."""
     from services.job_relevance import title_is_senior

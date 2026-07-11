@@ -183,9 +183,14 @@ async def api_match_run(
                 per_title=SEARCH_PER_TITLE,
                 arbeitnow_limit=settings_store.get_arbeitnow_limit(user_id),
                 bundesagentur_limit=settings_store.get_bundesagentur_limit(user_id),
+                entry_only=entry_only_flag,
             )
             discover_and_score(
-                jobs, user_id=user_id, entry_only=entry_only_flag, manual=True
+                jobs,
+                user_id=user_id,
+                entry_only=entry_only_flag,
+                manual=True,
+                titles=titles,
             )
 
         try:
