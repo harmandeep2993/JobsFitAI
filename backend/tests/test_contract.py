@@ -1,0 +1,333 @@
+# tests/test_contract.py
+"""
+Frontend-backend contract tests.
+
+Each test calls an endpoint with the exact request shape the frontend sends
+(see frontend/src/components and pages) and asserts the exact response fields
+the frontend reads. If either side drifts, a test fails here instead of a tab
+silently breaking in the browser.
+
+LLM-dependent endpoints (/api/analyze, /api/ats/optimise, /api/improve-resume,
+job fetch runs) are excluded - their contracts are covered indirectly through
+the shapes their consumers share with the endpoints tested here.
+"""
+
+# NOTE: do not import from tests.conftest here - importing it as a module
+# re-runs its chdir/tempdir setup a second time and orphans the test database.
+RESUME_TEXT = (
+    "John Doe\njohn@example.com\nSUMMARY\nData analyst with 3 years experience.\n"
+    "WORK EXPERIENCE\nData Analyst at Acme GmbH 2021-2024: built dashboards in "
+    "Power BI, SQL queries, Python ETL pipelines.\n"
+    "EDUCATION\nBSc Computer Science, TU Berlin, 2020\n"
+    "SKILLS\nPython, SQL, Power BI, Excel"
+)
+
+
+def assert_keys(payload: dict, keys: list[str]) -> None:
+    """Assert every key the frontend reads is present in the response."""
+    missing = [k for k in keys if k not in payload]
+    assert not missing, f"response missing keys the frontend reads: {missing}"
+
+
+# === Auth (Login.jsx, Settings.jsx, AppShell) ===
+
+
+def test_register_and_login_contract(client):
+    email = "contract-auth@example.com"
+    r = client.post(
+        "/api/auth/register", json={"email": email, "password": "testpass123"}
+    )
+    assert r.status_code == 201
+    assert_keys(r.json(), ["token", "user_id", "email"])
+
+    r = client.post("/api/auth/login", json={"email": email, "password": "testpass123"})
+    assert r.status_code == 200
+    assert_keys(r.json(), ["token", "user_id", "email"])
+
+
+def test_me_contract(client, auth):
+    r = client.get("/api/auth/me", headers=auth)
+    assert r.status_code == 200
+    # Settings.jsx reads email, created_at, is_admin
+    assert_keys(r.json(), ["user_id", "email", "created_at", "is_admin"])
+
+
+def test_change_password_contract(client):
+    email = "contract-pw@example.com"
+    r = client.post(
+        "/api/auth/register", json={"email": email, "password": "testpass123"}
+    )
+    h = {"Authorization": f"Bearer {r.json()['token']}"}
+
+    r = client.post(
+        "/api/auth/change-password",
+        headers=h,
+        json={"current_password": "wrong", "new_password": "newpass1234"},
+    )
+    assert r.status_code == 401
+
+    r = client.post(
+        "/api/auth/change-password",
+        headers=h,
+        json={"current_password": "testpass123", "new_password": "newpass1234"},
+    )
+    assert r.status_code == 200 and r.json()["ok"]
+
+
+# === Temp upload + preview (Analyzer.jsx, ATS.jsx) ===
+
+
+def test_upload_returns_opaque_token(client, auth):
+    r = client.post(
+        "/api/upload",
+        headers=auth,
+        files={"file": ("cv.txt", RESUME_TEXT.encode(), "text/plain")},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert_keys(body, ["ok", "name", "tmp", "kb", "ext"])
+    # The token must never be a filesystem path
+    assert "/" not in body["tmp"] and "\\" not in body["tmp"]
+
+
+def test_resume_preview_contract(client, auth, tmp_token):
+    r = client.post(
+        "/api/resume-preview",
+        headers=auth,
+        json={"tmp": tmp_token, "resume_id": ""},
+    )
+    assert r.status_code == 200
+    assert_keys(r.json(), ["ok", "text", "total_chars"])
+
+
+def test_preview_rejects_raw_paths(client, auth):
+    r = client.post(
+        "/api/resume-preview",
+        headers=auth,
+        json={"tmp": "C:\\Windows\\win.ini", "resume_id": ""},
+    )
+    assert r.status_code == 400
+
+
+# === Resume vault (Resumes.jsx, ResumePicker.jsx) ===
+
+
+def test_resumes_crud_contract(client, auth):
+    r = client.post(
+        "/api/resumes/upload",
+        headers=auth,
+        files={"file": ("base.txt", RESUME_TEXT.encode(), "text/plain")},
+        data={"slot": "0"},
+    )
+    assert r.status_code == 200
+    assert_keys(r.json(), ["ok", "id", "slot", "label", "name", "kb", "uploaded_at"])
+    rid = r.json()["id"]
+
+    r = client.get("/api/resumes", headers=auth)
+    assert r.status_code == 200
+    rows = r.json()["resumes"]
+    assert rows, "uploaded resume missing from list"
+    # Resumes.jsx + ResumePicker.jsx read these fields per row
+    assert_keys(
+        rows[0],
+        [
+            "id",
+            "slot",
+            "label",
+            "original_name",
+            "file_size_kb",
+            "extracted_json",
+            "uploaded_at",
+        ],
+    )
+
+    r = client.post(
+        f"/api/resumes/{rid}/label", headers=auth, json={"label": "Renamed"}
+    )
+    assert r.status_code == 200
+
+    r = client.get(f"/api/resumes/{rid}/file", headers=auth)
+    assert r.status_code == 200
+
+    r = client.post(f"/api/resumes/{rid}/re-extract", headers=auth)
+    assert r.status_code == 200
+
+    r = client.delete(f"/api/resumes/{rid}", headers=auth)
+    assert r.status_code == 200
+
+
+# === ATS (ATS.jsx) ===
+
+
+def test_ats_check_contract(client, auth, tmp_token):
+    r = client.post("/api/ats/check", headers=auth, json={"tmp": tmp_token, "jd": ""})
+    assert r.status_code == 200
+    body = r.json()
+    assert_keys(
+        body, ["ok", "ats_score", "section_flags", "formatting_flags", "coverage"]
+    )
+    assert_keys(body["ats_score"], ["score", "has_jd"])
+    assert body["section_flags"], "section flags empty"
+    assert_keys(body["section_flags"][0], ["name", "found", "suggestion"])
+
+
+def test_ats_docx_contract(client, auth):
+    r = client.post(
+        "/api/ats/docx",
+        headers=auth,
+        json={
+            "resume": {
+                "summary": "x",
+                "skills": ["Python"],
+                "experience": [],
+                "education": [],
+            }
+        },
+    )
+    assert r.status_code == 200
+    assert "wordprocessingml" in r.headers["content-type"]
+    assert len(r.content) > 1000
+
+
+# === Job matches (JobMatches.jsx, Settings.jsx) ===
+
+
+def test_match_state_contract(client, auth):
+    r = client.get("/api/match/state", headers=auth)
+    assert r.status_code == 200
+    body = r.json()
+    assert_keys(
+        body,
+        [
+            "ok",
+            "has_resume",
+            "resume_name",
+            "filters",
+            "run_status",
+            "resume",
+            "scheduler",
+            "results",
+        ],
+    )
+    # Settings.jsx reads filters.target_titles / countries / location
+    assert_keys(body["filters"], ["target_titles", "countries", "location"])
+    # JobMatches.jsx reads run_status.running / phase / checked / scored / total
+    assert_keys(body["run_status"], ["running", "phase", "checked", "scored", "total"])
+    # Settings.jsx reads scheduler.enabled / interval
+    assert_keys(body["scheduler"], ["enabled", "interval"])
+
+
+def test_match_filters_contract(client, auth):
+    r = client.post(
+        "/api/match/filters",
+        headers=auth,
+        json={
+            "target_titles": ["data analyst"],
+            "location": "Berlin",
+            "countries": ["de"],
+        },
+    )
+    assert r.status_code == 200
+    assert r.json()["target_titles"] == ["data analyst"]
+
+
+def test_match_applied_requires_flag(client, auth):
+    # JobMatches.jsx must send both id and applied - omitting applied is a 422
+    r = client.post("/api/match/applied", headers=auth, json={"id": "job-1"})
+    assert r.status_code == 422
+    r = client.post(
+        "/api/match/applied", headers=auth, json={"id": "job-1", "applied": True}
+    )
+    assert r.status_code == 200
+    assert_keys(r.json(), ["ok", "id", "applied"])
+
+
+def test_match_scheduler_contract(client, auth):
+    r = client.post("/api/match/scheduler", headers=auth, json={"enabled": False})
+    assert r.status_code == 200
+    assert_keys(r.json(), ["ok", "enabled", "interval"])
+
+
+def test_match_export_contract(client, auth):
+    r = client.get("/api/match/export", headers=auth)
+    assert r.status_code == 200
+    assert "text/csv" in r.headers["content-type"]
+
+
+# === History (History.jsx) ===
+
+
+def test_history_contract(client, auth):
+    r = client.get("/api/history", headers=auth)
+    assert r.status_code == 200
+    assert_keys(r.json(), ["ok", "analyses", "fetcher_runs", "applications"])
+
+
+def test_history_analysis_unknown_hash(client, auth):
+    r = client.get("/api/history/analysis?hash=deadbeef", headers=auth)
+    assert r.status_code == 404
+
+
+# === LLM settings (Settings.jsx) ===
+
+
+def test_llm_settings_contract(client, auth):
+    r = client.get("/api/llm-settings", headers=auth)
+    assert r.status_code == 200
+    body = r.json()
+    assert_keys(body, ["ok", "current", "providers"])
+    assert_keys(body["current"], ["provider", "model"])
+    assert body["providers"], "provider catalog empty"
+    assert_keys(
+        body["providers"][0],
+        ["name", "default_model", "models", "needs_key", "has_key"],
+    )
+
+
+def test_llm_settings_post_requires_admin(client, auth):
+    r = client.post(
+        "/api/llm-settings",
+        headers=auth,
+        json={"provider": "openai", "model": ""},
+    )
+    assert r.status_code == 403
+
+
+# === Invite gate (Login.jsx register form) ===
+
+
+def test_invite_gate(client, monkeypatch):
+    import api.routes.auth as auth_route
+
+    monkeypatch.setattr(auth_route, "_INVITE_CODE", "test-code")
+    r = client.post(
+        "/api/auth/register",
+        json={"email": "gated@example.com", "password": "testpass123"},
+    )
+    assert r.status_code == 403
+    assert r.json()["detail"] == "invalid_invite_code"
+
+    r = client.post(
+        "/api/auth/register",
+        json={
+            "email": "gated@example.com",
+            "password": "testpass123",
+            "invite_code": "test-code",
+        },
+    )
+    assert r.status_code == 201
+
+
+# === Auth boundaries ===
+
+
+def test_protected_endpoints_reject_anonymous(client):
+    for method, path in [
+        ("get", "/api/history"),
+        ("get", "/api/resumes"),
+        ("get", "/api/match/state"),
+        ("get", "/api/llm-settings"),
+        ("post", "/api/upload"),
+    ]:
+        r = getattr(client, method)(path)
+        assert r.status_code in (401, 403), f"{path} not protected: {r.status_code}"
