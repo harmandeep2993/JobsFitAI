@@ -235,25 +235,52 @@ const SCHEDULER_INTERVALS = [
   { value: 1440, label: 'Once a day' },
 ]
 
-function SearchCriteriaPanel({ state, onSaved, onSchedulerChange, onToggleScheduler }) {
+function SearchCriteriaPanel({ state, onSaved, onSchedulerChange, onToggleScheduler, onFiltersChange }) {
   const toast = useToast()
   const [saving, setSaving] = useState(false)
+  const [titles, setTitles] = useState(state.filters?.target_titles || [])
+  const [newTitle, setNewTitle] = useState('')
+  const [location, setLocation] = useState(state.filters?.location || '')
+  const [countriesStr, setCountriesStr] = useState((state.filters?.countries || []).join(', '))
+  const entryOnly = Boolean(state.filters?.entry_only)
 
-  async function saveFilters(e) {
-    e.preventDefault()
-    setSaving(true)
-    const fd = new FormData(e.target)
-    const target_titles = (fd.get('titles') || '').split('\n').map(t => t.trim()).filter(Boolean)
-    const location  = (fd.get('location') || '').trim()
-    const countries = (fd.get('countries') || '').split(',').map(c => c.trim()).filter(Boolean)
+  async function postFilters(payload) {
     const res = await apiFetch('/api/match/filters', {
       method: 'POST',
-      body: JSON.stringify({ target_titles, location, countries }),
+      body: JSON.stringify(payload),
     })
     const data = await res?.json().catch(() => ({}))
+    if (!res?.ok || !data.ok) { toast(errMsg(data, 'Save failed'), 'error'); return null }
+    return data
+  }
+
+  async function addTitle() {
+    const t = newTitle.trim().toLowerCase()
+    if (!t) return
+    if (titles.includes(t)) { setNewTitle(''); return }
+    const data = await postFilters({ target_titles: [...titles, t] })
+    if (data) { setTitles(data.target_titles); setNewTitle(''); onSaved() }
+  }
+
+  async function removeTitle(t) {
+    const data = await postFilters({ target_titles: titles.filter(x => x !== t) })
+    if (data) { setTitles(data.target_titles); onSaved() }
+  }
+
+  async function toggleEntryOnly() {
+    const data = await postFilters({ entry_only: !entryOnly })
+    if (data) {
+      onFiltersChange({ entry_only: data.entry_only })
+      toast(data.entry_only ? 'Showing entry-level roles only' : 'Showing all job levels', 'success')
+    }
+  }
+
+  async function saveLocation() {
+    setSaving(true)
+    const countries = countriesStr.split(',').map(c => c.trim()).filter(Boolean)
+    const data = await postFilters({ location: location.trim(), countries })
     setSaving(false)
-    if (res?.ok && data.ok) { toast('Search criteria saved', 'success'); onSaved() }
-    else toast(errMsg(data, 'Save failed'), 'error')
+    if (data) { toast('Search criteria saved', 'success'); onSaved() }
   }
 
   async function changeInterval(e) {
@@ -266,37 +293,79 @@ function SearchCriteriaPanel({ state, onSaved, onSchedulerChange, onToggleSchedu
 
   return (
     <div className="space-y-4">
-      <form onSubmit={saveFilters}>
-        <CardSection
-          title="Search Criteria"
-          action={
-            <button type="submit" disabled={saving} className="btn-primary h-7 px-3.5 text-[12.5px]">
-              {saving ? 'Saving...' : 'Save'}
-            </button>
-          }
-        >
-          <div className="space-y-4">
-            <div>
-              <FieldLabel hint="(one per line)">Job titles</FieldLabel>
-              <textarea
-                name="titles"
-                defaultValue={(state.filters?.target_titles || []).join('\n')}
-                rows={4}
-                placeholder={"Software Engineer\nBackend Developer\nPython Developer"}
-                className="input-base resize-none"
-              />
+      <CardSection
+        title="Search Criteria"
+        action={
+          <button type="button" onClick={saveLocation} disabled={saving} className="btn-primary h-7 px-3.5 text-[12.5px]">
+            {saving ? 'Saving...' : 'Save'}
+          </button>
+        }
+      >
+        <div className="space-y-5">
+          <div>
+            <FieldLabel hint="(keywords used to search the job boards)">Job roles</FieldLabel>
+            <div className="flex flex-wrap gap-1.5 mb-2.5">
+              {titles.map(t => (
+                <span
+                  key={t}
+                  className="flex items-center gap-1 pl-2.5 pr-1 py-1 text-[12.5px] font-medium rounded-full border"
+                  style={{ background: 'rgba(var(--accent) / 0.07)', borderColor: 'rgba(var(--accent) / 0.25)', color: 'rgb(var(--accent))' }}
+                >
+                  {t}
+                  <button
+                    type="button"
+                    onClick={() => removeTitle(t)}
+                    aria-label={`Remove ${t}`}
+                    className="w-4 h-4 flex items-center justify-center rounded-full transition-colors hover:bg-accent/15"
+                    title="Remove"
+                  >
+                    <svg width="8" height="8" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                      <path d="M1.5 1.5l7 7M8.5 1.5l-7 7"/>
+                    </svg>
+                  </button>
+                </span>
+              ))}
+              {titles.length === 0 && (
+                <span className="text-[12.5px] text-t3">No job roles yet - add your first keyword below.</span>
+              )}
             </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newTitle}
+                onChange={e => setNewTitle(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTitle() } }}
+                placeholder="e.g. ml engineer, data analyst..."
+                className="input-base flex-1"
+              />
+              <button type="button" onClick={addTitle} disabled={!newTitle.trim()} className="btn-secondary h-9 px-4 text-[12.5px]">
+                Add
+              </button>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between gap-4 pt-1" style={{ borderTop: '1px solid rgba(var(--border) / 0.08)', paddingTop: '16px' }}>
+            <div>
+              <div className="text-[13px] font-medium text-t1">Entry level only</div>
+              <div className="text-[12px] text-t3 mt-0.5 max-w-md">
+                Combines each role with junior, graduate, trainee, and intern keywords and skips senior and working-student posts.
+              </div>
+            </div>
+            <Switch on={entryOnly} onClick={toggleEntryOnly} />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <FieldLabel>Location</FieldLabel>
-              <input type="text" name="location" defaultValue={state.filters?.location || ''} placeholder="Berlin, Munich, Remote..." className="input-base" />
+              <input type="text" value={location} onChange={e => setLocation(e.target.value)} placeholder="Berlin, Munich, Remote..." className="input-base" />
             </div>
             <div>
               <FieldLabel hint="(comma separated)">Countries</FieldLabel>
-              <input type="text" name="countries" defaultValue={(state.filters?.countries || []).join(', ')} placeholder="de, at, ch" className="input-base" />
+              <input type="text" value={countriesStr} onChange={e => setCountriesStr(e.target.value)} placeholder="de, at, ch" className="input-base" />
             </div>
           </div>
-        </CardSection>
-      </form>
+        </div>
+      </CardSection>
 
       <CardSection title="Auto-fetch">
         <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -538,6 +607,8 @@ export default function JobMatches() {
           onToggleScheduler={toggleAutoFetch}
           onSchedulerChange={patch =>
             setState(s => s ? { ...s, scheduler: { ...s.scheduler, ...patch } } : s)}
+          onFiltersChange={patch =>
+            setState(s => s ? { ...s, filters: { ...s.filters, ...patch } } : s)}
         />
       )}
 
