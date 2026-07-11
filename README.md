@@ -45,23 +45,28 @@ So I built it. The core works and I use it for every role I consider applying to
 ## What It Does
 
 **Resume Analyser** - Upload a PDF or DOCX resume and paste any job description. The AI
-pipeline extracts structured data from both, runs a weighted scoring engine across six dimensions,
-and returns a 0-100 match score with a full breakdown, keyword gap list, and actionable
-recommendations.
+pipeline extracts structured data from both, runs a weighted scoring engine across seven
+dimensions, and returns a 0-100 match score with a full breakdown, keyword gap list, and
+actionable recommendations. Re-running the same pair shows the score delta.
+
+**AI Resume Improvement** - After an analysis, one click feeds the identified gaps into a
+rewrite engine that generates improved, JD-aligned bullet points grounded in your real
+experience - shown as before/after pairs with copy buttons.
 
 **Live Job Fetcher** - Pulls fresh listings from Adzuna Germany, Arbeitnow, and the
 Bundesagentur fur Arbeit (up to 200 per search title with pagination), scores each against
-your loaded resume, and presents them ranked by match score. Supports scheduled auto-runs.
+your loaded resume, and presents them ranked by match score. Supports scheduled auto-runs,
+applied-status tracking, and CSV export.
 
-**ATS Check** - Scans your resume for structural issues that confuse Applicant Tracking Systems:
-missing sections, formatting problems, and keyword coverage against a job description.
+**ATS Check and Optimise** - Scans your resume for structural issues that confuse Applicant
+Tracking Systems (missing sections, formatting problems, keyword coverage), then optionally
+rewrites it for the job description and exports the result as a ready-to-send DOCX.
 
 **Resume Vault** - Store up to 3 resume versions (base + tailored). Switch between them
-instantly when scoring a new job. The system remembers which version you used for each analysis.
+instantly when scoring a new job. Past analyses can be reopened in full from the History tab.
 
-**Multi-provider LLM** - Works with OpenAI GPT-4o, Groq (fast, free tier), or a local Ollama
-model. Switch providers from the Settings tab. Falls back automatically if the primary provider
-fails.
+**LLM Routing** - Analyses run on OpenAI GPT-4o-mini with automatic retry and Groq fallback.
+The active provider is an app-wide setting controlled by the admin account.
 
 ---
 
@@ -100,10 +105,11 @@ JobsFitAI/
     main.py                    FastAPI entry point, routers, scheduler
     config.yaml                LLM providers, matcher weights, job search settings
     api/routes/                One file per feature group (auth, resumes, analyzer, matches, ats)
-    core/                      Config, database, security, logger, state
+    core/                      Config, database, security, logger, state, upload tokens
     models/                    User model (DB queries for the users table)
     repositories/              Data access layer for all other tables
     schemas/                   Pydantic request/response shapes
+    tests/                     Frontend-backend contract test suite (pytest)
     services/
       ats.py                   ATS check and optimise logic
       job_matcher.py           Fetch + score pipeline orchestration
@@ -119,9 +125,10 @@ JobsFitAI/
     src/
       pages/                   Landing, Login, About, Pricing, Privacy
       components/tabs/         Analyzer, ATS, JobMatches, Resumes, History, Settings
-      components/              ResumePicker, TopBar, Sidebar, Toast, ui
+      components/              ResumePicker, AnalysisResults, TopBar, Sidebar, Toast, ui
       layouts/AppShell.jsx     Main app shell (sidebar + content)
-      lib/auth.js              apiFetch() - attaches Bearer token to every API call
+      lib/auth.js              apiFetch() - attaches Bearer token, redirects to login on 401
+      lib/errors.js            errMsg() - maps API error codes to human-readable messages
       App.jsx                  React Router config
       index.css                Design tokens + global styles
 ```
@@ -147,6 +154,13 @@ npm run dev
 
 Open `http://localhost:5173` for the React app, or `http://localhost:8080` to hit the API directly.
 
+**Tests** - the contract test suite runs offline against a throwaway database:
+
+```bash
+cd backend
+uv run pytest tests
+```
+
 **Environment variables** - copy `.env.example` to `backend/.env` and fill in your keys:
 
 ```
@@ -155,10 +169,12 @@ OPENAI_API_KEY=sk-...
 GROQ_API_KEY=gsk-...
 ADZUNA_APP_ID=your-app-id
 ADZUNA_APP_KEY=your-app-key
+ADMIN_EMAILS=you@example.com        # admin role (app-wide LLM settings)
+INVITE_CODE=your-beta-code          # optional: makes registration invite-only
 ```
 
-For fully local usage with no cloud API keys, install [Ollama](https://ollama.com) and set
-the provider to `ollama` in the Settings tab.
+Optional: `APP_ENV=production` enforces production requirements (JWT_SECRET must be set),
+and `ALLOWED_ORIGINS` restricts CORS to your real domain.
 
 ---
 
@@ -166,25 +182,28 @@ the provider to `ollama` in the Settings tab.
 
 | Group | Endpoints |
 |-------|-----------|
-| Auth | POST /api/auth/register, /login, GET /me |
-| Resumes | GET/POST/DELETE /api/resumes, /api/resumes/{id}/file, /label, /use-for-matching |
-| Analyzer | POST /api/upload, /resume-preview, /analyze |
-| Job Matches | GET /api/match/run, /state, /export; POST /applied, /filters, /scheduler, /clear |
-| ATS | POST /api/ats/check, /optimise |
-| History | GET /api/history |
-| LLM Settings | GET/POST /api/llm-settings, GET /api/llm-ping |
+| Auth | POST /api/auth/register, /login, /change-password; GET /me |
+| Resumes | GET/POST/DELETE /api/resumes, /{id}/file, /label, /use-for-matching, /re-extract, /recommend |
+| Analyzer | POST /api/upload, /resume-preview, /analyze; POST /api/improve-resume |
+| Job Matches | GET /api/match/run, /state, /detail, /export; POST /applied, /filters, /score-jd, /scheduler, /delete, /clear |
+| ATS | POST /api/ats/check, /optimise, /docx |
+| History | GET /api/history, /api/history/analysis |
+| LLM Settings | GET/POST /api/llm-settings (POST is admin-only), GET /api/llm-ping |
 
 ---
 
 ## Current Status
 
 Core pipeline works end to end: resume parsing, LLM extraction, semantic scoring, keyword
-gap analysis, ATS check, and live job fetching from three German job boards.
+gap analysis, ATS check and optimise with DOCX export, AI resume improvement, and live job
+fetching from three German job boards.
 
-The React frontend is live with full auth, resume vault, analyzer, ATS check, job matches,
-history, and settings tabs.
+The React frontend is live with full auth (invite-only beta), resume vault, analyzer with
+improve flow, ATS tab, job matches with run progress, reopenable history, and settings with
+account management. A contract test suite pins every frontend-backend interaction.
 
-**In progress:** Pro plan billing, AI-powered ATS optimise, resume improvement suggestions.
+**In progress:** production deployment prep (usage quotas, GDPR account deletion, Docker),
+then Pro plan billing.
 
 ---
 
