@@ -19,6 +19,69 @@ const itemVariants = {
   show:   { opacity: 1, y: 0, transition: { duration: 0.18, ease: [0.25, 0.1, 0.25, 1] } },
 }
 
+// Jobs posted within this many days get the "New" badge and count as fresh.
+const NEW_JOB_DAYS = 3
+
+function parsePostedAt(postedAt) {
+  if (!postedAt) return null
+  const d = /^\d+$/.test(String(postedAt))
+    ? new Date(Number(postedAt) * 1000)
+    : new Date(postedAt)
+  return isNaN(d.getTime()) ? null : d
+}
+
+function relTime(postedAt) {
+  const d = parsePostedAt(postedAt)
+  if (!d) return ''
+  const days = Math.floor((Date.now() - d.getTime()) / 86400000)
+  if (days <= 0) return 'today'
+  if (days === 1) return 'yesterday'
+  if (days < 7) return `${days}d ago`
+  if (days < 30) return `${Math.floor(days / 7)}w ago`
+  return `${Math.floor(days / 30)}mo ago`
+}
+
+function isNewJob(postedAt) {
+  const d = parsePostedAt(postedAt)
+  return d ? (Date.now() - d.getTime()) / 86400000 <= NEW_JOB_DAYS : false
+}
+
+// Accessible on/off switch - off state uses a soft neutral track, not a
+// solid fill, so both states read clearly.
+function Switch({ on, onClick }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      onClick={onClick}
+      className="relative w-10 h-6 rounded-full transition-colors flex-shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+      style={{ background: on ? 'rgb(var(--accent))' : 'rgba(var(--t3) / 0.35)' }}
+    >
+      <span
+        className="absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform"
+        style={{ transform: on ? 'translateX(20px)' : 'translateX(4px)' }}
+      />
+    </button>
+  )
+}
+
+// Toolbar filter chip - active state is accent-tinted, inactive is neutral.
+function Chip({ active, onClick, children }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="h-8 px-3 text-[12.5px] font-medium rounded-full border transition-colors"
+      style={active
+        ? { background: 'rgba(var(--accent) / 0.1)', borderColor: 'rgba(var(--accent) / 0.35)', color: 'rgb(var(--accent))' }
+        : { background: 'rgb(var(--surface))', borderColor: 'rgba(var(--border) / 0.12)', color: 'rgb(var(--t2))' }}
+    >
+      {children}
+    </button>
+  )
+}
+
 // === Paste-JD modal for jobs whose description could not be fetched ===
 function ScoreJdModal({ job, onClose, onScored }) {
   const toast = useToast()
@@ -76,6 +139,8 @@ function JobCard({ job, onApply, onDelete, onPasteJd }) {
   const chips = (job.matched_required || []).slice(0, 5)
   const extra = (job.matched_required || []).length - chips.length
   const jdUnavailable = job.status === 'jd_unavailable'
+  const posted = relTime(job.posted_at)
+  const fresh = isNewJob(job.posted_at)
 
   return (
     <div className={`bg-surface border rounded-lg p-4 flex items-start gap-4 transition-shadow hover:shadow-md ${
@@ -86,10 +151,19 @@ function JobCard({ job, onApply, onDelete, onPasteJd }) {
       <div className="flex-1 min-w-0">
         <div className="flex items-start gap-2">
           <div className="flex-1 min-w-0">
-            <div className="text-[14px] font-semibold text-t1 truncate">{job.title}</div>
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="text-[14px] font-semibold text-t1 truncate">{job.title}</div>
+              {fresh && (
+                <span className="flex-shrink-0 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide rounded-sm"
+                  style={{ background: 'rgba(var(--accent) / 0.1)', color: 'rgb(var(--accent))' }}>
+                  New
+                </span>
+              )}
+            </div>
             <div className="text-[12.5px] text-t2 mt-0.5">
               {job.company}
               {job.location && <span className="text-t3"> · {job.location}</span>}
+              {posted && <span className="text-t3"> · {posted}</span>}
             </div>
           </div>
           {jdUnavailable && (
@@ -152,6 +226,15 @@ function JobCard({ job, onApply, onDelete, onPasteJd }) {
 }
 
 // === Search settings panel (titles, location, countries, scheduler) ===
+const SCHEDULER_INTERVALS = [
+  { value: 30,   label: 'Every 30 minutes' },
+  { value: 60,   label: 'Every hour' },
+  { value: 180,  label: 'Every 3 hours' },
+  { value: 360,  label: 'Every 6 hours' },
+  { value: 720,  label: 'Every 12 hours' },
+  { value: 1440, label: 'Once a day' },
+]
+
 function SearchSettingsPanel({ state, onSaved, onSchedulerChange }) {
   const toast = useToast()
   const [saving, setSaving] = useState(false)
@@ -176,8 +259,20 @@ function SearchSettingsPanel({ state, onSaved, onSchedulerChange }) {
   async function toggleScheduler() {
     const enabled = !state.scheduler?.enabled
     const res = await apiFetch('/api/match/scheduler', { method: 'POST', body: JSON.stringify({ enabled }) })
-    if (res?.ok) onSchedulerChange(enabled)
-    else toast('Could not update scheduler', 'error')
+    if (res?.ok) {
+      onSchedulerChange({ enabled })
+      toast(enabled ? 'Auto-fetch enabled' : 'Auto-fetch disabled', 'success')
+    } else {
+      toast('Could not update scheduler', 'error')
+    }
+  }
+
+  async function changeInterval(e) {
+    const interval = Number(e.target.value)
+    const res = await apiFetch('/api/match/scheduler', { method: 'POST', body: JSON.stringify({ interval }) })
+    const data = await res?.json().catch(() => ({}))
+    if (res?.ok && data.ok) onSchedulerChange({ interval: data.interval })
+    else toast('Could not update the interval', 'error')
   }
 
   return (
@@ -214,19 +309,33 @@ function SearchSettingsPanel({ state, onSaved, onSchedulerChange }) {
         </CardSection>
       </form>
 
-      <CardSection title="Auto Scheduler">
-        <p className="text-[13px] text-t2 mb-4">Automatically fetch and score new jobs in the background on a set interval.</p>
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={toggleScheduler}
-            className={`relative w-10 h-6 rounded-full transition-colors flex-shrink-0 ${state.scheduler?.enabled ? 'bg-accent' : 'bg-border'}`}
-          >
-            <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${state.scheduler?.enabled ? 'translate-x-5' : 'translate-x-1'}`} />
-          </button>
-          <span className="text-[13.5px] font-medium text-t1">{state.scheduler?.enabled ? 'Enabled' : 'Disabled'}</span>
-          {state.scheduler?.interval && (
-            <span className="text-[12px] text-t3">- runs every {state.scheduler.interval} min</span>
+      <CardSection title="Auto-fetch">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-3">
+            <Switch on={Boolean(state.scheduler?.enabled)} onClick={toggleScheduler} />
+            <div>
+              <div className="text-[13.5px] font-medium text-t1">
+                {state.scheduler?.enabled ? 'Auto-fetch is on' : 'Auto-fetch is off'}
+              </div>
+              <div className="text-[12px] text-t3 mt-0.5">
+                Fetch and score new jobs in the background while you are away.
+              </div>
+            </div>
+          </div>
+          {state.scheduler?.enabled && (
+            <select
+              value={state.scheduler?.interval || 60}
+              onChange={changeInterval}
+              className="h-8 px-3 bg-surface border rounded-sm text-[12.5px] text-t1 focus:outline-none focus:border-accent"
+              style={{ borderColor: 'rgba(var(--border) / 0.12)' }}
+            >
+              {SCHEDULER_INTERVALS.map(o => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+              {!SCHEDULER_INTERVALS.some(o => o.value === (state.scheduler?.interval || 60)) && (
+                <option value={state.scheduler.interval}>Every {state.scheduler.interval} min</option>
+              )}
+            </select>
           )}
         </div>
       </CardSection>
@@ -285,6 +394,7 @@ export default function JobMatches() {
   const [running, setRunning] = useState(false)
   const [minScore, setMinScore] = useState(0)
   const [sortBy, setSortBy] = useState('score')
+  const [hideApplied, setHideApplied] = useState(false)
   const [pasteJob, setPasteJob] = useState(null)
   const [showSettings, setShowSettings] = useState(false)
 
@@ -346,12 +456,17 @@ export default function JobMatches() {
   }
 
   const allResults = state?.results || []
+  const newCount = allResults.filter(r => isNewJob(r.posted_at)).length
   const results = allResults
     .filter(r => (r.score || 0) >= minScore)
+    .filter(r => !hideApplied || !r.applied)
     .sort((a, b) => {
       if (sortBy === 'score') return (b.score || 0) - (a.score || 0)
-      // Newest first: posted_at may be an ISO string or unix timestamp
-      return String(b.posted_at || '').localeCompare(String(a.posted_at || ''))
+      // Newest first: compare parsed dates so ISO strings and unix
+      // timestamps from different sources sort together correctly
+      const da = parsePostedAt(a.posted_at)?.getTime() || 0
+      const db = parsePostedAt(b.posted_at)?.getTime() || 0
+      return db - da
     })
 
   const hasResume = state?.has_resume
@@ -382,10 +497,27 @@ export default function JobMatches() {
         }
       />
 
-      {/* Active resume banner */}
+      {/* Context strip: active resume + auto-fetch status */}
       {hasResume && state?.resume_name && (
-        <div className="text-[12.5px] text-t3">
-          Scoring against: <span className="font-medium text-t2">{state.resume_name}</span>
+        <div className="flex items-center gap-3 flex-wrap text-[12.5px] text-t3">
+          <span>
+            Scoring against: <span className="font-medium text-t2">{state.resume_name}</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => setShowSettings(true)}
+            className="flex items-center gap-1.5 px-2 py-0.5 rounded-full border transition-colors hover:bg-hover"
+            style={{ borderColor: 'rgba(var(--border) / 0.12)' }}
+            title="Open search settings"
+          >
+            <span
+              className="w-1.5 h-1.5 rounded-full"
+              style={{ background: state.scheduler?.enabled ? 'rgb(var(--green))' : 'rgba(var(--t3) / 0.5)' }}
+            />
+            {state.scheduler?.enabled
+              ? `Auto-fetch on · every ${state.scheduler?.interval || 60} min`
+              : 'Auto-fetch off'}
+          </button>
         </div>
       )}
 
@@ -394,8 +526,8 @@ export default function JobMatches() {
         <SearchSettingsPanel
           state={state}
           onSaved={load}
-          onSchedulerChange={enabled =>
-            setState(s => s ? { ...s, scheduler: { ...s.scheduler, enabled } } : s)}
+          onSchedulerChange={patch =>
+            setState(s => s ? { ...s, scheduler: { ...s.scheduler, ...patch } } : s)}
         />
       )}
 
@@ -404,14 +536,18 @@ export default function JobMatches() {
 
       {/* Stats */}
       {allResults.length > 0 && (
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
-            { label: 'Total scored', value: allResults.length },
-            { label: '60+ score',    value: allResults.filter(r => r.score >= 60).length },
-            { label: 'Applied',      value: allResults.filter(r => r.applied).length },
+            { label: 'Total scored',                    value: allResults.length },
+            { label: `New (last ${NEW_JOB_DAYS} days)`, value: newCount, accent: true },
+            { label: 'Good matches (60+)',              value: allResults.filter(r => r.score >= 60).length },
+            { label: 'Applied',                         value: allResults.filter(r => r.applied).length },
           ].map(s => (
-            <div key={s.label} className="bg-surface border border-border rounded-lg px-4 py-3">
-              <div className="text-xl font-bold text-t1">{s.value}</div>
+            <div key={s.label} className="bg-surface border rounded-lg px-4 py-3"
+              style={{ borderColor: 'rgba(var(--border) / 0.08)' }}>
+              <div className="text-xl font-bold" style={{ color: s.accent && s.value > 0 ? 'rgb(var(--accent))' : 'rgb(var(--t1))' }}>
+                {s.value}
+              </div>
               <div className="text-[12px] text-t2 mt-0.5">{s.label}</div>
             </div>
           ))}
@@ -419,26 +555,26 @@ export default function JobMatches() {
       )}
 
       {/* Filter + sort + running progress */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <select
-          value={minScore}
-          onChange={e => setMinScore(Number(e.target.value))}
-          className="h-8 px-3 bg-surface border border-border rounded-sm text-[12.5px] text-t1 focus:outline-none focus:border-accent"
-        >
-          <option value={0}>All scores</option>
-          <option value={40}>40+ Partial</option>
-          <option value={60}>60+ Good</option>
-          <option value={80}>80+ Excellent</option>
-        </select>
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-1.5">
+          {[
+            { v: 0,  label: 'All' },
+            { v: 40, label: '40+' },
+            { v: 60, label: '60+' },
+            { v: 80, label: '80+' },
+          ].map(o => (
+            <Chip key={o.v} active={minScore === o.v} onClick={() => setMinScore(o.v)}>{o.label}</Chip>
+          ))}
+        </div>
 
-        <select
-          value={sortBy}
-          onChange={e => setSortBy(e.target.value)}
-          className="h-8 px-3 bg-surface border border-border rounded-sm text-[12.5px] text-t1 focus:outline-none focus:border-accent"
-        >
-          <option value="score">Highest score</option>
-          <option value="date">Newest first</option>
-        </select>
+        <span className="w-px h-5 mx-1" style={{ background: 'rgba(var(--border) / 0.12)' }} />
+
+        <Chip active={sortBy === 'score'} onClick={() => setSortBy('score')}>Top score</Chip>
+        <Chip active={sortBy === 'date'} onClick={() => setSortBy('date')}>Newest</Chip>
+
+        <span className="w-px h-5 mx-1" style={{ background: 'rgba(var(--border) / 0.12)' }} />
+
+        <Chip active={hideApplied} onClick={() => setHideApplied(v => !v)}>Hide applied</Chip>
 
         {running && (
           <div className="flex items-center gap-2 text-[13px] font-medium text-blue">
@@ -465,7 +601,7 @@ export default function JobMatches() {
           icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>}
           title="No job matches yet"
           description={allResults.length > 0
-            ? 'No jobs match the current score filter. Try lowering the minimum score.'
+            ? 'No jobs match the current filters. Try lowering the minimum score or including applied jobs.'
             : 'Click Fetch Jobs to pull live listings scored against your resume.'}
           action={allResults.length === 0
             ? <button onClick={runFetch} disabled={running} className="btn-primary px-5 py-2 text-[13.5px]">Fetch Jobs</button>
