@@ -4,7 +4,7 @@
  * whose description could not be fetched.
  */
 import { useState, useEffect, useCallback } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { apiFetch } from '../../lib/auth.js'
 import { errMsg } from '../../lib/errors.js'
 import { useToast } from '../Toast.jsx'
@@ -431,6 +431,14 @@ export default function JobMatches() {
     else toast(errMsg(data, 'Could not start fetch'), 'error')
   }
 
+  async function stopFetch() {
+    const res = await apiFetch('/api/match/stop', { method: 'POST' })
+    const data = await res?.json().catch(() => ({}))
+    if (res?.ok && data.stopped) toast('Stopping - jobs already scored are kept', 'info')
+    else if (res?.ok) { setRunning(false); toast('No run is active', 'info') }
+    else toast('Could not stop the run', 'error')
+  }
+
   async function toggleApplied(job) {
     const next = !job.applied
     const res = await apiFetch('/api/match/applied', {
@@ -487,12 +495,19 @@ export default function JobMatches() {
               {showSettings ? 'Hide criteria' : 'Search criteria'}
             </button>
             <button onClick={exportCsv} className="btn-secondary h-8 px-3 text-[12.5px]">Export CSV</button>
-            <button onClick={runFetch} disabled={running || !hasResume} className="btn-primary h-8 px-4 text-[12.5px]"
-              title={!hasResume ? 'Activate a resume in the Resumes tab first' : ''}>
-              {running
-                ? <><span className="w-3 h-3 border border-white/40 border-t-white rounded-full animate-spin" />Running...</>
-                : 'Fetch Jobs'}
-            </button>
+            {running ? (
+              <button onClick={stopFetch} className="h-8 px-4 text-[12.5px] font-medium rounded-sm border transition-colors flex items-center gap-2"
+                style={{ borderColor: 'rgba(var(--red) / 0.35)', color: 'rgb(var(--red))', background: 'rgba(var(--red) / 0.06)' }}>
+                <span className="w-3 h-3 border rounded-full animate-spin"
+                  style={{ borderColor: 'rgba(var(--red) / 0.3)', borderTopColor: 'rgb(var(--red))' }} />
+                Stop
+              </button>
+            ) : (
+              <button onClick={runFetch} disabled={!hasResume} className="btn-primary h-8 px-4 text-[12.5px]"
+                title={!hasResume ? 'Activate a resume in the Resumes tab first' : ''}>
+                Fetch Jobs
+              </button>
+            )}
           </div>
         }
       />
@@ -575,7 +590,8 @@ export default function JobMatches() {
           <div className="flex items-center gap-2 text-[13px] font-medium text-blue">
             <span className="w-2 h-2 rounded-full bg-blue animate-pulse" />
             {runStatus.phase === 'fetching' && 'Fetching listings from job boards...'}
-            {runStatus.phase !== 'fetching' && (
+            {runStatus.phase === 'stopping' && 'Stopping - finishing the current job...'}
+            {runStatus.phase !== 'fetching' && runStatus.phase !== 'stopping' && (
               runStatus.total > 0
                 ? `Scoring jobs: ${runStatus.checked || 0} of ${runStatus.total} checked, ${runStatus.scored || 0} scored`
                 : 'Scoring jobs...'
@@ -604,14 +620,24 @@ export default function JobMatches() {
         />
       )}
 
-      {/* List */}
+      {/* List - AnimatePresence so jobs streaming in during a run slide in,
+          deletions fade out, and re-sorts animate via layout */}
       {results.length > 0 && (
         <motion.div className="space-y-2.5" variants={listVariants} initial="hidden" animate="show">
-          {results.map(r => (
-            <motion.div key={r.id} variants={itemVariants}>
-              <JobCard job={r} onApply={toggleApplied} onDelete={deleteJob} onPasteJd={setPasteJob} />
-            </motion.div>
-          ))}
+          <AnimatePresence initial={false}>
+            {results.map(r => (
+              <motion.div
+                key={r.id}
+                layout
+                variants={itemVariants}
+                initial="hidden"
+                animate="show"
+                exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.15 } }}
+              >
+                <JobCard job={r} onApply={toggleApplied} onDelete={deleteJob} onPasteJd={setPasteJob} />
+              </motion.div>
+            ))}
+          </AnimatePresence>
         </motion.div>
       )}
 

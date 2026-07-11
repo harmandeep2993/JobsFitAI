@@ -33,6 +33,7 @@ from services.job_matcher import (
     end_run,
     fetch_combined,
     get_run_status,
+    request_stop,
     rescore_all,
 )
 from services.profile_summary import generate_summary
@@ -218,6 +219,18 @@ async def api_match_run(
 
     asyncio.create_task(_bg())
     return JSONResponse({"ok": True, "started": True})
+
+
+@router.post("/stop")
+async def api_match_stop(
+    current_user: dict = Depends(get_current_user),
+) -> JSONResponse:
+    """Stop the current fetch-and-score run at the next job boundary.
+
+    Jobs already scored are kept. Returns stopped=false when no run was active.
+    """
+    stopped = request_stop(current_user["id"])
+    return JSONResponse({"ok": True, "stopped": stopped})
 
 
 @router.get("/state")

@@ -360,6 +360,15 @@ def test_spa_catch_all_serves_client_routes(client):
     assert r.json()["error"] == "not_found"
 
 
+def test_match_stop_contract(client, auth):
+    """Stop endpoint responds ok with stopped=false when no run is active."""
+    r = client.post("/api/match/stop", headers=auth)
+    assert r.status_code == 200
+    body = r.json()
+    assert body["ok"] is True
+    assert body["stopped"] is False
+
+
 def test_seniority_guard_overrides_llm():
     """Titles with explicit seniority markers must never pass the entry gate."""
     from services.job_relevance import title_is_senior

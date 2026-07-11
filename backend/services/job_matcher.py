@@ -93,7 +93,14 @@ _run_statuses: dict[str, dict] = {}
 
 def _default_status() -> dict:
     """Return a blank run-status dict."""
-    return {"running": False, "phase": "idle", "checked": 0, "scored": 0, "total": 0}
+    return {
+        "running": False,
+        "phase": "idle",
+        "checked": 0,
+        "scored": 0,
+        "total": 0,
+        "cancel": False,
+    }
 
 
 def get_run_status(user_id: str) -> dict:
@@ -111,7 +118,23 @@ def begin_run(user_id: str) -> bool:
         "checked": 0,
         "scored": 0,
         "total": 0,
+        "cancel": False,
     }
+    return True
+
+
+def request_stop(user_id: str) -> bool:
+    """Ask the current run to stop at the next job boundary.
+
+    Returns True when a run was active and the stop was requested. The
+    pipeline checks the flag between phases and between jobs, so already
+    fetched-and-scored results are kept.
+    """
+    status = _run_statuses.get(user_id)
+    if not status or not status.get("running"):
+        return False
+    status["cancel"] = True
+    status["phase"] = "stopping"
     return True
 
 
@@ -290,6 +313,12 @@ def discover_and_score(
         len(candidates),
     )
 
+    # Stop requested while sources were being fetched - keep nothing pending.
+    if status.get("cancel"):
+        logger.info("Run stopped by user %s before classification", user_id)
+        status.update({"running": False, "phase": "idle", "cancel": False})
+        return {"checked": 0, "scored": 0, "results": match_repo.get_all(user_id)}
+
     # --- bulk LLM relevance gate (few calls, not one-per-job) ---
     status.update(
         {"phase": "classifying", "total": len(candidates), "checked": 0, "scored": 0}
@@ -312,8 +341,19 @@ def discover_and_score(
     status.update({"phase": "scoring", "total": len(survivors), "checked": 0})
 
     scored = 0
+    stopped = False
     try:
         for job in survivors:
+            # User-requested stop: finish cleanly, keeping what was scored.
+            if status.get("cancel"):
+                stopped = True
+                logger.info(
+                    "Run stopped by user %s after %d of %d jobs",
+                    user_id,
+                    status["checked"],
+                    len(survivors),
+                )
+                break
             status["checked"] += 1
             tag = f"{job.title[:42]} @ {job.company[:20]}"
 
@@ -378,13 +418,14 @@ def discover_and_score(
                 "bundesagentur": by_source.get("bundesagentur", 0),
                 "total_seen": len(seen) + len(new_jobs),
                 "manual": manual,
+                "stopped": stopped,
             }
         )
         try:
             event_repo.log_event(user_id, "run", "", run_detail)
         except Exception as _log_err:
             logger.warning("Could not log run event: %s", _log_err)
-        status.update({"running": False, "phase": "idle"})
+        status.update({"running": False, "phase": "idle", "cancel": False})
 
     return {
         "checked": len(candidates),
