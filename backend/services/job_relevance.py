@@ -15,10 +15,10 @@ from services.llm.caller import call_llm, parse_json_response
 
 logger = get_logger(__name__)
 
-# Deterministic seniority guard. The LLM screens relevance, but an explicit
-# seniority word in the title is a hard signal - never let a fail-open
-# default or a sloppy LLM answer mark these as entry level. Covers German
-# compound titles like Teamleiter/Abteilungsleiterin via the leiter suffix.
+# Deterministic seniority fallback. The LLM is the primary classifier; this
+# regex decides entry_level only when the LLM failed or skipped a title, and
+# acts as a safety net when an explicit seniority word contradicts the LLM
+# verdict. Covers German compounds like Teamleiter/Abteilungsleiterin.
 _SENIORITY_RE = re.compile(
     r"\b(senior|sr\.?|lead|principal|staff|head|director|manager|architect)\b"
     r"|\w*leiter(in)?\b",
@@ -33,8 +33,9 @@ def title_is_senior(title: str) -> bool:
 
 _PROMPT = """Screen a job title for an entry-level AI/ML/Data candidate.
 
-relevant=true: AI, ML, Data Science, NLP, LLM, GenAI, MLOps, Computer Vision, Data Analyst, Analytics Engineer, Applied Scientist (incl. junior/graduate/trainee). NOT sales, marketing, finance, HR, civil/mechanical engineering, general software dev unrelated to AI.
-entry_level=true by DEFAULT. false ONLY if title contains: senior/sr/lead/principal/staff/head/director/manager/architect.
+relevant=true: AI, ML, Data Science, NLP, LLM, GenAI, MLOps, Computer Vision, Data Analyst, Analytics Engineer, Applied Scientist roles. NOT sales, marketing, finance, HR, civil/mechanical engineering, general software dev unrelated to AI.
+entry_level=true ONLY for roles a candidate with 0-2 years of experience can realistically get: junior, graduate, trainee, intern, working student (Werkstudent), entry level, associate, or a plain title with no seniority signal.
+entry_level=false for senior/sr/lead/principal/staff/head/director/manager/architect/Teamleiter or any title implying 3+ years of experience.
 
 Return ONLY JSON: {{"relevant": true/false, "entry_level": true/false, "reason": "<=8 words"}}
 
@@ -44,8 +45,9 @@ JSON:"""
 
 _BATCH_PROMPT = """Screen job titles for an entry-level AI/ML/Data candidate.
 
-relevant=true: AI, ML, Data Science, NLP, LLM, GenAI, MLOps, Computer Vision, Data Analyst, Analytics Engineer, Applied Scientist roles (incl. junior/graduate/trainee/working-student). NOT sales, marketing, finance, HR, civil/mechanical engineering, general software dev unrelated to AI.
-entry_level=true by DEFAULT. false ONLY if title contains: senior/sr/lead/principal/staff/head/director/manager/architect.
+relevant=true: AI, ML, Data Science, NLP, LLM, GenAI, MLOps, Computer Vision, Data Analyst, Analytics Engineer, Applied Scientist roles. NOT sales, marketing, finance, HR, civil/mechanical engineering, general software dev unrelated to AI.
+entry_level=true ONLY for roles a candidate with 0-2 years of experience can realistically get: junior, graduate, trainee, intern, working student (Werkstudent), entry level, associate, or a plain title with no seniority signal.
+entry_level=false for senior/sr/lead/principal/staff/head/director/manager/architect/Teamleiter or any title implying 3+ years of experience.
 
 Return ONLY a JSON array: [{{"n":1,"relevant":true,"entry_level":true}}, ...]
 
@@ -81,9 +83,12 @@ def _classify_chunk(chunk: list) -> dict:
         logger.error("batch classify failed: %s", e)
 
     if llm_ok:
-        # LLM responded but may have skipped some jobs - fail open for those only.
+        # LLM responded but may have skipped some jobs - for those, keep the
+        # job (relevance unknown) and fall back to the keyword seniority check.
         for j in chunk:
-            out.setdefault(j.id, {"relevant": True, "entry_level": True})
+            out.setdefault(
+                j.id, {"relevant": True, "entry_level": not title_is_senior(j.title)}
+            )
     else:
         # LLM call crashed entirely - fail closed so junk doesn't flood the scorer.
         logger.warning(
@@ -93,7 +98,8 @@ def _classify_chunk(chunk: list) -> dict:
         for j in chunk:
             out.setdefault(j.id, {"relevant": False, "entry_level": False})
 
-    # Hard override: seniority words in the title always win over the LLM.
+    # Safety net: an explicit seniority word in the title always wins, even
+    # when the LLM verdict says otherwise.
     for j in chunk:
         if title_is_senior(j.title):
             out[j.id]["entry_level"] = False
