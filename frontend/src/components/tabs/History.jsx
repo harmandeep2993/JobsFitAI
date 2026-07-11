@@ -2,7 +2,7 @@
  * History tab - past analyses (clickable to reopen the full result),
  * fetcher runs, and tracked applications.
  */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { apiFetch } from '../../lib/auth.js'
 import { errMsg } from '../../lib/errors.js'
 import { useToast } from '../Toast.jsx'
@@ -12,6 +12,78 @@ import { PageHeader, PageSpinner, EmptyState, ListRow, ScorePill, ScoreLabel, Sp
 function formatDate(str) {
   if (!str) return ''
   return str.slice(0, 16).replace('T', ' ')
+}
+
+// Application status -> badge styling. Empty status means plain "applied".
+const APP_STATUS_STYLES = {
+  applied:   { label: 'Applied',   background: 'rgba(var(--blue) / 0.08)',  borderColor: 'rgba(var(--blue) / 0.25)',  color: 'rgb(var(--blue))' },
+  interview: { label: 'Interview', background: 'rgba(var(--amber) / 0.08)', borderColor: 'rgba(var(--amber) / 0.25)', color: 'rgb(var(--amber))' },
+  offer:     { label: 'Offer',     background: 'rgba(var(--green) / 0.08)', borderColor: 'rgba(var(--green) / 0.25)', color: 'rgb(var(--green))' },
+  rejected:  { label: 'Rejected',  background: 'rgba(var(--red) / 0.08)',   borderColor: 'rgba(var(--red) / 0.25)',   color: 'rgb(var(--red))' },
+}
+
+function AppStatusBadge({ status }) {
+  const s = APP_STATUS_STYLES[status] || APP_STATUS_STYLES.applied
+  return (
+    <span className="px-2 py-0.5 text-[11px] font-medium rounded-sm border flex-shrink-0"
+      style={{ background: s.background, borderColor: s.borderColor, color: s.color }}>
+      {s.label}
+    </span>
+  )
+}
+
+// Fetcher run details are stored as a JSON blob - parse defensively and
+// render a readable summary instead of the raw string.
+function parseRun(detail) {
+  try {
+    const d = JSON.parse(detail)
+    if (!d || typeof d !== 'object') return null
+    return d
+  } catch {
+    return null
+  }
+}
+
+function RunRow({ run }) {
+  const d = parseRun(run.detail)
+  if (!d) {
+    return (
+      <ListRow>
+        <span className="w-2 h-2 rounded-full bg-accent flex-shrink-0" />
+        <div className="flex-1 text-[13.5px] text-t1">{run.detail || 'Fetch run completed'}</div>
+        <div className="text-[12px] text-t3 flex-shrink-0">{formatDate(run.created_at)}</div>
+      </ListRow>
+    )
+  }
+
+  const failed = Boolean(d.error)
+  const dotColor = failed
+    ? 'rgb(var(--red))'
+    : d.stopped ? 'rgb(var(--amber))' : 'rgb(var(--green))'
+  const sources = [
+    d.adzuna ? `adzuna ${d.adzuna}` : '',
+    d.arbeitnow ? `arbeitnow ${d.arbeitnow}` : '',
+    d.bundesagentur ? `bundesagentur ${d.bundesagentur}` : '',
+  ].filter(Boolean).join(' · ')
+
+  return (
+    <ListRow>
+      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: dotColor }} />
+      <div className="flex-1 min-w-0">
+        <div className="text-[13.5px] text-t1">
+          {failed
+            ? <>Run failed<span className="text-t3"> - {d.error}</span></>
+            : <>{d.fetched || 0} fetched · {d.new || 0} new · <span className="font-semibold">{d.scored || 0} scored</span></>}
+        </div>
+        <div className="text-[12px] text-t3 mt-0.5">
+          {d.manual ? 'Manual run' : 'Auto-fetch'}
+          {d.stopped ? ' · stopped early' : ''}
+          {sources ? ` · ${sources}` : ''}
+        </div>
+      </div>
+      <div className="text-[12px] text-t3 flex-shrink-0">{formatDate(run.created_at)}</div>
+    </ListRow>
+  )
 }
 
 // === Modal reopening the full cached result of a past analysis ===
@@ -28,6 +100,7 @@ function AnalysisModal({ row, onClose }) {
         setResult(data)
         setLoading(false)
       })
+      .catch(() => { toast('Network error loading the analysis', 'error'); onClose() })
   }, [row.cache_hash, onClose, toast])
 
   useEffect(() => {
@@ -61,12 +134,24 @@ function AnalysisModal({ row, onClose }) {
 
 export default function History() {
   const [data, setData] = useState(null)
+  const [failed, setFailed] = useState(false)
   const [tab, setTab] = useState('analyses')
   const [opened, setOpened] = useState(null)
 
-  useEffect(() => {
-    apiFetch('/api/history').then(r => r?.json()).then(d => setData(d))
+  const load = useCallback(async () => {
+    setFailed(false)
+    setData(null)
+    try {
+      const res = await apiFetch('/api/history')
+      const d = await res?.json().catch(() => ({}))
+      if (!res?.ok || !d.ok) { setFailed(true); return }
+      setData(d)
+    } catch {
+      setFailed(true)
+    }
   }, [])
+
+  useEffect(() => { load() }, [load])
 
   const tabs = [
     { id: 'analyses',     label: 'Analyses',     count: data?.analyses?.length || 0 },
@@ -79,10 +164,15 @@ export default function History() {
       <PageHeader
         title="History"
         description="Your past analyses, job fetch runs, and applications in one place."
+        action={
+          <button onClick={load} className="btn-secondary h-8 px-3 text-[12.5px]">
+            Refresh
+          </button>
+        }
       />
 
       {/* Tab bar */}
-      <div className="flex border-b border-border gap-0.5">
+      <div className="flex border-b border-border/10 gap-0.5">
         {tabs.map(t => (
           <button
             key={t.id}
@@ -103,7 +193,15 @@ export default function History() {
         ))}
       </div>
 
-      {!data && <PageSpinner />}
+      {!data && !failed && <PageSpinner />}
+
+      {failed && (
+        <EmptyState
+          title="Could not load your history"
+          description="The server did not respond - check your connection and try again."
+          action={<button onClick={load} className="btn-primary px-5 py-2 text-[13.5px]">Retry</button>}
+        />
+      )}
 
       {/* Analyses */}
       {data && tab === 'analyses' && (
@@ -112,7 +210,7 @@ export default function History() {
               {data.analyses.map((a, i) => {
                 const clickable = Boolean(a.cache_hash)
                 return (
-                  <div key={i}
+                  <div key={a.cache_hash || i}
                     onClick={clickable ? () => setOpened(a) : undefined}
                     className={clickable ? 'cursor-pointer' : ''}
                     title={clickable ? 'Click to reopen the full result' : ''}>
@@ -145,13 +243,7 @@ export default function History() {
       {data && tab === 'runs' && (
         data.fetcher_runs?.length
           ? <div className="space-y-2">
-              {data.fetcher_runs.map((r, i) => (
-                <ListRow key={i}>
-                  <span className="w-2 h-2 rounded-full bg-accent flex-shrink-0" />
-                  <div className="flex-1 text-[13.5px] text-t1">{r.detail || 'Fetch run completed'}</div>
-                  <div className="text-[12px] text-t3 flex-shrink-0">{formatDate(r.created_at)}</div>
-                </ListRow>
-              ))}
+              {data.fetcher_runs.map((r, i) => <RunRow key={i} run={r} />)}
             </div>
           : <EmptyState
               title="No fetcher runs yet"
@@ -172,6 +264,7 @@ export default function History() {
                     </div>
                     <div className="text-[12px] text-t3 mt-0.5">Applied {formatDate(a.applied_at)}</div>
                   </div>
+                  <AppStatusBadge status={(a.app_status || '').trim()} />
                   {a.url && (
                     <a href={a.url} target="_blank" rel="noreferrer"
                       className="text-[12px] font-medium flex-shrink-0" style={{ color: 'rgb(var(--accent))' }}>

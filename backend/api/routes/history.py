@@ -44,14 +44,21 @@ async def api_history(
             (user_id, _HISTORY_LIMIT),
         ).fetchall()
 
+        # One row per job: toggling the applied flag logs multiple events,
+        # so keep only the most recent 'applied' event per job_id.
         applications = conn.execute(
             """SELECT e.created_at AS applied_at, m.title, m.company, m.url,
                       m.score, m.label, m.app_status
                FROM events e
                LEFT JOIN matches m ON m.id = e.job_id
                WHERE e.type = 'applied' AND e.user_id = ?
+                 AND e.id IN (
+                     SELECT MAX(id) FROM events
+                     WHERE type = 'applied' AND user_id = ?
+                     GROUP BY job_id
+                 )
                ORDER BY e.id DESC LIMIT ?""",
-            (user_id, _HISTORY_LIMIT),
+            (user_id, user_id, _HISTORY_LIMIT),
         ).fetchall()
 
     return JSONResponse(
