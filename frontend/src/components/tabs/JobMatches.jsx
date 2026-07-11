@@ -228,6 +228,8 @@ function SummaryBlock({ summary }) {
 }
 
 // === Job detail drawer ===
+// Temporarily unwired from the cards - re-enable by passing onOpen to
+// JobCard and rendering this modal once the analysis quality is settled.
 function JobDetailModal({ jobId, onClose, onStatusChange }) {
   const toast = useToast()
   const [data, setData] = useState(null)
@@ -381,7 +383,7 @@ function JobDetailModal({ jobId, onClose, onStatusChange }) {
 }
 
 
-function JobCard({ job, onOpen, onApply, onDelete, onPasteJd }) {
+function JobCard({ job, onApply, onDelete, onPasteJd }) {
   const chips = (job.matched_required || []).slice(0, 5)
   const extra = (job.matched_required || []).length - chips.length
   const jdUnavailable = job.status === 'jd_unavailable'
@@ -389,13 +391,9 @@ function JobCard({ job, onOpen, onApply, onDelete, onPasteJd }) {
   const fresh = isNewJob(job.posted_at)
 
   return (
-    <div
-      onClick={() => onOpen(job)}
-      className={`bg-surface border rounded-lg p-4 flex items-start gap-4 transition-shadow hover:shadow-md cursor-pointer ${
-        job.applied ? 'border-green-bd' : 'border-border'
-      }`}
-      title="View match details"
-    >
+    <div className={`bg-surface border rounded-lg p-4 flex items-start gap-4 transition-shadow hover:shadow-md ${
+      job.applied ? 'border-green-bd' : 'border-border'
+    }`}>
       <ScoreBadge score={job.score || 0} />
 
       <div className="flex-1 min-w-0">
@@ -706,7 +704,6 @@ export default function JobMatches() {
   const [hideApplied, setHideApplied] = useState(false)
   const [pasteJob, setPasteJob] = useState(null)
   const [showSettings, setShowSettings] = useState(false)
-  const [detailJobId, setDetailJobId] = useState(null)
   const [appliedOnly, setAppliedOnly] = useState(false)
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
 
@@ -786,14 +783,6 @@ export default function JobMatches() {
     if (!res?.ok || !data.ok) { toast(errMsg(data, 'Could not restore the job'), 'error'); return }
     await load()
     toast('Job restored', 'success')
-  }
-
-  function onStatusChange(id, status) {
-    setState(s => s ? {
-      ...s,
-      results: s.results.map(r =>
-        r.id === id ? { ...r, app_status: status, applied: status ? 1 : 0 } : r),
-    } : s)
   }
 
   async function exportCsv() {
@@ -1013,7 +1002,7 @@ export default function JobMatches() {
                 animate="show"
                 exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.15 } }}
               >
-                <JobCard job={r} onOpen={j => setDetailJobId(j.id)} onApply={toggleApplied} onDelete={deleteJob} onPasteJd={setPasteJob} />
+                <JobCard job={r} onApply={toggleApplied} onDelete={deleteJob} onPasteJd={setPasteJob} />
               </motion.div>
             ))}
           </AnimatePresence>
@@ -1035,13 +1024,6 @@ export default function JobMatches() {
         <ScoreJdModal job={pasteJob} onClose={() => setPasteJob(null)} onScored={load} />
       )}
 
-      {detailJobId && (
-        <JobDetailModal
-          jobId={detailJobId}
-          onClose={() => setDetailJobId(null)}
-          onStatusChange={onStatusChange}
-        />
-      )}
     </div>
   )
 }
