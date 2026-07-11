@@ -235,7 +235,7 @@ const SCHEDULER_INTERVALS = [
   { value: 1440, label: 'Once a day' },
 ]
 
-function SearchSettingsPanel({ state, onSaved, onSchedulerChange }) {
+function SearchCriteriaPanel({ state, onSaved, onSchedulerChange, onToggleScheduler }) {
   const toast = useToast()
   const [saving, setSaving] = useState(false)
 
@@ -252,19 +252,8 @@ function SearchSettingsPanel({ state, onSaved, onSchedulerChange }) {
     })
     const data = await res?.json().catch(() => ({}))
     setSaving(false)
-    if (res?.ok && data.ok) { toast('Search settings saved', 'success'); onSaved() }
+    if (res?.ok && data.ok) { toast('Search criteria saved', 'success'); onSaved() }
     else toast(errMsg(data, 'Save failed'), 'error')
-  }
-
-  async function toggleScheduler() {
-    const enabled = !state.scheduler?.enabled
-    const res = await apiFetch('/api/match/scheduler', { method: 'POST', body: JSON.stringify({ enabled }) })
-    if (res?.ok) {
-      onSchedulerChange({ enabled })
-      toast(enabled ? 'Auto-fetch enabled' : 'Auto-fetch disabled', 'success')
-    } else {
-      toast('Could not update scheduler', 'error')
-    }
   }
 
   async function changeInterval(e) {
@@ -279,7 +268,7 @@ function SearchSettingsPanel({ state, onSaved, onSchedulerChange }) {
     <div className="space-y-4">
       <form onSubmit={saveFilters}>
         <CardSection
-          title="Search Settings"
+          title="Search Criteria"
           action={
             <button type="submit" disabled={saving} className="btn-primary h-7 px-3.5 text-[12.5px]">
               {saving ? 'Saving...' : 'Save'}
@@ -312,7 +301,7 @@ function SearchSettingsPanel({ state, onSaved, onSchedulerChange }) {
       <CardSection title="Auto-fetch">
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-3">
-            <Switch on={Boolean(state.scheduler?.enabled)} onClick={toggleScheduler} />
+            <Switch on={Boolean(state.scheduler?.enabled)} onClick={onToggleScheduler} />
             <div>
               <div className="text-[13.5px] font-medium text-t1">
                 {state.scheduler?.enabled ? 'Auto-fetch is on' : 'Auto-fetch is off'}
@@ -355,7 +344,7 @@ function FirstRunSetup({ hasResume }) {
     {
       done: false,
       title: 'Set your search targets',
-      desc: 'Click "Search settings" above and enter the job titles and location you want to search for.',
+      desc: 'Click "Search criteria" above and enter the job titles and location you want to search for.',
     },
     {
       done: false,
@@ -424,6 +413,17 @@ export default function JobMatches() {
     return () => clearInterval(iv)
   }, [running, toast])
 
+  async function toggleAutoFetch() {
+    const enabled = !state?.scheduler?.enabled
+    const res = await apiFetch('/api/match/scheduler', { method: 'POST', body: JSON.stringify({ enabled }) })
+    if (res?.ok) {
+      setState(s => s ? { ...s, scheduler: { ...s.scheduler, enabled } } : s)
+      toast(enabled ? 'Auto-fetch enabled' : 'Auto-fetch disabled', 'success')
+    } else {
+      toast('Could not update scheduler', 'error')
+    }
+  }
+
   async function runFetch() {
     const res = await apiFetch('/api/match/run')
     const data = await res?.json().catch(() => ({}))
@@ -484,7 +484,7 @@ export default function JobMatches() {
               onClick={() => setShowSettings(v => !v)}
               className={`btn-secondary h-8 px-3 text-[12.5px] ${showSettings ? 'text-accent' : ''}`}
             >
-              {showSettings ? 'Hide settings' : 'Search settings'}
+              {showSettings ? 'Hide criteria' : 'Search criteria'}
             </button>
             <button onClick={exportCsv} className="btn-secondary h-8 px-3 text-[12.5px]">Export CSV</button>
             <button onClick={runFetch} disabled={running || !hasResume} className="btn-primary h-8 px-4 text-[12.5px]"
@@ -505,10 +505,10 @@ export default function JobMatches() {
           </span>
           <button
             type="button"
-            onClick={() => setShowSettings(true)}
+            onClick={toggleAutoFetch}
             className="flex items-center gap-1.5 px-2 py-0.5 rounded-full border transition-colors hover:bg-hover"
             style={{ borderColor: 'rgba(var(--border) / 0.12)' }}
-            title="Open search settings"
+            title="Toggle auto-fetch"
           >
             <span
               className="w-1.5 h-1.5 rounded-full"
@@ -521,11 +521,12 @@ export default function JobMatches() {
         </div>
       )}
 
-      {/* Search settings */}
+      {/* Search criteria */}
       {showSettings && state && (
-        <SearchSettingsPanel
+        <SearchCriteriaPanel
           state={state}
           onSaved={load}
+          onToggleScheduler={toggleAutoFetch}
           onSchedulerChange={patch =>
             setState(s => s ? { ...s, scheduler: { ...s.scheduler, ...patch } } : s)}
         />
