@@ -4,8 +4,8 @@ LLM relevance gate for the Job Matches funnel.
 
 Classifies jobs by title only - snippets are unreliable (BA posts metadata,
 Adzuna posts company intros in the first N chars). Relevance is judged
-against the user's own target titles, so the gate works for any profession;
-seniority (Senior/Lead in title) is judged the same way for everyone.
+against the user's own target titles WITHIN the IT & Computer Science
+domain - non-IT professions never pass, whatever the titles say.
 Batch size 30 titles per LLM call keeps cost low.
 """
 
@@ -32,12 +32,25 @@ def title_is_senior(title: str) -> bool:
     return bool(_SENIORITY_RE.search(title or ""))
 
 
+# JobsFitAI serves IT & Computer Science job seekers only - the gate judges
+# relevance against the user's target titles WITHIN this domain, and rejects
+# every non-IT profession regardless of what the titles say.
+_IT_DOMAIN_RULE = (
+    "Only IT & Computer Science jobs can be relevant: software development, "
+    "data (analyst/engineer/scientist), AI/ML, DevOps/cloud/SRE, IT security, "
+    "QA/testing, IT support/administration (incl. Fachinformatiker), databases, "
+    "IT/SAP consulting, CS research. "
+    "relevant=false for ALL non-IT professions: sales, marketing, finance, HR, "
+    "accounting, legal, healthcare, logistics, and mechanical/civil/electrical "
+    "engineering."
+)
+
 # Fallback role description when a user has no target titles configured.
-_DEFAULT_TARGET_DESC = "AI, ML, Data Science, or Data Analytics"
+_DEFAULT_TARGET_DESC = "any IT or Computer Science role"
 
-_PROMPT = """Screen a job title for a candidate targeting these roles: {targets}.
+_PROMPT = """Screen a job title for a candidate targeting these IT/CS roles: {targets}.
 
-relevant=true: the job is one of the target roles or a close variant of them (same profession, related specialisation). relevant=false: a different profession or an unrelated department.
+relevant=true: the job is one of the target roles or a close variant (same profession, related specialisation). {domain_rule}
 entry_level=true ONLY for roles a candidate with 0-2 years of experience can realistically get: junior, graduate, trainee, intern, working student (Werkstudent), apprentice (Azubi), entry level, associate, or a plain title with no seniority signal.
 entry_level=false for senior/sr/lead/principal/staff/head/director/manager/architect/Teamleiter or any title implying 3+ years of experience.
 
@@ -47,9 +60,9 @@ TITLE: {title}
 JSON:"""
 
 
-_BATCH_PROMPT = """Screen job titles for a candidate targeting these roles: {targets}.
+_BATCH_PROMPT = """Screen job titles for a candidate targeting these IT/CS roles: {targets}.
 
-relevant=true: the job is one of the target roles or a close variant of them (same profession, related specialisation). relevant=false: a different profession or an unrelated department.
+relevant=true: the job is one of the target roles or a close variant (same profession, related specialisation). {domain_rule}
 entry_level=true ONLY for roles a candidate with 0-2 years of experience can realistically get: junior, graduate, trainee, intern, working student (Werkstudent), apprentice (Azubi), entry level, associate, or a plain title with no seniority signal.
 entry_level=false for senior/sr/lead/principal/staff/head/director/manager/architect/Teamleiter or any title implying 3+ years of experience.
 
@@ -75,7 +88,10 @@ def _classify_chunk(chunk: list, targets: str) -> dict:
     for n, j in enumerate(chunk, 1):
         lines.append(f"{n}. {j.title}")
     prompt = _BATCH_PROMPT.format(
-        targets=targets, count=len(chunk), jobs="\n".join(lines)
+        targets=targets,
+        domain_rule=_IT_DOMAIN_RULE,
+        count=len(chunk),
+        jobs="\n".join(lines),
     )
 
     out: dict = {}
@@ -149,7 +165,9 @@ def classify(title: str, snippet: str = "", titles: list | None = None) -> dict:
     On any failure, fails OPEN (relevant=True, entry_level=True) so a flaky
     LLM call doesn't silently drop a job - the scorer still runs.
     """
-    prompt = _PROMPT.format(targets=_targets_desc(titles), title=title or "")
+    prompt = _PROMPT.format(
+        targets=_targets_desc(titles), domain_rule=_IT_DOMAIN_RULE, title=title or ""
+    )
     try:
         _r = call_llm(prompt)
         data = parse_json_response(_r.text) if (_r and _r.text) else None

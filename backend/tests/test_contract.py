@@ -521,19 +521,22 @@ def test_entry_exclude_terms():
     assert title_blocked("Senior ML Engineer", terms)
 
 
-def test_relevance_gate_uses_user_titles():
-    """The gate prompt is built from the user's roles, not a hardcoded list."""
-    from services.job_relevance import _targets_desc, _BATCH_PROMPT
+def test_relevance_gate_uses_user_titles_within_it_domain():
+    """The gate prompt carries the user's roles plus the IT/CS domain wall."""
+    from services.job_relevance import _targets_desc, _BATCH_PROMPT, _IT_DOMAIN_RULE
 
-    desc = _targets_desc(["pflegefachkraft", "krankenpfleger"])
-    assert desc == "pflegefachkraft, krankenpfleger"
-    prompt = _BATCH_PROMPT.format(targets=desc, count=1, jobs="1. Pflegefachkraft")
-    assert "pflegefachkraft" in prompt
-    assert "AI" not in prompt.split("entry_level")[0].replace(desc, "")
+    desc = _targets_desc(["devops engineer", "sre"])
+    assert desc == "devops engineer, sre"
+    prompt = _BATCH_PROMPT.format(
+        targets=desc, domain_rule=_IT_DOMAIN_RULE, count=1, jobs="1. DevOps Engineer"
+    )
+    # User titles drive relevance, the domain rule excludes non-IT professions
+    assert "devops engineer" in prompt
+    assert "non-IT professions" in prompt
 
-    # No titles configured falls back to the default description
-    assert "Data" in _targets_desc([])
-    assert "Data" in _targets_desc(None)
+    # No titles configured falls back to the whole IT/CS domain
+    assert "IT" in _targets_desc([])
+    assert "IT" in _targets_desc(None)
 
 
 def test_seniority_guard_overrides_llm():
