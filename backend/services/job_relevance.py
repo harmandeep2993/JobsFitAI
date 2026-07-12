@@ -66,7 +66,7 @@ relevant=true: the job is one of the target roles or a close variant (same profe
 entry_level=true ONLY for roles a candidate with 0-2 years of experience can realistically get: junior, graduate, trainee, intern, working student (Werkstudent), apprentice (Azubi), entry level, associate, or a plain title with no seniority signal.
 entry_level=false for senior/sr/lead/principal/staff/head/director/manager/architect/Teamleiter or any title implying 3+ years of experience.
 
-Return ONLY a JSON array: [{{"n":1,"relevant":true,"entry_level":true}}, ...]
+Return ONLY JSON: {{"results":[{{"n":1,"relevant":true,"entry_level":true}}, ...]}}
 
 TITLES ({count}):
 {jobs}
@@ -99,6 +99,10 @@ def _classify_chunk(chunk: list, targets: str) -> dict:
     try:
         _r = call_llm(prompt)
         data = parse_json_response(_r.text) if (_r and _r.text) else None
+        # Object root ({"results": [...]}) is the JSON-mode shape; accept a
+        # bare array too for models that ignore the wrapper.
+        if isinstance(data, dict):
+            data = data.get("results")
         if isinstance(data, list):
             llm_ok = True
             for obj in data:

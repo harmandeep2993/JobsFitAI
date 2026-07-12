@@ -131,7 +131,7 @@ def _backoff(attempt: int) -> None:
 
 
 def _call_with_retry(
-    provider_module, prompt: str, model: str
+    provider_module, prompt: str, model: str, json_mode: bool = True
 ) -> tuple[str | None, int]:
     """Call provider.call() up to _MAX_ATTEMPTS times, retrying on None.
 
@@ -145,7 +145,7 @@ def _call_with_retry(
     attempts are exhausted.
     """
     for attempt in range(1, _MAX_ATTEMPTS + 1):
-        text = provider_module.call(prompt, model)
+        text = provider_module.call(prompt, model, json_mode=json_mode)
         if text is not None:
             return text, attempt
         if attempt < _MAX_ATTEMPTS:
@@ -190,7 +190,7 @@ def check_llm() -> bool:
     return provider.check()
 
 
-def call_llm(prompt: str) -> "LLMResult | None":
+def call_llm(prompt: str, json_mode: bool = True) -> "LLMResult | None":
     """
     Send prompt to the active LLM provider, with retry-backoff and Groq fallback.
 
@@ -213,6 +213,11 @@ def call_llm(prompt: str) -> "LLMResult | None":
 
     Args:
         prompt (str): Prompt text
+        json_mode (bool): When True (default), providers are asked to emit
+            strictly valid JSON (OpenAI/Groq response_format, Ollama format).
+            Every current caller parses JSON; pass False for free-text output.
+            JSON mode requires an OBJECT root - prompts must not ask for a
+            bare array.
 
     Returns:
         LLMResult | None: Typed result. Check result.degraded and result.text
@@ -234,7 +239,7 @@ def call_llm(prompt: str) -> "LLMResult | None":
         _groq_pace(prompt)
 
     # --- Primary provider attempt ---
-    text, primary_attempts = _call_with_retry(provider, prompt, model)
+    text, primary_attempts = _call_with_retry(provider, prompt, model, json_mode)
 
     if text is not None:
         logger.info(
@@ -276,7 +281,9 @@ def call_llm(prompt: str) -> "LLMResult | None":
     # Pace before the fallback Groq call too
     _groq_pace(prompt)
 
-    groq_text, groq_attempts = _call_with_retry(_groq_mod, prompt, _GROQ_FALLBACK_MODEL)
+    groq_text, groq_attempts = _call_with_retry(
+        _groq_mod, prompt, _GROQ_FALLBACK_MODEL, json_mode
+    )
     total_attempts = primary_attempts + groq_attempts
 
     if groq_text is not None:

@@ -62,13 +62,15 @@ def check() -> bool:
         return False
 
 
-def call(prompt: str, model: str | None = None) -> str | None:
+def call(prompt: str, model: str | None = None, json_mode: bool = True) -> str | None:
     """
     Send prompt to Groq and return response text.
 
     Args:
         prompt (str): Prompt text
         model (str | None): Model id to use; falls back to the config default.
+        json_mode (bool): When True, response_format forces strictly valid
+            JSON output.
 
     Returns:
         str | None: Response text or None if failed
@@ -79,6 +81,15 @@ def call(prompt: str, model: str | None = None) -> str | None:
 
     use_model = model or _MODEL
 
+    payload = {
+        "model": use_model,
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": LLM_TEMPERATURE,
+        "max_tokens": LLM_MAX_OUTPUT_TOKENS,
+    }
+    if json_mode:
+        payload["response_format"] = {"type": "json_object"}
+
     try:
         response = requests.post(
             GROQ_URL,
@@ -86,12 +97,7 @@ def call(prompt: str, model: str | None = None) -> str | None:
                 "Authorization": f"Bearer {_API_KEY}",
                 "Content-Type": "application/json",
             },
-            json={
-                "model": use_model,
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": LLM_TEMPERATURE,
-                "max_tokens": LLM_MAX_OUTPUT_TOKENS,
-            },
+            json=payload,
             timeout=LLM_TIMEOUT,
         )
 
