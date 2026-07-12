@@ -30,7 +30,8 @@ def _get_jd_schema() -> str:
     with open(JD_SCHEMA_PATH, "r") as f:
         schema = json.load(f)
 
-    schema_text = json.dumps(schema, indent=2)
+    # Compact separators - indentation costs prompt tokens the LLM ignores.
+    schema_text = json.dumps(schema, separators=(",", ":"))
 
     logger.info("Loaded JD schema from %s", JD_SCHEMA_PATH)
     logger.info("JD schema length: %d characters", len(schema_text))

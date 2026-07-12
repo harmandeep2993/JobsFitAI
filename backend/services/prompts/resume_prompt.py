@@ -29,7 +29,9 @@ def _get_resume_schema() -> str:
     with open(RESUME_SCHEMA_PATH, "r") as f:
         schema = json.load(f)
 
-    schema_text = json.dumps(schema, indent=2)
+    # Compact separators - indentation costs ~100 prompt tokens per call
+    # and the LLM needs none of it.
+    schema_text = json.dumps(schema, separators=(",", ":"))
 
     logger.info("Loaded resume schema from %s", RESUME_SCHEMA_PATH)
     logger.info("Resume schema length: %d characters", len(schema_text))
@@ -46,23 +48,15 @@ def get_resume_prompt(resume_text: str) -> str:
     """
     schema_text = _get_resume_schema()
 
-    prompt = f"""Extract resume data into this JSON schema. Follow all rules strictly.
+    prompt = f"""Extract resume data into this JSON schema. The <hints> in the schema describe each field - replace every <hint> with extracted data.
 
     RULES:
-    1. Return ONLY valid JSON. No markdown, no explanation, no extra text.
-    2. Resume may be in any language - extract and return ALL values in English.
-    3. skills: extract ALL skill keywords and technologies into skills[] - scan every section without exception: experience bullets, project technologies and descriptions, certifications, summary, skills section, publications. Include programming languages, frameworks, libraries, tools, platforms, cloud services, databases, methodologies, domain knowledge, and soft skills. Every technology or tool mentioned anywhere must appear in skills[]. Write each skill in its canonical lowercase industry name: expand abbreviations ("k8s" -> "kubernetes", "js" -> "javascript", "ts" -> "typescript", "ml" -> "machine learning", "nlp" -> "natural language processing", "gcp" -> "google cloud", "sklearn" -> "scikit-learn", "postgres" -> "postgresql") but keep acronyms that ARE the standard name ("aws", "sql", "etl", "sap"). Never list the same skill twice in different spellings.
-    4. summary: copy the professional summary, profile, objective, or "about me" section verbatim (translated to English). Leave "" if no such section exists.
-    5. experience_entries: extract ALL roles - full-time, part-time, freelance, contract, internship, trainee, research, academic, teaching, and volunteer work. For functional resumes with no dates extract roles from any experience section.
-    6. start_date, end_date: extract the start AND end date for EVERY role that shows any dates. Dates may appear in different forms - "MM/YYYY", "Month YYYY" (e.g. Dec 2025), "YYYY", or a range like "Oct 2021 - May 2023" or "2021-2023". Normalize each to "MM/YYYY" when a month is known, otherwise "YYYY". For ongoing/current roles (Present, Current, till date, heute) set end_date to "present". Only use "" when the role shows no date at all. Never invent dates, but always capture the dates that ARE shown. Do NOT calculate durations.
-    7. duration_years and meta.total_experience_years: always set these to 0. They are calculated automatically after extraction - never compute them yourself.
-    8. projects: extract ALL projects, research, publications, campaigns, or independent work. title and description are mandatory - never leave empty if text exists. technologies[]: extract from title and description text.
-    9. education: extract degree, field, institution, and graduation year. Translate degree names to English (e.g. Diplom -> Diploma, Magister -> Master, Licence -> Bachelor).
-    10. languages: for each language extract BOTH the name into "language" AND the exact proficiency level stated into "proficiency" (use the form given: native, fluent, C1, B2, B1, intermediate, basic, or CEFR code). Leave proficiency as "" if not stated.
-    11. certifications: extract all professional certifications AND completed online courses (Coursera, Udemy, edX, DataCamp, LinkedIn Learning, etc.) as plain strings.
-    12. awards: extract honors, awards, scholarships, prizes, fellowships, or recognition as plain strings. Leave [] if none.
-    13. candidate.name/title/location: extract from header or contact section.
-    14. Missing fields -> empty string, empty list, or 0.
+    1. Return ONLY valid minified JSON. Use "" / [] / 0 for anything absent - never output a <hint> or an empty template object.
+    2. Resume may be in any language - return ALL values in English.
+    3. skills: scan EVERY section (experience bullets, projects, summary, certifications, publications) - every technology, tool, methodology, and soft skill mentioned anywhere goes in skills[]. Use canonical lowercase names: expand abbreviations (k8s -> kubernetes, js -> javascript, ml -> machine learning, nlp -> natural language processing, gcp -> google cloud, postgres -> postgresql) but keep standard acronyms (aws, sql, etl, sap). No duplicate spellings.
+    4. experience_entries: ALL roles count - jobs, internships, working student, freelance, research positions, teaching, volunteer work.
+    5. Dates: normalize to MM/YYYY (or YYYY when no month is shown); ongoing roles get end_date "present". Never invent dates. Always set duration_years and meta.total_experience_years to 0 - they are computed after extraction.
+    6. Academic profiles: research positions belong in experience_entries, papers in publications[], thesis title in education.
 
     SCHEMA:
     {schema_text}

@@ -1,51 +1,58 @@
 {
   "candidate": {
-    "name": "",
-    "title": "",
-    "location": ""
+    "name": "<full name>",
+    "title": "<professional title, e.g. data analyst, phd researcher>",
+    "location": "<city, country>",
+    "email": "<email address>",
+    "phone": "<phone number>",
+    "links": ["<linkedin, github, or portfolio url>"]
   },
 
-  "summary": "",
+  "summary": "<professional summary, profile, or objective - verbatim, translated to English>",
 
   "experience_entries": [
     {
-      "title": "",
-      "company": "",
-      "location": "",
-      "start_date": "",
-      "end_date": "",
+      "title": "<role title>",
+      "company": "<employer, university, or lab>",
+      "location": "<city or remote>",
+      "employment_type": "<full-time|part-time|internship|working student|freelance|research|teaching|volunteer>",
+      "start_date": "<MM/YYYY or YYYY>",
+      "end_date": "<MM/YYYY, YYYY, or present>",
       "duration_years": 0,
-      "responsibilities": []
+      "responsibilities": ["<one bullet per task or achievement>"]
     }
   ],
 
   "education": [
     {
-      "degree": "",
-      "field": "",
-      "institution": "",
-      "year": ""
+      "degree": "<degree in English, e.g. BSc, MSc, PhD, Diploma>",
+      "field": "<field of study>",
+      "institution": "<university or school>",
+      "year": "<graduation year, or expected year for current students>",
+      "thesis": "<thesis or dissertation title if stated>"
     }
   ],
 
   "projects": [
     {
-      "title": "",
-      "description": "",
-      "technologies": []
+      "title": "<project or research topic title>",
+      "description": "<what was built or investigated>",
+      "technologies": ["<tools and methods used>"]
     }
   ],
+
+  "publications": ["<title, venue, year - one string per paper or article>"],
 
   "languages": [
     {
-      "language": "",
-      "proficiency": ""
+      "language": "<language name in English>",
+      "proficiency": "<level exactly as stated: native, fluent, C1, B2, intermediate...>"
     }
   ],
 
-  "skills": [],
-  "certifications": [],
-  "awards": [],
+  "skills": ["<canonical lowercase skill, e.g. python, kubernetes, machine learning>"],
+  "certifications": ["<certification or completed online course>"],
+  "awards": ["<award, scholarship, fellowship, or honor>"],
 
   "meta": {
     "total_experience_years": 0
