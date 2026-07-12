@@ -34,6 +34,9 @@ router = APIRouter()
 ALLOWED_EXTENSIONS: Set[str] = SUPPORTED_EXTENSIONS
 MAX_FILE_MB: int = MAX_FILE_SIZE_MB
 
+# Bump when match() scoring semantics change - keys the analysis cache.
+_SCORING_VERSION = "v2"
+
 _PREVIEW_TYPES = {
     ".pdf": "application/pdf",
     ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -160,34 +163,39 @@ def _build_summary(raw: dict | str | None) -> dict:
 def _build_breakdown(results: dict) -> dict:
     """Map match() output into a per-section breakdown for the API response.
 
+    A section score of None means the JD had no data for it - the frontend
+    renders those as "not in JD" instead of a numeric bar.
+
     Args:
         results: Dict returned by match() containing section_scores and matched/missing lists.
 
     Returns:
-        Dict keyed by section name, each with score, matched, and missing lists.
+        Dict keyed by section name, each with score, matched, partial, and missing lists.
     """
     ss = results.get("section_scores") or {}
     return {
         "required_skills": {
-            "score": ss.get("required_skills", 0),
+            "score": ss.get("required_skills"),
             "matched": results.get("matched_required") or [],
+            "partial": results.get("partial_required") or [],
             "missing": results.get("missing_required") or [],
         },
         "preferred_skills": {
-            "score": ss.get("preferred_skills", 0),
+            "score": ss.get("preferred_skills"),
             "matched": results.get("matched_preferred") or [],
+            "partial": results.get("partial_preferred") or [],
             "missing": results.get("missing_preferred") or [],
         },
         "responsibilities": {
-            "score": ss.get("responsibilities", 0),
+            "score": ss.get("responsibilities"),
             "matched": [],
             "missing": [],
         },
-        "experience": {"score": ss.get("experience", 0), "matched": [], "missing": []},
-        "education": {"score": ss.get("education", 0), "matched": [], "missing": []},
-        "languages": {"score": ss.get("languages", 0), "matched": [], "missing": []},
+        "experience": {"score": ss.get("experience"), "matched": [], "missing": []},
+        "education": {"score": ss.get("education"), "matched": [], "missing": []},
+        "languages": {"score": ss.get("languages"), "matched": [], "missing": []},
         "certifications": {
-            "score": ss.get("certifications", 0),
+            "score": ss.get("certifications"),
             "matched": [],
             "missing": [],
         },
@@ -236,7 +244,12 @@ async def api_analyze(
         logger.warning("JD truncated from %d to %d chars", len(jd_text), JD_MAX_CHARS)
         jd_text = jd_text[:JD_MAX_CHARS]
 
-    cache_key = hashlib.sha256(f"{resume_id or tmp}::{jd_text}".encode()).hexdigest()
+    # _SCORING_VERSION busts the cache when the scoring engine changes, so a
+    # cache hit never serves scores from an older engine. Old entries stay in
+    # the table so history rows keep reopening.
+    cache_key = hashlib.sha256(
+        f"{_SCORING_VERSION}::{resume_id or tmp}::{jd_text}".encode()
+    ).hexdigest()
     cached = cache_store.get(cache_key)
     if cached:
         logger.info("Cache hit for analysis %s", cache_key[:12])
@@ -287,6 +300,7 @@ async def api_analyze(
         "breakdown": _build_breakdown(results),
         "keywords": {
             "matched": results.get("matched_required") or [],
+            "partial": results.get("partial_required") or [],
             "missing": results.get("missing_required") or [],
         },
     }

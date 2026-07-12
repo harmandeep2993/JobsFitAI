@@ -39,11 +39,23 @@ function ScoreRing({ score, delta }) {
 }
 
 // === Score bar ===
+// value === null means the JD listed nothing for this section - it was
+// excluded from the overall score, so show "not in JD" instead of a 0 bar.
 function ScoreBar({ label, value }) {
+  const name = label.replace(/_/g, ' ')
+  if (value === null || value === undefined) {
+    return (
+      <div className="flex items-center gap-3">
+        <div className="w-28 text-[12px] text-t3 capitalize flex-shrink-0">{name}</div>
+        <div className="flex-1 h-1.5 rounded-full" style={{ background: 'rgba(0,0,0,0.04)' }} />
+        <div className="w-14 text-[11px] text-t3 text-right flex-shrink-0">not in JD</div>
+      </div>
+    )
+  }
   const color = value >= 80 ? '#16a34a' : value >= 60 ? '#6366f1' : value >= 40 ? '#d97706' : '#dc2626'
   return (
     <div className="flex items-center gap-3">
-      <div className="w-28 text-[12px] text-t2 capitalize flex-shrink-0">{label.replace(/_/g, ' ')}</div>
+      <div className="w-28 text-[12px] text-t2 capitalize flex-shrink-0">{name}</div>
       <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(0,0,0,0.06)' }}>
         <motion.div
           className="h-full rounded-full" style={{ background: color }}
@@ -51,18 +63,23 @@ function ScoreBar({ label, value }) {
           transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
         />
       </div>
-      <div className="w-7 text-[12px] font-bold text-right flex-shrink-0" style={{ color }}>{Math.round(value)}</div>
+      <div className="w-14 text-[12px] font-bold text-right flex-shrink-0" style={{ color }}>{Math.round(value)}</div>
     </div>
   )
 }
 
 // === Keyword chip ===
-function KeywordChip({ text, matched }) {
-  const style = matched
-    ? { background: 'rgba(22,163,74,0.08)', borderColor: 'rgba(22,163,74,0.25)', color: '#16a34a' }
-    : { background: 'rgba(220,38,38,0.08)', borderColor: 'rgba(220,38,38,0.25)', color: '#dc2626' }
+const CHIP_STYLES = {
+  matched: { background: 'rgba(22,163,74,0.08)',  borderColor: 'rgba(22,163,74,0.25)',  color: '#16a34a' },
+  partial: { background: 'rgba(217,119,6,0.08)',  borderColor: 'rgba(217,119,6,0.25)',  color: '#d97706' },
+  missing: { background: 'rgba(220,38,38,0.08)', borderColor: 'rgba(220,38,38,0.25)', color: '#dc2626' },
+}
+
+function KeywordChip({ text, kind }) {
   return (
-    <span className="px-2.5 py-0.5 rounded-sm text-[12px] font-medium border" style={style}>{text}</span>
+    <span className="px-2.5 py-0.5 rounded-sm text-[12px] font-medium border" style={CHIP_STYLES[kind] || CHIP_STYLES.matched}>
+      {text}
+    </span>
   )
 }
 
@@ -71,6 +88,7 @@ export function ResultsPanel({ result, delta = null, footer = null }) {
     Object.entries(result.breakdown || {}).map(([k, v]) => [k, typeof v === 'object' ? v.score : v])
   )
   const matchedKw = result.keywords?.matched || []
+  const partialKw = result.keywords?.partial || []
   const missingKw = result.keywords?.missing || []
 
   return (
@@ -109,18 +127,22 @@ export function ResultsPanel({ result, delta = null, footer = null }) {
         </CardBody>
       </Card>
 
-      {(matchedKw.length > 0 || missingKw.length > 0) && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      {(matchedKw.length > 0 || partialKw.length > 0 || missingKw.length > 0) && (
+        <div className={`grid grid-cols-1 gap-3 ${partialKw.length > 0 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
           {[
-            { label: 'Matched keywords', items: matchedKw, matched: true },
-            { label: 'Missing keywords',  items: missingKw, matched: false },
-          ].map(({ label, items, matched }) => (
+            { label: 'Matched keywords', items: matchedKw, kind: 'matched', empty: 'No matches found.' },
+            ...(partialKw.length > 0
+              ? [{ label: 'Related skills', items: partialKw, kind: 'partial', empty: '', hint: 'You have something similar - half credit' }]
+              : []),
+            { label: 'Missing keywords', items: missingKw, kind: 'missing', empty: 'All keywords covered!' },
+          ].map(({ label, items, kind, empty, hint }) => (
             <CardSection key={label} title={label} action={
-              <span className="text-[11px] font-bold" style={{ color: matched ? '#16a34a' : '#dc2626' }}>{items.length}</span>
+              <span className="text-[11px] font-bold" style={{ color: CHIP_STYLES[kind].color }}>{items.length}</span>
             }>
+              {hint && <p className="text-[11.5px] text-t3 mb-2">{hint}</p>}
               {items.length > 0
-                ? <div className="flex flex-wrap gap-1.5">{items.map(k => <KeywordChip key={k} text={k} matched={matched} />)}</div>
-                : <p className="text-[13px] text-t3">{matched ? 'No matches found.' : 'All keywords covered!'}</p>
+                ? <div className="flex flex-wrap gap-1.5">{items.map(k => <KeywordChip key={k} text={k} kind={kind} />)}</div>
+                : <p className="text-[13px] text-t3">{empty}</p>
               }
             </CardSection>
           ))}

@@ -148,38 +148,58 @@ def get_jd_sections(jd: dict) -> dict:
     }
 
 
+# Calibration band for raw cosine similarities. Sentence-transformer cosines
+# for genuinely equivalent sentences cluster around 0.6-0.8, never near 1.0,
+# so using raw cosine x 100 as a score structurally caps sections at ~75 and
+# reads honest matches as mediocre. Similarities are mapped linearly:
+# <= CALIBRATION_LOW -> 0 (noise), >= CALIBRATION_HIGH -> 100 (full match).
+CALIBRATION_LOW = 0.35
+CALIBRATION_HIGH = 0.75
+
+
+def calibrate_similarity(sim: float) -> float:
+    """Map a raw cosine similarity onto a 0-100 score via the calibration band."""
+    if sim <= CALIBRATION_LOW:
+        return 0.0
+    if sim >= CALIBRATION_HIGH:
+        return 100.0
+    return round(
+        (sim - CALIBRATION_LOW) / (CALIBRATION_HIGH - CALIBRATION_LOW) * 100, 1
+    )
+
+
 def _cosine_score(text_a: str, text_b: str) -> float:
     """
-    Cosine similarity between two text strings. Returns 0-100.
+    Calibrated cosine similarity between two text strings. Returns 0-100.
 
     Args:
         text_a (str): First text
         text_b (str): Second text
 
     Returns:
-        float: Similarity score 0-100
+        float: Calibrated similarity score 0-100
     """
     if not text_a or not text_b:
         return 0.0
 
     model = load_model()
     vecs = model.encode([text_a, text_b], convert_to_tensor=True)
-    score = util.cos_sim(vecs[0], vecs[1]).item()
+    sim = util.cos_sim(vecs[0], vecs[1]).item()
 
-    return round(max(score, 0) * 100, 1)
+    return calibrate_similarity(sim)
 
 
 def _best_match_score(source_list: list, target_list: list) -> float:
     """
     For each target item find the best matching source item.
-    Returns average of best matches - 0-100.
+    Returns the average of calibrated best matches - 0-100.
 
     Args:
         source_list (list): Candidate items (resume)
         target_list (list): Required items (JD)
 
     Returns:
-        float: Average best-match score 0-100
+        float: Average calibrated best-match score 0-100
     """
     if not source_list or not target_list:
         return 0.0
@@ -190,6 +210,6 @@ def _best_match_score(source_list: list, target_list: list) -> float:
 
     sim_matrix = util.cos_sim(target_vecs, source_vecs)
     best_per_target = sim_matrix.max(dim=1).values
-    score = float(best_per_target.mean()) * 100
+    calibrated = [calibrate_similarity(float(v)) for v in best_per_target]
 
-    return round(max(score, 0), 1)
+    return round(sum(calibrated) / len(calibrated), 1)

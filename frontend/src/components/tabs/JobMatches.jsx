@@ -336,7 +336,7 @@ function JobDetailModal({ jobId, onClose, onStatusChange }) {
                 <div className="text-[11px] font-semibold text-t3 uppercase tracking-wide mb-2.5">Score breakdown</div>
                 <div className="space-y-2">
                   {Object.entries(SECTION_LABELS)
-                    .filter(([key]) => sections[key] !== undefined)
+                    .filter(([key]) => sections[key] !== undefined && sections[key] !== null)
                     .map(([key, name]) => (
                       <SectionBar key={key} name={name} score={sections[key] || 0} />
                     ))}
