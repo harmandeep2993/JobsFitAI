@@ -15,7 +15,7 @@
       "title": "<role title>",
       "company": "<employer, university, or lab>",
       "location": "<city or remote>",
-      "employment_type": "<full-time|part-time|internship|working student|freelance|research|teaching|volunteer>",
+      "employment_type": "<full-time|part-time|internship|working student|apprenticeship|freelance|research|teaching|volunteer>",
       "start_date": "<MM/YYYY or YYYY>",
       "end_date": "<MM/YYYY, YYYY, or present>",
       "duration_years": 0,
@@ -25,9 +25,9 @@
 
   "education": [
     {
-      "degree": "<degree in English, e.g. BSc, MSc, PhD, Diploma>",
-      "field": "<field of study>",
-      "institution": "<university or school>",
+      "degree": "<qualification in English: BSc, MSc, PhD, Diploma, vocational training (Ausbildung), Meister, state-certified technician...>",
+      "field": "<field of study or trade>",
+      "institution": "<university, school, or training company>",
       "year": "<graduation year, or expected year for current students>",
       "thesis": "<thesis or dissertation title if stated>"
     }
@@ -51,7 +51,7 @@
   ],
 
   "skills": ["<canonical lowercase skill, e.g. python, kubernetes, machine learning>"],
-  "certifications": ["<certification or completed online course>"],
+  "certifications": ["<certification, professional license (IHK, Approbation, driving class...), or completed course>"],
   "awards": ["<award, scholarship, fellowship, or honor>"],
 
   "meta": {

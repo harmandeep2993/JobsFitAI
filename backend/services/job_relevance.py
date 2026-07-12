@@ -3,9 +3,10 @@
 LLM relevance gate for the Job Matches funnel.
 
 Classifies jobs by title only - snippets are unreliable (BA posts metadata,
-Adzuna posts company intros in the first N chars). The title alone reliably
-signals relevance (AI/ML/Data vs unrelated) and seniority (Senior/Lead in
-title). Batch size 30 titles per LLM call keeps cost low.
+Adzuna posts company intros in the first N chars). Relevance is judged
+against the user's own target titles, so the gate works for any profession;
+seniority (Senior/Lead in title) is judged the same way for everyone.
+Batch size 30 titles per LLM call keeps cost low.
 """
 
 import re
@@ -31,10 +32,13 @@ def title_is_senior(title: str) -> bool:
     return bool(_SENIORITY_RE.search(title or ""))
 
 
-_PROMPT = """Screen a job title for an entry-level AI/ML/Data candidate.
+# Fallback role description when a user has no target titles configured.
+_DEFAULT_TARGET_DESC = "AI, ML, Data Science, or Data Analytics"
 
-relevant=true: AI, ML, Data Science, NLP, LLM, GenAI, MLOps, Computer Vision, Data Analyst, Analytics Engineer, Applied Scientist roles. NOT sales, marketing, finance, HR, civil/mechanical engineering, general software dev unrelated to AI.
-entry_level=true ONLY for roles a candidate with 0-2 years of experience can realistically get: junior, graduate, trainee, intern, working student (Werkstudent), entry level, associate, or a plain title with no seniority signal.
+_PROMPT = """Screen a job title for a candidate targeting these roles: {targets}.
+
+relevant=true: the job is one of the target roles or a close variant of them (same profession, related specialisation). relevant=false: a different profession or an unrelated department.
+entry_level=true ONLY for roles a candidate with 0-2 years of experience can realistically get: junior, graduate, trainee, intern, working student (Werkstudent), apprentice (Azubi), entry level, associate, or a plain title with no seniority signal.
 entry_level=false for senior/sr/lead/principal/staff/head/director/manager/architect/Teamleiter or any title implying 3+ years of experience.
 
 Return ONLY JSON: {{"relevant": true/false, "entry_level": true/false, "reason": "<=8 words"}}
@@ -43,10 +47,10 @@ TITLE: {title}
 JSON:"""
 
 
-_BATCH_PROMPT = """Screen job titles for an entry-level AI/ML/Data candidate.
+_BATCH_PROMPT = """Screen job titles for a candidate targeting these roles: {targets}.
 
-relevant=true: AI, ML, Data Science, NLP, LLM, GenAI, MLOps, Computer Vision, Data Analyst, Analytics Engineer, Applied Scientist roles. NOT sales, marketing, finance, HR, civil/mechanical engineering, general software dev unrelated to AI.
-entry_level=true ONLY for roles a candidate with 0-2 years of experience can realistically get: junior, graduate, trainee, intern, working student (Werkstudent), entry level, associate, or a plain title with no seniority signal.
+relevant=true: the job is one of the target roles or a close variant of them (same profession, related specialisation). relevant=false: a different profession or an unrelated department.
+entry_level=true ONLY for roles a candidate with 0-2 years of experience can realistically get: junior, graduate, trainee, intern, working student (Werkstudent), apprentice (Azubi), entry level, associate, or a plain title with no seniority signal.
 entry_level=false for senior/sr/lead/principal/staff/head/director/manager/architect/Teamleiter or any title implying 3+ years of experience.
 
 Return ONLY a JSON array: [{{"n":1,"relevant":true,"entry_level":true}}, ...]
@@ -56,14 +60,23 @@ TITLES ({count}):
 
 JSON:"""
 
+
+def _targets_desc(titles: list | None) -> str:
+    """Human-readable target-role list for the prompts, with a safe fallback."""
+    cleaned = [t.strip() for t in (titles or []) if t and t.strip()]
+    return ", ".join(cleaned[:15]) if cleaned else _DEFAULT_TARGET_DESC
+
+
 _BATCH_SIZE = 30
 
 
-def _classify_chunk(chunk: list) -> dict:
+def _classify_chunk(chunk: list, targets: str) -> dict:
     lines = []
     for n, j in enumerate(chunk, 1):
         lines.append(f"{n}. {j.title}")
-    prompt = _BATCH_PROMPT.format(count=len(chunk), jobs="\n".join(lines))
+    prompt = _BATCH_PROMPT.format(
+        targets=targets, count=len(chunk), jobs="\n".join(lines)
+    )
 
     out: dict = {}
     llm_ok = False
@@ -106,15 +119,21 @@ def _classify_chunk(chunk: list) -> dict:
     return out
 
 
-def classify_batch(jobs: list) -> dict:
+def classify_batch(jobs: list, titles: list | None = None) -> dict:
     """
     Classify many jobs with few LLM calls (chunks of _BATCH_SIZE).
 
+    Args:
+        jobs: Jobs to classify.
+        titles: The user's target role titles - relevance is judged against
+            these, so the gate works for any profession, not just AI/ML.
+
     Returns {job_id: {"relevant": bool, "entry_level": bool}}.
     """
+    targets = _targets_desc(titles)
     verdicts: dict = {}
     for i in range(0, len(jobs), _BATCH_SIZE):
-        verdicts.update(_classify_chunk(jobs[i : i + _BATCH_SIZE]))
+        verdicts.update(_classify_chunk(jobs[i : i + _BATCH_SIZE], targets))
     logger.info(
         "Classified %d jobs in %d batch call(s)",
         len(jobs),
@@ -123,14 +142,14 @@ def classify_batch(jobs: list) -> dict:
     return verdicts
 
 
-def classify(title: str, snippet: str = "") -> dict:
+def classify(title: str, snippet: str = "", titles: list | None = None) -> dict:
     """
     Return {"relevant": bool, "entry_level": bool, "reason": str}.
 
     On any failure, fails OPEN (relevant=True, entry_level=True) so a flaky
     LLM call doesn't silently drop a job - the scorer still runs.
     """
-    prompt = _PROMPT.format(title=title or "")
+    prompt = _PROMPT.format(targets=_targets_desc(titles), title=title or "")
     try:
         _r = call_llm(prompt)
         data = parse_json_response(_r.text) if (_r and _r.text) else None

@@ -370,7 +370,7 @@ def discover_and_score(
     status.update(
         {"phase": "classifying", "total": len(candidates), "checked": 0, "scored": 0}
     )
-    verdicts = relevance.classify_batch(candidates)
+    verdicts = relevance.classify_batch(candidates, titles=titles)
 
     survivors = []
     for job in candidates:

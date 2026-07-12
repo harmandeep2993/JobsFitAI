@@ -521,6 +521,21 @@ def test_entry_exclude_terms():
     assert title_blocked("Senior ML Engineer", terms)
 
 
+def test_relevance_gate_uses_user_titles():
+    """The gate prompt is built from the user's roles, not a hardcoded list."""
+    from services.job_relevance import _targets_desc, _BATCH_PROMPT
+
+    desc = _targets_desc(["pflegefachkraft", "krankenpfleger"])
+    assert desc == "pflegefachkraft, krankenpfleger"
+    prompt = _BATCH_PROMPT.format(targets=desc, count=1, jobs="1. Pflegefachkraft")
+    assert "pflegefachkraft" in prompt
+    assert "AI" not in prompt.split("entry_level")[0].replace(desc, "")
+
+    # No titles configured falls back to the default description
+    assert "Data" in _targets_desc([])
+    assert "Data" in _targets_desc(None)
+
+
 def test_seniority_guard_overrides_llm():
     """Titles with explicit seniority markers must never pass the entry gate."""
     from services.job_relevance import title_is_senior
