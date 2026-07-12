@@ -24,11 +24,8 @@ from core.logger import get_logger
 
 logger = get_logger(__name__)
 
-# Neutral score when JD has no certification requirements
-NO_REQUIREMENT_SCORE = 60.0
 
-
-def score_certifications(resume: dict, jd: dict) -> float:
+def score_certifications(resume: dict, jd: dict) -> float | None:
     """
     Semantic similarity between candidate certifications
     and JD required certifications.
@@ -37,8 +34,8 @@ def score_certifications(resume: dict, jd: dict) -> float:
     resume certification. Final score is average of
     best matches.
 
-    Neutral score (60) returned when:
-        - JD has no certification requirements
+    None returned when the JD has no certification requirements
+    (section excluded from the overall score).
 
     Zero score returned when:
         - JD has requirements but resume has no certifications
@@ -48,7 +45,7 @@ def score_certifications(resume: dict, jd: dict) -> float:
         jd (dict): Extracted JD data
 
     Returns:
-        float: Certification score 0-100
+        float | None: Certification score 0-100, or None when not required
     """
     jd_certs = [
         c.strip() for c in jd.get("certifications", []) if c and isinstance(c, str)
@@ -63,10 +60,9 @@ def score_certifications(resume: dict, jd: dict) -> float:
     # --- Edge case: no requirements ---
     if not jd_certs:
         logger.info(
-            "No certification requirements in JD - returning neutral %.1f",
-            NO_REQUIREMENT_SCORE,
+            "No certification requirements in JD - section excluded from overall"
         )
-        return NO_REQUIREMENT_SCORE
+        return None
 
     # --- Edge case: no certifications in resume ---
     if not resume_certs:

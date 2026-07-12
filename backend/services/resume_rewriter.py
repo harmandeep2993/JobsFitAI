@@ -302,8 +302,8 @@ For each item produce ONE concise resume bullet (max 20 words):
 Items:
 {chr(10).join(lines)}
 
-Return ONLY a valid JSON array, one object per item:
-[{{"id": "...", "bullet": "..."}}]"""
+Return ONLY JSON, one object per item:
+{{"bullets": [{{"id": "...", "bullet": "..."}}]}}"""
 
     logger.info(
         "improve_resume: sending %d items to LLM for user=%s", len(items), user_id
@@ -315,15 +315,22 @@ Return ONLY a valid JSON array, one object per item:
         logger.warning("improve_resume: LLM returned no response")
         return {"ok": False, "reason": "llm_failed", "sections": []}
 
-    arr_match = re.search(r"\[[\s\S]*\]", response)
-    if not arr_match:
-        logger.warning("improve_resume: could not find JSON array in LLM response")
-        return {"ok": False, "reason": "parse_failed", "sections": []}
-
+    # JSON-mode shape is {"bullets": [...]}; accept a bare array too for
+    # models that ignore the wrapper.
+    llm_out = None
     try:
-        llm_out = json.loads(arr_match.group())
-    except Exception:
-        logger.warning("improve_resume: JSON parse error")
+        parsed = json.loads(response)
+        llm_out = parsed.get("bullets") if isinstance(parsed, dict) else parsed
+    except (ValueError, TypeError):
+        arr_match = re.search(r"\[[\s\S]*\]", response)
+        if arr_match:
+            try:
+                llm_out = json.loads(arr_match.group())
+            except (ValueError, TypeError):
+                pass
+
+    if not isinstance(llm_out, list):
+        logger.warning("improve_resume: could not parse bullets from LLM response")
         return {"ok": False, "reason": "parse_failed", "sections": []}
 
     bullet_map = {

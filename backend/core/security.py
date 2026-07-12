@@ -8,6 +8,7 @@ jose or passlib directly.
 
 import os
 import secrets
+import sys
 from datetime import datetime, timedelta, timezone
 
 from jose import JWTError, jwt
@@ -29,17 +30,21 @@ _TOKEN_EXPIRE_DAYS = 30
 
 
 def validate_secret() -> None:
-    """Warn at startup if JWT_SECRET is not pinned in .env.
+    """Enforce JWT_SECRET at startup.
 
     Without a fixed secret, tokens are valid only for the lifetime of the
     process - every restart logs all users out. Acceptable for local dev,
-    not for production.
+    fatal in production (APP_ENV=production refuses to boot without it).
     """
-    if not os.getenv("JWT_SECRET"):
-        logger.warning(
-            "JWT_SECRET not set in .env - tokens will be invalidated on every restart. "
-            "Set JWT_SECRET in .env for production."
-        )
+    if os.getenv("JWT_SECRET"):
+        return
+    if os.getenv("APP_ENV", "").strip().lower() == "production":
+        logger.error("JWT_SECRET is required in production - set it in .env")
+        sys.exit(1)
+    logger.warning(
+        "JWT_SECRET not set in .env - tokens will be invalidated on every restart. "
+        "Set JWT_SECRET in .env for production."
+    )
 
 
 def hash_password(plain: str) -> str:

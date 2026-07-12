@@ -162,9 +162,22 @@ def get_scheduler_interval(user_id: str) -> int:
     return int(_get(user_id, "scheduler_interval", default))
 
 
+# Clamp bounds for user-supplied numbers so one account cannot configure the
+# scheduler or fetchers into hammering external APIs (each scored job also
+# costs an LLM call downstream).
+SCHEDULER_INTERVAL_MIN_MINUTES = 5
+SCHEDULER_INTERVAL_MAX_MINUTES = 1440
+ARBEITNOW_LIMIT_MAX = 300
+BUNDESAGENTUR_LIMIT_MAX = 200
+
+
 def set_scheduler_interval(user_id: str, minutes: int) -> None:
-    """Persist the scheduler interval (minimum 5 minutes) for this user."""
-    _set(user_id, "scheduler_interval", max(5, int(minutes)))
+    """Persist the scheduler interval in minutes, clamped to a sane range."""
+    clamped = max(
+        SCHEDULER_INTERVAL_MIN_MINUTES,
+        min(SCHEDULER_INTERVAL_MAX_MINUTES, int(minutes)),
+    )
+    _set(user_id, "scheduler_interval", clamped)
 
 
 def get_users_with_scheduler_enabled() -> list[str]:
@@ -195,8 +208,8 @@ def get_arbeitnow_limit(user_id: str) -> int:
 
 
 def set_arbeitnow_limit(user_id: str, n: int) -> None:
-    """Persist the Arbeitnow fetch limit (minimum 1) for this user."""
-    _set(user_id, "arbeitnow_limit", max(1, int(n)))
+    """Persist the Arbeitnow fetch limit for this user, clamped to a sane range."""
+    _set(user_id, "arbeitnow_limit", max(1, min(ARBEITNOW_LIMIT_MAX, int(n))))
 
 
 def get_bundesagentur_limit(user_id: str) -> int:
@@ -205,5 +218,5 @@ def get_bundesagentur_limit(user_id: str) -> int:
 
 
 def set_bundesagentur_limit(user_id: str, n: int) -> None:
-    """Persist the Bundesagentur fetch limit (minimum 1) for this user."""
-    _set(user_id, "bundesagentur_limit", max(1, int(n)))
+    """Persist the Bundesagentur fetch limit for this user, clamped to a sane range."""
+    _set(user_id, "bundesagentur_limit", max(1, min(BUNDESAGENTUR_LIMIT_MAX, int(n))))

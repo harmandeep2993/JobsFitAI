@@ -9,17 +9,16 @@ import asyncio
 import csv
 import io
 import json
-import os
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from api.routes.auth import get_current_user
-from core.config import MAX_AGE_DAYS, SEARCH_PER_TITLE
+from api.routes.auth import get_current_user, get_current_user_llm_limited
+from core.config import JD_MAX_CHARS, MAX_AGE_DAYS, SEARCH_PER_TITLE
 from core.logger import get_logger
-from core import state
+from core import state, uploads
 from core.state import sched_last_ref
 from services.extractors.jd_extractor import extract_jd
 from services.matcher.engine import match
@@ -34,6 +33,7 @@ from services.job_matcher import (
     end_run,
     fetch_combined,
     get_run_status,
+    request_stop,
     rescore_all,
 )
 from services.profile_summary import generate_summary
@@ -97,14 +97,14 @@ def _resume_diff(old: dict, new: dict) -> dict:
 @router.post("/resume")
 async def api_match_resume(
     body: MatchResumeRequest,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user_llm_limited),
 ) -> JSONResponse:
     """Parse + extract an uploaded resume and store it for this user's matching session."""
     user_id = current_user["id"]
-    tmp = (body.tmp or "").strip()
+    tmp = uploads.resolve(user_id, (body.tmp or "").strip())
     name = (body.name or "resume").strip()
 
-    if not tmp or not os.path.exists(tmp):
+    if not tmp:
         raise HTTPException(status_code=400, detail="resume file not found")
 
     def _process() -> dict:
@@ -183,9 +183,14 @@ async def api_match_run(
                 per_title=SEARCH_PER_TITLE,
                 arbeitnow_limit=settings_store.get_arbeitnow_limit(user_id),
                 bundesagentur_limit=settings_store.get_bundesagentur_limit(user_id),
+                entry_only=entry_only_flag,
             )
             discover_and_score(
-                jobs, user_id=user_id, entry_only=entry_only_flag, manual=True
+                jobs,
+                user_id=user_id,
+                entry_only=entry_only_flag,
+                manual=True,
+                titles=titles,
             )
 
         try:
@@ -221,6 +226,18 @@ async def api_match_run(
     return JSONResponse({"ok": True, "started": True})
 
 
+@router.post("/stop")
+async def api_match_stop(
+    current_user: dict = Depends(get_current_user),
+) -> JSONResponse:
+    """Stop the current fetch-and-score run at the next job boundary.
+
+    Jobs already scored are kept. Returns stopped=false when no run was active.
+    """
+    stopped = request_stop(current_user["id"])
+    return JSONResponse({"ok": True, "stopped": stopped})
+
+
 @router.get("/state")
 async def api_match_state(
     current_user: dict = Depends(get_current_user),
@@ -242,6 +259,7 @@ async def api_match_state(
                 "bundesagentur_limit": settings_store.get_bundesagentur_limit(user_id),
             },
             "stats": event_store.stats(user_id),
+            "last_run": event_store.last_run(user_id),
             "run_status": get_run_status(user_id),
             "resume": state.resume_info(user_id),
             "scheduler": {
@@ -264,7 +282,8 @@ async def api_match_applied(
     applied = bool(body.applied)
     if not job_id:
         raise HTTPException(status_code=400, detail="id required")
-    match_store.set_applied(user_id, job_id, applied)
+    if not match_store.set_applied(user_id, job_id, applied):
+        raise HTTPException(status_code=404, detail="job not found")
     if applied:
         event_store.log_event(user_id, "applied", job_id)
     return JSONResponse({"ok": True, "id": job_id, "applied": applied})
@@ -281,7 +300,10 @@ async def api_match_app_status(
     status = (body.status or "").strip().lower()
     if not job_id:
         raise HTTPException(status_code=400, detail="id required")
-    match_store.set_app_status(user_id, job_id, status)
+    if status not in match_store.VALID_APP_STATUSES:
+        raise HTTPException(status_code=400, detail="invalid_status")
+    if not match_store.set_app_status(user_id, job_id, status):
+        raise HTTPException(status_code=404, detail="job not found")
     if status == "applied":
         event_store.log_event(user_id, "applied", job_id)
     return JSONResponse({"ok": True, "id": job_id, "app_status": status})
@@ -334,6 +356,9 @@ async def api_match_detail(
                 "score": row["score"],
                 "label": row["label"],
                 "applied": row.get("applied", 0),
+                "app_status": row.get("app_status") or "",
+                "source": row.get("source") or "",
+                "status": row.get("status") or "",
             },
             "section_scores": row.get("section_scores", {}),
             "matched_required": row.get("matched_required", []),
@@ -397,12 +422,12 @@ async def api_match_filters(
 @router.post("/score-jd")
 async def api_score_jd(
     body: ScoreJdRequest,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user_llm_limited),
 ) -> JSONResponse:
     """Score a jd_unavailable job using a manually pasted JD."""
     user_id = current_user["id"]
     job_id = (body.id or "").strip()
-    jd_text = (body.jd_text or "").strip()
+    jd_text = (body.jd_text or "").strip()[:JD_MAX_CHARS]
 
     if not job_id:
         raise HTTPException(status_code=400, detail="id required")
@@ -495,14 +520,34 @@ async def api_match_delete(
     body: DeleteJobRequest,
     current_user: dict = Depends(get_current_user),
 ) -> JSONResponse:
-    """Delete a job match and block its id from ever appearing again for this user."""
+    """Soft-delete a job match and block its id from re-appearing in fetches.
+
+    Restorable via POST /api/match/restore until the user clears all matches.
+    """
     user_id = current_user["id"]
     job_id = (body.id or "").strip()
     if not job_id:
         raise HTTPException(status_code=400, detail="id required")
-    match_store.delete(user_id, job_id)
+    if not match_store.delete(user_id, job_id):
+        raise HTTPException(status_code=404, detail="job not found")
     event_store.block(job_id, user_id)
-    return JSONResponse({"ok": True})
+    return JSONResponse({"ok": True, "id": job_id})
+
+
+@router.post("/restore")
+async def api_match_restore(
+    body: DeleteJobRequest,
+    current_user: dict = Depends(get_current_user),
+) -> JSONResponse:
+    """Undo a job deletion: bring the match back and unblock its id."""
+    user_id = current_user["id"]
+    job_id = (body.id or "").strip()
+    if not job_id:
+        raise HTTPException(status_code=400, detail="id required")
+    if not match_store.restore(user_id, job_id):
+        raise HTTPException(status_code=404, detail="job not found")
+    event_store.unblock(job_id, user_id)
+    return JSONResponse({"ok": True, "id": job_id})
 
 
 @router.post("/clear")

@@ -11,6 +11,11 @@ Falls back to a deterministic template if the LLM call fails.
 from services.llm.caller import call_llm
 
 
+def _fmt_score(value) -> str:
+    """Format a section score for LLM prompts; None means the JD had no data."""
+    return "n/a" if value is None else str(value)
+
+
 def generate_summary(resume_json, jd_json, results):
     """
     Generate a concise candidate summary using LLM.
@@ -188,7 +193,7 @@ def generate_swot(resume_json, jd_json, results):
 ROLE: {role_title}
 OVERALL SCORE: {score}/100
 CANDIDATE EXPERIENCE: {candidate_years} years
-SECTION SCORES: required_skills={section_scores.get('required_skills',0)}, responsibilities={section_scores.get('responsibilities',0)}, experience={section_scores.get('experience',0)}, education={section_scores.get('education',0)}
+SECTION SCORES: required_skills={_fmt_score(section_scores.get('required_skills'))}, responsibilities={_fmt_score(section_scores.get('responsibilities'))}, experience={_fmt_score(section_scores.get('experience'))}, education={_fmt_score(section_scores.get('education'))}
 
 MATCHED REQUIRED SKILLS: {', '.join(matched_req[:8]) or 'none'}
 MISSING REQUIRED SKILLS:  {', '.join(missing_req[:8]) or 'none'}

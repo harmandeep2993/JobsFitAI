@@ -40,9 +40,9 @@ const TYPE_STYLES = {
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([])
 
-  const toast = useCallback((msg, type = 'info', duration = 3500) => {
+  const toast = useCallback((msg, type = 'info', duration = 3500, action = null) => {
     const id = Date.now()
-    setToasts(t => [...t, { id, msg, type }])
+    setToasts(t => [...t, { id, msg, type, action }])
     setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), duration)
   }, [])
 
@@ -74,6 +74,19 @@ export function ToastProvider({ children }) {
               >
                 <span className="flex-shrink-0 mt-px">{ICONS[t.type] || ICONS.info}</span>
                 <span style={{ color: 'rgb(var(--t1))' }}>{t.msg}</span>
+                {t.action && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setToasts(x => x.filter(y => y.id !== t.id))
+                      t.action.onClick()
+                    }}
+                    className="ml-auto flex-shrink-0 font-semibold hover:underline"
+                    style={{ color: 'rgb(var(--accent))' }}
+                  >
+                    {t.action.label}
+                  </button>
+                )}
               </motion.div>
             )
           })}

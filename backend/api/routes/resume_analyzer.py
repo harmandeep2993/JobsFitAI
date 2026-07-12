@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, JSONResponse
 
+from core import uploads
 from core.config import JD_MAX_CHARS, MAX_FILE_SIZE_MB, SUPPORTED_EXTENSIONS
 from core.logger import get_logger
 from services.extractors import extract_all
@@ -25,13 +26,16 @@ from repositories import resume_repo as resume_store
 from services.profile_summary import generate_summary
 from services.llm.caller import check_llm
 from schemas.analyzer import AnalyzeRequest, ResumePreviewRequest
-from api.routes.auth import get_current_user
+from api.routes.auth import get_current_user, get_current_user_llm_limited
 
 logger = get_logger(__name__)
 
 router = APIRouter()
 ALLOWED_EXTENSIONS: Set[str] = SUPPORTED_EXTENSIONS
 MAX_FILE_MB: int = MAX_FILE_SIZE_MB
+
+# Bump when match() scoring semantics change - keys the analysis cache.
+_SCORING_VERSION = "v2"
 
 _PREVIEW_TYPES = {
     ".pdf": "application/pdf",
@@ -40,11 +44,15 @@ _PREVIEW_TYPES = {
 
 
 @router.post("/upload")
-async def api_upload(file: UploadFile = File(...)) -> JSONResponse:
+async def api_upload(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user),
+) -> JSONResponse:
     """
     Handle resume file uploads.
 
-    Returns {ok, name, tmp, kb, ext} on success.
+    Returns {ok, name, tmp, kb, ext} on success. `tmp` is an opaque token
+    resolved server-side - never a filesystem path.
     """
     if file is None:
         raise HTTPException(status_code=400, detail="no file uploaded")
@@ -69,11 +77,13 @@ async def api_upload(file: UploadFile = File(...)) -> JSONResponse:
         tmp_file.write(data)
         temp_path = tmp_file.name
 
+    token = uploads.register(current_user["id"], temp_path)
+
     return JSONResponse(
         {
             "ok": True,
             "name": filename,
-            "tmp": temp_path,
+            "tmp": token,
             "kb": round(len(data) / 1024, 1),
             "ext": suffix.upper()[1:],
         }
@@ -81,15 +91,18 @@ async def api_upload(file: UploadFile = File(...)) -> JSONResponse:
 
 
 @router.get("/resume-file")
-async def api_resume_file(tmp: str) -> FileResponse:
-    """Serve a temp-path resume file for inline preview in the browser."""
-    tmp = tmp.strip()
-    if not tmp or not os.path.exists(tmp):
+async def api_resume_file(
+    tmp: str,
+    current_user: dict = Depends(get_current_user),
+) -> FileResponse:
+    """Serve an uploaded temp resume for inline preview, resolved by token."""
+    path = uploads.resolve(current_user["id"], tmp)
+    if not path:
         return JSONResponse({"ok": False, "error": "file not found"}, status_code=404)
-    suffix = Path(tmp).suffix.lower()
+    suffix = Path(path).suffix.lower()
     if suffix not in _PREVIEW_TYPES:
         return JSONResponse({"ok": False, "error": "unsupported type"}, status_code=400)
-    return FileResponse(tmp, media_type=_PREVIEW_TYPES[suffix])
+    return FileResponse(path, media_type=_PREVIEW_TYPES[suffix])
 
 
 @router.post("/resume-preview")
@@ -108,8 +121,12 @@ async def api_resume_preview(
                 {"ok": False, "error": "file not found"}, status_code=404
             )
         tmp = row["file_path"]
-    elif not tmp or not os.path.exists(tmp):
-        return JSONResponse({"ok": False, "error": "file not found"}, status_code=400)
+    else:
+        tmp = uploads.resolve(current_user["id"], tmp)
+        if not tmp:
+            return JSONResponse(
+                {"ok": False, "error": "file not found"}, status_code=400
+            )
 
     text = await run_in_threadpool(lambda: extract_all_text(tmp))
     if not text:
@@ -146,34 +163,39 @@ def _build_summary(raw: dict | str | None) -> dict:
 def _build_breakdown(results: dict) -> dict:
     """Map match() output into a per-section breakdown for the API response.
 
+    A section score of None means the JD had no data for it - the frontend
+    renders those as "not in JD" instead of a numeric bar.
+
     Args:
         results: Dict returned by match() containing section_scores and matched/missing lists.
 
     Returns:
-        Dict keyed by section name, each with score, matched, and missing lists.
+        Dict keyed by section name, each with score, matched, partial, and missing lists.
     """
     ss = results.get("section_scores") or {}
     return {
         "required_skills": {
-            "score": ss.get("required_skills", 0),
+            "score": ss.get("required_skills"),
             "matched": results.get("matched_required") or [],
+            "partial": results.get("partial_required") or [],
             "missing": results.get("missing_required") or [],
         },
         "preferred_skills": {
-            "score": ss.get("preferred_skills", 0),
+            "score": ss.get("preferred_skills"),
             "matched": results.get("matched_preferred") or [],
+            "partial": results.get("partial_preferred") or [],
             "missing": results.get("missing_preferred") or [],
         },
         "responsibilities": {
-            "score": ss.get("responsibilities", 0),
+            "score": ss.get("responsibilities"),
             "matched": [],
             "missing": [],
         },
-        "experience": {"score": ss.get("experience", 0), "matched": [], "missing": []},
-        "education": {"score": ss.get("education", 0), "matched": [], "missing": []},
-        "languages": {"score": ss.get("languages", 0), "matched": [], "missing": []},
+        "experience": {"score": ss.get("experience"), "matched": [], "missing": []},
+        "education": {"score": ss.get("education"), "matched": [], "missing": []},
+        "languages": {"score": ss.get("languages"), "matched": [], "missing": []},
         "certifications": {
-            "score": ss.get("certifications", 0),
+            "score": ss.get("certifications"),
             "matched": [],
             "missing": [],
         },
@@ -183,7 +205,7 @@ def _build_breakdown(results: dict) -> dict:
 @router.post("/analyze")
 async def api_analyze(
     body: AnalyzeRequest,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user_llm_limited),
 ) -> JSONResponse:
     """
     Full analysis pipeline: parse resume -> extract -> score -> summarize.
@@ -201,10 +223,12 @@ async def api_analyze(
                 {"ok": False, "error": "resume file not found"}, status_code=400
             )
         tmp = row["file_path"]
-    elif not tmp or not os.path.exists(tmp):
-        return JSONResponse(
-            {"ok": False, "error": "resume file not found"}, status_code=400
-        )
+    else:
+        tmp = uploads.resolve(current_user["id"], tmp)
+        if not tmp:
+            return JSONResponse(
+                {"ok": False, "error": "resume file not found"}, status_code=400
+            )
 
     if len(jd_text) < 50:
         return JSONResponse(
@@ -220,7 +244,12 @@ async def api_analyze(
         logger.warning("JD truncated from %d to %d chars", len(jd_text), JD_MAX_CHARS)
         jd_text = jd_text[:JD_MAX_CHARS]
 
-    cache_key = hashlib.sha256(f"{resume_id or tmp}::{jd_text}".encode()).hexdigest()
+    # _SCORING_VERSION busts the cache when the scoring engine changes, so a
+    # cache hit never serves scores from an older engine. Old entries stay in
+    # the table so history rows keep reopening.
+    cache_key = hashlib.sha256(
+        f"{_SCORING_VERSION}::{resume_id or tmp}::{jd_text}".encode()
+    ).hexdigest()
     cached = cache_store.get(cache_key)
     if cached:
         logger.info("Cache hit for analysis %s", cache_key[:12])
@@ -271,6 +300,7 @@ async def api_analyze(
         "breakdown": _build_breakdown(results),
         "keywords": {
             "matched": results.get("matched_required") or [],
+            "partial": results.get("partial_required") or [],
             "missing": results.get("missing_required") or [],
         },
     }
@@ -279,10 +309,12 @@ async def api_analyze(
     if resume_id:
         try:
             analysis_store.save(
+                current_user["id"],
                 resume_id,
                 jd_text,
                 results.get("overall_score", 0),
                 results.get("label", ""),
+                cache_hash=cache_key,
             )
         except Exception as e:
             logger.error("analysis_store.save failed: %s", e)

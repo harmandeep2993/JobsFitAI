@@ -21,7 +21,12 @@ from services.fetchers import (
 from services.fetchers.job_enricher import fetch_full_description
 from services.matcher import match
 from repositories import event_repo, match_repo
-from services import job_relevance as relevance, role_filter, vector_store
+from services import (
+    job_relevance as relevance,
+    role_filter,
+    title_expander,
+    vector_store,
+)
 from core import state as session
 from core.config import MAX_AGE_DAYS
 from core.logger import get_logger
@@ -93,7 +98,14 @@ _run_statuses: dict[str, dict] = {}
 
 def _default_status() -> dict:
     """Return a blank run-status dict."""
-    return {"running": False, "phase": "idle", "checked": 0, "scored": 0, "total": 0}
+    return {
+        "running": False,
+        "phase": "idle",
+        "checked": 0,
+        "scored": 0,
+        "total": 0,
+        "cancel": False,
+    }
 
 
 def get_run_status(user_id: str) -> dict:
@@ -111,7 +123,23 @@ def begin_run(user_id: str) -> bool:
         "checked": 0,
         "scored": 0,
         "total": 0,
+        "cancel": False,
     }
+    return True
+
+
+def request_stop(user_id: str) -> bool:
+    """Ask the current run to stop at the next job boundary.
+
+    Returns True when a run was active and the stop was requested. The
+    pipeline checks the flag between phases and between jobs, so already
+    fetched-and-scored results are kept.
+    """
+    status = _run_statuses.get(user_id)
+    if not status or not status.get("running"):
+        return False
+    status["cancel"] = True
+    status["phase"] = "stopping"
     return True
 
 
@@ -122,6 +150,11 @@ def end_run(user_id: str) -> None:
         _run_statuses[user_id]["phase"] = "idle"
 
 
+# Floor for the per-query Adzuna budget after entry-keyword expansion, so
+# each expanded query still fills at least a good part of one result page.
+_MIN_PER_QUERY = 20
+
+
 def fetch_combined(
     titles: list[str],
     location: str = "",
@@ -129,6 +162,7 @@ def fetch_combined(
     per_title: int = 5,
     arbeitnow_limit: int = 100,
     bundesagentur_limit: int = 500,
+    entry_only: bool = False,
 ) -> list[Job]:
     """Pull jobs from all sources across one or more countries and merge.
 
@@ -136,14 +170,24 @@ def fetch_combined(
     - Arbeitnow: Germany feed filtered to target-title roles (DE only).
     - Bundesagentur: Germany official job board via public API (DE only).
 
+    When entry_only is set, plain titles are combined with the configured
+    entry keywords ("ml engineer" -> "junior ml engineer", "intern ml
+    engineer", ...) so sources surface entry postings that generic queries
+    push past the pagination cap. The per-title budget is split across the
+    expanded queries to keep total API usage roughly constant.
+
     Deduped by id; the LLM funnel and vector dedup refine further.
     """
     countries = countries or ["de"]
 
+    queries = title_expander.entry_search_queries(titles) if entry_only else titles
+    expansion = max(1, len(queries) // max(1, len(titles)))
+    per_query = max(_MIN_PER_QUERY, per_title // expansion) if entry_only else per_title
+
     adzuna: list[Job] = []
     for code in countries:
         adzuna += fetch_adzuna_multi(
-            titles, location=location, country=code, per_title=per_title
+            queries, location=location, country=code, per_title=per_query
         )
 
     arbeitnow: list[Job] = []
@@ -156,7 +200,7 @@ def fetch_combined(
         )
         arbeitnow = [j for j in arb_raw if role_filter.is_target_role(j.title, titles)]
 
-        # Bundesagentur: fetch all titles in parallel - each title is an
+        # Bundesagentur: fetch all queries in parallel - each query is an
         # independent API search so there is no shared state to protect.
         seen_ba: set[str] = set()
 
@@ -165,8 +209,8 @@ def fetch_combined(
                 query=title, location=location, max_age_days=MAX_AGE_DAYS
             )
 
-        with ThreadPoolExecutor(max_workers=min(6, len(titles))) as pool:
-            futures = {pool.submit(_ba_fetch, t): t for t in titles}
+        with ThreadPoolExecutor(max_workers=min(6, len(queries))) as pool:
+            futures = {pool.submit(_ba_fetch, t): t for t in queries}
             for fut in as_completed(futures):
                 try:
                     for job in fut.result():
@@ -242,12 +286,16 @@ def rescore_all(user_id: str) -> int:
 
 
 def discover_and_score(
-    jobs: list[Job], user_id: str, entry_only: bool = True, manual: bool = False
+    jobs: list[Job],
+    user_id: str,
+    entry_only: bool = True,
+    manual: bool = False,
+    titles: list[str] | None = None,
 ) -> dict:
     """Token-efficient funnel for one user's job run.
 
-    skip already-seen -> recency -> cheap LLM relevance gate ->
-    full-JD enrich + extract + score.
+    skip already-seen -> recency -> keyword exclude gate -> cheap LLM
+    relevance gate -> full-JD enrich + extract + score.
 
     Each scored job is persisted immediately so the dashboard can show
     results streaming in. Progress is exposed via get_run_status(user_id).
@@ -257,6 +305,8 @@ def discover_and_score(
         user_id: The user this run belongs to.
         entry_only: When True, filter to entry-level roles only.
         manual: Whether this was a user-triggered run (vs scheduler).
+        titles: The user's target titles - used to decide whether student
+            posts (werkstudent/praktikum) were explicitly asked for.
     """
     status = _run_statuses.setdefault(user_id, _default_status())
     status["running"] = True  # idempotent - begin_run may have set this already
@@ -290,11 +340,37 @@ def discover_and_score(
         len(candidates),
     )
 
+    # --- deterministic keyword gate (free) ---
+    # Blocks seniority markers and, unless the user asked for them, student
+    # posts (werkstudent/praktikum) before any LLM tokens are spent.
+    blocked_terms = title_expander.exclude_terms(titles or [], entry_only)
+    if blocked_terms:
+        kept = []
+        for job in candidates:
+            if title_expander.title_blocked(job.title, blocked_terms):
+                event_repo.mark_seen(job, user_id, "not_entry")
+            else:
+                kept.append(job)
+        if len(kept) < len(candidates):
+            logger.info(
+                "   keyword gate blocked %d of %d for user %s",
+                len(candidates) - len(kept),
+                len(candidates),
+                user_id,
+            )
+        candidates = kept
+
+    # Stop requested while sources were being fetched - keep nothing pending.
+    if status.get("cancel"):
+        logger.info("Run stopped by user %s before classification", user_id)
+        status.update({"running": False, "phase": "idle", "cancel": False})
+        return {"checked": 0, "scored": 0, "results": match_repo.get_all(user_id)}
+
     # --- bulk LLM relevance gate (few calls, not one-per-job) ---
     status.update(
         {"phase": "classifying", "total": len(candidates), "checked": 0, "scored": 0}
     )
-    verdicts = relevance.classify_batch(candidates)
+    verdicts = relevance.classify_batch(candidates, titles=titles)
 
     survivors = []
     for job in candidates:
@@ -312,8 +388,19 @@ def discover_and_score(
     status.update({"phase": "scoring", "total": len(survivors), "checked": 0})
 
     scored = 0
+    stopped = False
     try:
         for job in survivors:
+            # User-requested stop: finish cleanly, keeping what was scored.
+            if status.get("cancel"):
+                stopped = True
+                logger.info(
+                    "Run stopped by user %s after %d of %d jobs",
+                    user_id,
+                    status["checked"],
+                    len(survivors),
+                )
+                break
             status["checked"] += 1
             tag = f"{job.title[:42]} @ {job.company[:20]}"
 
@@ -378,13 +465,14 @@ def discover_and_score(
                 "bundesagentur": by_source.get("bundesagentur", 0),
                 "total_seen": len(seen) + len(new_jobs),
                 "manual": manual,
+                "stopped": stopped,
             }
         )
         try:
             event_repo.log_event(user_id, "run", "", run_detail)
         except Exception as _log_err:
             logger.warning("Could not log run event: %s", _log_err)
-        status.update({"running": False, "phase": "idle"})
+        status.update({"running": False, "phase": "idle", "cancel": False})
 
     return {
         "checked": len(candidates),

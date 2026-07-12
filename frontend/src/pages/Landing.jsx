@@ -220,12 +220,12 @@ function Ticker() {
 const FAQ_ITEMS = [
   { q: 'Which job boards do you pull from?', a: 'We connect to Adzuna Germany, Arbeitnow, and the Bundesagentur fur Arbeit - three of the largest job boards for the German market. Each run can fetch up to 200 listings per search title.' },
   { q: 'What resume formats are supported?', a: 'PDF and DOCX. We extract the text automatically - no manual copy-paste needed. Files up to 10 MB are accepted.' },
-  { q: 'How is the match score calculated?', a: 'The score is a weighted average across six dimensions: skills, experience, education, keywords, language, and role seniority. You can see the per-section breakdown after each analysis.' },
-  { q: 'Which AI models power the analysis?', a: 'You can choose between OpenAI (GPT-4o), Groq (fast and free tier available), or a locally running Ollama model. The active provider is shown in Settings and can be switched at any time.' },
+  { q: 'How is the match score calculated?', a: 'The score is a weighted average across seven dimensions: required skills, preferred skills, responsibilities, experience, education, languages, and certifications. You can see the per-section breakdown after each analysis.' },
+  { q: 'Which AI models power the analysis?', a: 'Analyses run on OpenAI GPT-4o-mini with an automatic fallback provider, so results stay fast and reliable. No API keys or model setup needed on your side.' },
   { q: 'Is my resume data private?', a: 'Your resume and analysis results are stored only in your account and never shared with third parties or used to train any model. See our Privacy Policy for full details.' },
   { q: 'Can I store multiple resume versions?', a: 'Yes - up to 3 resume slots are available. Use one for your base resume and the others for role-specific or company-tailored versions. You can switch between them with one click.' },
   { q: 'Does it work for non-German-speaking roles?', a: 'Yes. While the job sources focus on Germany, many listings are in English. Our language detection flags the job language and the scoring works for both German and English resumes.' },
-  { q: 'Is there a free plan?', a: 'Yes. The free plan gives you full access to the analyzer, ATS check, and resume storage. The Pro plan adds scheduled auto-fetching, priority LLM routing, and export features.' },
+  { q: 'Is there a free plan?', a: 'During the beta everything is free and access is by invite. When we launch, the free plan keeps the analyzer, ATS check, and resume storage; the Pro plan adds scheduled auto-fetching and export features.' },
 ]
 function FAQ() {
   const [open, setOpen] = useState(null)
@@ -271,8 +271,8 @@ const COMPARE_ROWS = [
   { feature: 'Adzuna + Arbeitnow + BA fetch', us: true,  jobscan: false,  manual: false },
   { feature: 'ATS compatibility scan',        us: true,  jobscan: true,   manual: false },
   { feature: 'Multiple resume slots',         us: true,  jobscan: false,  manual: false },
-  { feature: 'Own LLM (OpenAI / Groq / Ollama)', us: true, jobscan: false, manual: false },
-  { feature: 'Works offline with Ollama',     us: true,  jobscan: false,  manual: false },
+  { feature: 'AI bullet rewriting from your real experience', us: true, jobscan: 'partial', manual: false },
+  { feature: 'Download ATS-optimised resume (DOCX)', us: true, jobscan: false, manual: false },
   { feature: 'Free tier available',           us: true,  jobscan: 'partial', manual: true },
 ]
 function Check({ val }) {
@@ -282,8 +282,8 @@ function Check({ val }) {
 }
 
 // === Pricing tier ===
-const FREE_FEATURES  = ['Resume analyzer (unlimited)', 'ATS compatibility check', 'Keyword gap analysis', 'AI profile summary', '3 resume slots', 'Manual job search']
-const PRO_FEATURES   = ['Everything in Free', 'Scheduled auto-fetch (hourly / daily)', 'Live job board scan (200+ per run)', 'Priority LLM routing', 'CSV export of all matches', 'Early access to new features']
+const FREE_FEATURES  = ['Resume analyzer (unlimited)', 'ATS check and AI optimise', 'AI bullet improvement', 'Keyword gap analysis', '3 resume slots', 'Live job matching']
+const PRO_FEATURES   = ['Everything in Free', 'Scheduled auto-fetch (hourly / daily)', 'Live job board scan (200+ per run)', 'Priority analysis', 'CSV export of all matches', 'Early access to new features']
 
 export default function Landing() {
   return (
@@ -334,7 +334,7 @@ export default function Landing() {
               style={{ background: 'rgb(99,102,241)' }}
               onMouseEnter={e => e.currentTarget.style.background='rgb(79,70,229)'}
               onMouseLeave={e => e.currentTarget.style.background='rgb(99,102,241)'}>
-              Get started
+              Join the beta
             </Link>
           </div>
         </div>
@@ -369,7 +369,7 @@ export default function Landing() {
                 style={{ background: 'rgb(99,102,241)', boxShadow: '0 4px 20px rgba(99,102,241,0.4)' }}
                 onMouseEnter={e => e.currentTarget.style.background='rgb(79,70,229)'}
                 onMouseLeave={e => e.currentTarget.style.background='rgb(99,102,241)'}>
-                Start for free
+                Join the beta
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
               </Link>
               <Link to="/login"
@@ -382,7 +382,7 @@ export default function Landing() {
             </motion.div>
             <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}
               className="text-[12px]" style={{ color: 'rgb(156,163,175)' }}>
-              Free to use. No credit card required.
+              Free during beta. Access is invite-only for now.
             </motion.p>
           </div>
           <div className="relative flex justify-center lg:justify-end pt-6 pb-16 pr-10">
@@ -405,7 +405,7 @@ export default function Landing() {
           {[
             { to: 3,   suffix: '',    label: 'German job boards connected' },
             { to: 200, suffix: '+',   label: 'Jobs fetched per run' },
-            { to: 6,   suffix: '',    label: 'Resume dimensions scored' },
+            { to: 7,   suffix: '',    label: 'Resume dimensions scored' },
             { to: 100, suffix: '',    label: 'Point match scale' },
           ].map((s, i) => (
             <FadeIn key={s.label} delay={i * 0.08}>
@@ -436,7 +436,7 @@ export default function Landing() {
             {[
               { n:'1', title:'Upload your resume', desc:'Drop a PDF or DOCX. We extract the text and store up to 3 versions in your vault - one base resume and tailored copies for different roles.' },
               { n:'2', title:'Paste a job description', desc:'Copy any German or English job posting. Our AI extracts the required skills, experience level, and keywords from the full text.' },
-              { n:'3', title:'Get your score and fix it', desc:'See your 0-100 match score, section breakdown, matched and missing keywords, strengths, and gaps - then tailor your resume accordingly.' },
+              { n:'3', title:'Get your score and fix it', desc:'See your 0-100 match score, section breakdown, matched and missing keywords, strengths, and gaps - then generate improved, JD-aligned bullet points with one click.' },
             ].map((s, i) => (
               <FadeIn key={s.n} delay={i * 0.12}>
                 <div className="rounded-2xl p-6 h-full border border-black/[0.06] hover:shadow-md transition-shadow"
@@ -469,11 +469,11 @@ export default function Landing() {
               icon:<><path d="M4 6h16M4 12h10M4 18h7"/></> },
             { color:'#8b5cf6', bg:'rgba(139,92,246,0.09)',  title:'Live German job listings', desc:'Automatically pull fresh listings from Adzuna Germany, Arbeitnow, and the Bundesagentur fur Arbeit - all scored against your resume.',
               icon:<><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></> },
-            { color:'#16a34a', bg:'rgba(22,163,74,0.09)',   title:'ATS compatibility check', desc:'Check if your resume will pass automated applicant tracking systems before you submit. Section completeness and formatting warnings included.',
+            { color:'#16a34a', bg:'rgba(22,163,74,0.09)',   title:'ATS check and optimise', desc:'Scan for ATS parsing issues, then let the AI rewrite your resume for the job description - and download it as a ready-to-send DOCX.',
               icon:<><path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2v-5M9 21H5a2 2 0 01-2-2v-5m0 0h18"/></> },
             { color:'#f59e0b', bg:'rgba(245,158,11,0.09)',  title:'3 resume slots', desc:'Store a base resume and up to two tailored versions. Switch between them instantly when applying for different roles or companies.',
               icon:<><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/></> },
-            { color:'#ec4899', bg:'rgba(236,72,153,0.09)',  title:'AI strengths and gaps', desc:'Get a plain-language summary of your profile strengths, the gaps you need to close, and a recommended focus area for each application.',
+            { color:'#ec4899', bg:'rgba(236,72,153,0.09)',  title:'AI resume improvement', desc:'See your strengths and gaps in plain language, then generate improved bullet points grounded in your real experience - copy them straight into your resume.',
               icon:<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/> },
           ].map((f, i) => (
             <FadeIn key={f.title} delay={i * 0.07}>
@@ -544,6 +544,11 @@ export default function Landing() {
           <p className="mt-3 text-[14px] max-w-md mx-auto" style={{ color: 'rgb(107,114,128)' }}>
             Start free. Upgrade when you need scheduled job fetching and priority analysis.
           </p>
+          <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-full text-[13px] font-medium"
+            style={{ background: 'rgba(99,102,241,0.08)', color: 'rgb(99,102,241)' }}>
+            <span className="w-2 h-2 rounded-full" style={{ background: 'rgb(99,102,241)' }} />
+            Currently in beta: all features are free for invited users
+          </div>
         </FadeIn>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Free */}
@@ -572,7 +577,7 @@ export default function Landing() {
                 style={{ color: 'rgb(99,102,241)', borderColor: 'rgba(99,102,241,0.3)', background: 'rgba(99,102,241,0.05)' }}
                 onMouseEnter={e => e.currentTarget.style.background='rgba(99,102,241,0.1)'}
                 onMouseLeave={e => e.currentTarget.style.background='rgba(99,102,241,0.05)'}>
-                Get started free
+                Join the beta
               </Link>
             </div>
           </FadeIn>
@@ -599,13 +604,11 @@ export default function Landing() {
                   </li>
                 ))}
               </ul>
-              <Link to="/login"
-                className="w-full h-11 flex items-center justify-center rounded-xl font-bold text-[14px] transition-all hover:-translate-y-0.5"
-                style={{ background: 'white', color: 'rgb(99,102,241)' }}
-                onMouseEnter={e => e.currentTarget.style.boxShadow='0 4px 20px rgba(0,0,0,0.2)'}
-                onMouseLeave={e => e.currentTarget.style.boxShadow='none'}>
-                Start Pro trial
-              </Link>
+              <div
+                className="w-full h-11 flex items-center justify-center rounded-xl font-bold text-[14px] cursor-default"
+                style={{ background: 'rgba(255,255,255,0.25)', color: 'white' }}>
+                Coming soon
+              </div>
             </div>
           </FadeIn>
         </div>
@@ -640,14 +643,14 @@ export default function Landing() {
                 Ready to land your next role in Germany?
               </h2>
               <p className="text-[15px] mb-8 max-w-md mx-auto" style={{ color: 'rgba(255,255,255,0.8)' }}>
-                Free to start. No credit card. Your first analysis takes under a minute.
+                Free during beta. Your first analysis takes under a minute.
               </p>
               <Link to="/login"
                 className="inline-flex items-center gap-2 h-12 px-8 rounded-xl font-bold text-[15px] transition-all hover:-translate-y-0.5"
                 style={{ background: 'white', color: 'rgb(99,102,241)' }}
                 onMouseEnter={e => e.currentTarget.style.boxShadow='0 8px 30px rgba(0,0,0,0.25)'}
                 onMouseLeave={e => e.currentTarget.style.boxShadow='none'}>
-                Get started free
+                Join the beta
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
               </Link>
             </div>

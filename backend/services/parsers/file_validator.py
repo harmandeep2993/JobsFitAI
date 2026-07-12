@@ -7,8 +7,7 @@ Validates before any parsing attempt:
     - File existence
     - File size limit
     - Supported file format
-    - MIME type matches extension
-    - File is not corrupted (basic header check)
+    - File content matches extension (magic-byte signature check)
 """
 
 from pathlib import Path
@@ -22,15 +21,6 @@ logger = get_logger(__name__)
 # Validation constants
 MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
 
-
-ALLOWED_MIME_TYPES = {
-    ".pdf": ["application/pdf"],
-    ".docx": [
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        "application/zip",  # DOCX files are ZIP archives
-    ],
-    ".txt": ["text/plain"],
-}
 
 # Magic bytes (file headers) for format verification
 FILE_SIGNATURES = {
@@ -113,44 +103,6 @@ def _check_extension(path: Path) -> None:
     logger.info("File extension: %s", ext)
 
 
-def _check_mime_type(path: Path) -> None:
-    """
-    Check MIME type matches the file extension.
-    Prevents misnamed files (e.g. a .exe renamed to .pdf).
-
-    Args:
-        path (Path): File path
-
-    Raises:
-        ValueError: If MIME type does not match extension
-    """
-    try:
-        import magic
-
-        mime = magic.from_file(str(path), mime=True)
-        ext = path.suffix.lower()
-
-        allowed = ALLOWED_MIME_TYPES.get(ext, [])
-
-        if mime not in allowed:
-            logger.warning(
-                "MIME type mismatch - extension: %s, detected: %s", ext, mime
-            )
-            raise ValueError(
-                f"File content does not match extension. "
-                f"Expected {ext} file but detected: {mime}"
-            )
-
-        logger.info("MIME type verified: %s", mime)
-
-    except ValueError:
-        raise
-    except ImportError:
-        logger.debug("python-magic not installed - skipping MIME type check")
-    except Exception as e:
-        logger.warning("MIME check failed unexpectedly: %s - skipping", e)
-
-
 def _check_signature(path: Path) -> None:
     """
     Check file magic bytes match expected format signature.
@@ -201,8 +153,7 @@ def validate(file_path: str) -> None:
         1. File exists
         2. File size within limit
         3. Extension is supported
-        4. MIME type matches extension
-        5. File signature (magic bytes) is valid
+        4. File signature (magic bytes) matches the extension
 
     Args:
         file_path (str): Path to the uploaded file
@@ -221,7 +172,6 @@ def validate(file_path: str) -> None:
     _check_exists(path)
     _check_size(path)
     _check_extension(path)
-    _check_mime_type(path)
     _check_signature(path)
 
     logger.info("Validation passed: %s", path.name)

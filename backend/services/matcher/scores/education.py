@@ -22,9 +22,6 @@ from core.logger import get_logger
 
 logger = get_logger(__name__)
 
-# Neutral score when JD has no education requirements
-NO_REQUIREMENT_SCORE = 60.0
-
 
 def _build_education_text(education_entries: list) -> str:
     """
@@ -53,7 +50,7 @@ def _build_education_text(education_entries: list) -> str:
     return " ".join(parts).strip()
 
 
-def score_education(resume: dict, jd: dict) -> float:
+def score_education(resume: dict, jd: dict) -> float | None:
     """
     Semantic similarity between candidate education
     and JD education requirements.
@@ -61,8 +58,8 @@ def score_education(resume: dict, jd: dict) -> float:
     Combines all education entries into a single text block
     and compares against all JD education requirements combined.
 
-    Neutral score (60) returned when:
-        - JD has no education requirements
+    None returned when the JD has no education requirements
+    (section excluded from the overall score).
 
     Zero score returned when:
         - JD has requirements but resume has no education entries
@@ -72,7 +69,7 @@ def score_education(resume: dict, jd: dict) -> float:
         jd (dict): Extracted JD data
 
     Returns:
-        float: Education score 0-100
+        float | None: Education score 0-100, or None when not required
     """
     education_requirements = jd.get("education_requirements", [])
     education_entries = resume.get("education", [])
@@ -82,11 +79,8 @@ def score_education(resume: dict, jd: dict) -> float:
 
     # --- Edge case: no requirements ---
     if not education_requirements:
-        logger.info(
-            "No education requirements in JD - returning neutral score %.1f",
-            NO_REQUIREMENT_SCORE,
-        )
-        return NO_REQUIREMENT_SCORE
+        logger.info("No education requirements in JD - section excluded from overall")
+        return None
 
     # --- Edge case: no education in resume ---
     if not education_entries:

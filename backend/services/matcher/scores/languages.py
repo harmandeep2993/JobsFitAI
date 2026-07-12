@@ -64,9 +64,6 @@ PROFICIENCY_LEVELS = {
     "starter": 1,
 }
 
-# Neutral score when JD has no language requirements
-NO_REQUIREMENT_SCORE = 60.0
-
 # Partial credit when language matches but proficiency is below what JD requires
 WEAK_MATCH_SCORE = 50.0
 
@@ -154,7 +151,9 @@ def _parse_lang_entry(entry) -> tuple[str, int]:
 # ---------------------------------------------------------------------------
 
 
-def score_languages(resume: dict, jd: dict) -> tuple[float, list[str], list[str]]:
+def score_languages(
+    resume: dict, jd: dict
+) -> tuple[float | None, list[str], list[str]]:
     """
     Match candidate languages against JD required languages with proficiency.
 
@@ -164,7 +163,8 @@ def score_languages(resume: dict, jd: dict) -> tuple[float, list[str], list[str]
           0 - language missing from resume
 
     Returns:
-        (score, matched_languages, weak_languages)
+        (score | None when the JD lists no languages,
+         matched_languages, weak_languages)
         weak_languages are languages present but below required proficiency.
     """
     raw_required = [e for e in jd.get("languages", []) if e]
@@ -172,11 +172,8 @@ def score_languages(resume: dict, jd: dict) -> tuple[float, list[str], list[str]
     required_parsed = [p for p in (_parse_lang_entry(e) for e in raw_required) if p[0]]
 
     if not required_parsed:
-        logger.info(
-            "No language requirements in JD - returning neutral %.1f",
-            NO_REQUIREMENT_SCORE,
-        )
-        return NO_REQUIREMENT_SCORE, [], []
+        logger.info("No language requirements in JD - section excluded from overall")
+        return None, [], []
 
     candidate_parsed = [
         p

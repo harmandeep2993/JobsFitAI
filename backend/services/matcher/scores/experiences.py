@@ -22,12 +22,18 @@ Sources:
 from sentence_transformers import util
 
 from services.matcher.embedding_model import load_model
+from services.matcher.scoring_utils import calibrate_similarity
 from core.logger import get_logger
 
 logger = get_logger(__name__)
 
 # Minimum similarity for an experience entry to be considered relevant
 RELEVANCE_THRESHOLD = 0.30
+
+# Score when the JD has no explicit requirements and nothing in the resume
+# is even topically relevant - low but not zero (the JD gave us little to
+# judge against, so we cannot rule the candidate out entirely).
+NO_RELEVANT_EXPERIENCE_SCORE = 20.0
 
 
 def _build_entry_text(entry: dict) -> str:
@@ -90,25 +96,26 @@ def _filter_relevant_entries(experience_entries: list, jd_context: str) -> list:
     return relevant
 
 
-def score_experience(resume: dict, jd: dict) -> float:
+def score_experience(resume: dict, jd: dict) -> float | None:
     """
     Score candidate experience against JD requirements.
 
     Step 1 - Filter relevant experience entries via semantic
              similarity against JD context.
-    Step 2 - Semantic similarity between relevant experience
+    Step 2 - Calibrated semantic similarity between relevant experience
              text and JD experience requirements.
 
-    Fallback scores when JD has no explicit requirements:
-        Relevant entries found -> 60.0 (neutral, cannot penalize)
-        No relevant entries    -> 20.0 (low but not zero)
+    Fallback when the JD has no explicit requirements:
+        Relevant entries found -> None (section excluded from overall)
+        No relevant entries    -> NO_RELEVANT_EXPERIENCE_SCORE
 
     Args:
         resume (dict): Extracted resume data
         jd (dict): Extracted JD data
 
     Returns:
-        float: Experience score 0-100
+        float | None: Experience score 0-100, or None when the JD gives
+        nothing to judge against and the resume looks relevant.
     """
     experience_entries = resume.get("experience_entries", [])
     experience_requirements = jd.get("experience_requirements", [])
@@ -150,17 +157,17 @@ def score_experience(resume: dict, jd: dict) -> float:
 
     # --- Step 2: score against requirements ---
     if not experience_requirements:
-        # JD has no explicit requirements - return neutral/low score
+        # JD has no explicit requirements - nothing to score against
         if relevant_entries:
             logger.info(
-                "No explicit requirements - relevant experience found, returning neutral 60"
+                "No explicit requirements - relevant experience found, section excluded"
             )
-            return 60.0
-        else:
-            logger.debug(
-                "No explicit requirements and no relevant experience - returning 20"
-            )
-            return 20.0
+            return None
+        logger.debug(
+            "No explicit requirements and no relevant experience - returning %.0f",
+            NO_RELEVANT_EXPERIENCE_SCORE,
+        )
+        return NO_RELEVANT_EXPERIENCE_SCORE
 
     # Build candidate text from the relevant entries. If the relevance
     # filter excluded everything, fall back to ALL entries rather than
@@ -183,11 +190,12 @@ def score_experience(resume: dict, jd: dict) -> float:
 
     requirements_text = " ".join(experience_requirements).strip()
 
-    # Semantic similarity
+    # Calibrated semantic similarity - raw cosines top out around 0.8 even
+    # for excellent matches, so map them onto the full 0-100 range.
     model = load_model()
     vecs = model.encode([candidate_text, requirements_text], convert_to_tensor=True)
     sim = util.cos_sim(vecs[0], vecs[1]).item()
-    score = round(max(sim, 0) * 100, 1)
+    score = calibrate_similarity(sim)
 
     logger.info("Experience score: %s", score)
     return score

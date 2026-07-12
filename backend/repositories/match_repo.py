@@ -36,7 +36,9 @@ _LIST_COLS = (
     "score, label, matched_required, missing_required, scored_at, applied, status, app_status"
 )
 
-_VALID_APP_STATUSES = {"", "applied", "interview", "offer", "rejected"}
+# Exposed so routes can reject invalid values with a 400 instead of a
+# silent no-op write.
+VALID_APP_STATUSES = {"", "applied", "interview", "offer", "rejected"}
 
 
 def known_ids(user_id: str) -> set:
@@ -131,10 +133,14 @@ def set_status(user_id: str, job_id: str, status: str) -> None:
 
 
 def get_all(user_id: str) -> list[dict]:
-    """Return all stored matches for this user (no jd_json), highest score first."""
+    """Return all stored matches for this user (no jd_json), highest score first.
+
+    Soft-deleted jobs are excluded - they stay restorable via restore().
+    """
     with db.connect() as conn:
         rows = conn.execute(
-            f"SELECT {_LIST_COLS} FROM matches WHERE user_id = ? ORDER BY score DESC",
+            f"SELECT {_LIST_COLS} FROM matches "
+            "WHERE user_id = ? AND deleted = 0 ORDER BY score DESC",
             (user_id,),
         ).fetchall()
 
@@ -163,7 +169,8 @@ def rows_with_jd(user_id: str) -> list[dict]:
     """Return [{id, jd}] for every stored job for this user that has a cached JD."""
     with db.connect() as conn:
         rows = conn.execute(
-            "SELECT id, jd_json FROM matches WHERE user_id = ? AND jd_json IS NOT NULL",
+            "SELECT id, jd_json FROM matches "
+            "WHERE user_id = ? AND jd_json IS NOT NULL AND deleted = 0",
             (user_id,),
         ).fetchall()
     out = []
@@ -203,7 +210,8 @@ def get_one(user_id: str, job_id: str) -> dict | None:
     """Return a single match row with jd/section_scores parsed, or None."""
     with db.connect() as conn:
         row = conn.execute(
-            "SELECT * FROM matches WHERE id=? AND user_id=?", (job_id, user_id)
+            "SELECT * FROM matches WHERE id=? AND user_id=? AND deleted=0",
+            (job_id, user_id),
         ).fetchone()
     if not row:
         return None
@@ -237,26 +245,37 @@ def set_summary(user_id: str, job_id: str, summary: str) -> None:
         )
 
 
-def set_applied(user_id: str, job_id: str, applied: bool) -> None:
-    """Mark a stored job as applied / not applied for this user."""
+def set_applied(user_id: str, job_id: str, applied: bool) -> bool:
+    """Mark a stored job as applied / not applied. Returns False if not found."""
     with db.connect() as conn:
-        conn.execute(
-            "UPDATE matches SET applied = ? WHERE id = ? AND user_id = ?",
+        cur = conn.execute(
+            "UPDATE matches SET applied = ? WHERE id = ? AND user_id = ? AND deleted = 0",
             (1 if applied else 0, job_id, user_id),
         )
+        return cur.rowcount > 0
 
 
-def set_app_status(user_id: str, job_id: str, status: str) -> None:
-    """Set the application status for a job (applied/interview/offer/rejected)."""
+def set_app_status(user_id: str, job_id: str, status: str) -> bool:
+    """Set the application status for a job. Returns False if the job is not found.
+
+    Args:
+        status: One of VALID_APP_STATUSES; '' clears the status. A non-empty
+            status also flags the job as applied.
+
+    Raises:
+        ValueError: If status is not a valid application status.
+    """
     status = (status or "").strip().lower()
-    if status not in _VALID_APP_STATUSES:
-        return
+    if status not in VALID_APP_STATUSES:
+        raise ValueError(f"invalid app status: {status!r}")
     applied = 1 if status else 0
     with db.connect() as conn:
-        conn.execute(
-            "UPDATE matches SET app_status = ?, applied = ? WHERE id = ? AND user_id = ?",
+        cur = conn.execute(
+            "UPDATE matches SET app_status = ?, applied = ? "
+            "WHERE id = ? AND user_id = ? AND deleted = 0",
             (status, applied, job_id, user_id),
         )
+        return cur.rowcount > 0
 
 
 def set_status_by_id(user_id: str, job_id: str, status: str) -> None:
@@ -264,12 +283,27 @@ def set_status_by_id(user_id: str, job_id: str, status: str) -> None:
     set_status(user_id, job_id, status)
 
 
-def delete(user_id: str, job_id: str) -> None:
-    """Remove a single match belonging to this user."""
+def delete(user_id: str, job_id: str) -> bool:
+    """Soft-delete a match so it disappears from lists but can be restored.
+
+    Returns False if the job was not found (or already deleted).
+    """
     with db.connect() as conn:
-        conn.execute(
-            "DELETE FROM matches WHERE id = ? AND user_id = ?", (job_id, user_id)
+        cur = conn.execute(
+            "UPDATE matches SET deleted = 1 WHERE id = ? AND user_id = ? AND deleted = 0",
+            (job_id, user_id),
         )
+        return cur.rowcount > 0
+
+
+def restore(user_id: str, job_id: str) -> bool:
+    """Undo a soft delete. Returns False if no deleted job with this id exists."""
+    with db.connect() as conn:
+        cur = conn.execute(
+            "UPDATE matches SET deleted = 0 WHERE id = ? AND user_id = ? AND deleted = 1",
+            (job_id, user_id),
+        )
+        return cur.rowcount > 0
 
 
 def clear(user_id: str) -> None:

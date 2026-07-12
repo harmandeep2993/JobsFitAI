@@ -30,7 +30,8 @@ def _get_jd_schema() -> str:
     with open(JD_SCHEMA_PATH, "r") as f:
         schema = json.load(f)
 
-    schema_text = json.dumps(schema, indent=2)
+    # Compact separators - indentation costs prompt tokens the LLM ignores.
+    schema_text = json.dumps(schema, separators=(",", ":"))
 
     logger.info("Loaded JD schema from %s", JD_SCHEMA_PATH)
     logger.info("JD schema length: %d characters", len(schema_text))
@@ -47,7 +48,7 @@ def get_jd_prompt(jd_text: str) -> str:
     RULES:
     1. Return ONLY valid JSON. No markdown, no explanation, no extra text.
     2. JD may be in any language - extract and return ALL values in English.
-    3. required_skills: scan the ENTIRE JD - not just a "Requirements" section. Extract every skill, tool, technology, framework, platform, methodology, or domain competency that is stated as required or essential, or implied by responsibilities. Split compound entries into individual items (e.g. "Python incl. Pydantic-AI, LangGraph" -> ["python", "pydantic-ai", "langgraph"]).
+    3. required_skills: scan the ENTIRE JD - not just a "Requirements" section. Extract every skill, tool, technology, framework, platform, methodology, or domain competency that is stated as required or essential, or implied by responsibilities. Split compound entries into individual items (e.g. "Python incl. Pydantic-AI, LangGraph" -> ["python", "pydantic-ai", "langgraph"]). Write each skill in its canonical lowercase industry name: expand abbreviations ("k8s" -> "kubernetes", "js" -> "javascript", "ts" -> "typescript", "ml" -> "machine learning", "nlp" -> "natural language processing", "gcp" -> "google cloud", "sklearn" -> "scikit-learn", "postgres" -> "postgresql") but keep acronyms that ARE the standard name ("aws", "sql", "etl", "sap"). Never list the same skill twice in different spellings.
     4. preferred_skills: bonus, nice-to-have, or "would be a plus" skills only. Do not repeat items already in required_skills.
     5. responsibilities: split into individual action items. Each item should be a single clear task or duty. Translate to English.
     6. experience_requirements: explicit years or type statements only (e.g. "3+ years of Python", "experience in fintech"). Empty list if none stated.

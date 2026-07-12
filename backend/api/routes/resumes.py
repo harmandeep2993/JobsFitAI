@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, JSONResponse
 
-from core.config import MAX_FILE_SIZE_MB, SUPPORTED_EXTENSIONS
+from core.config import JD_MAX_CHARS, MAX_FILE_SIZE_MB, SUPPORTED_EXTENSIONS
 from core.logger import get_logger
 from core import state as session
 from services.extractors.jd_extractor import extract_jd
@@ -23,7 +23,7 @@ from services.parsers import extract_all_text
 from repositories import resume_repo as resume_store
 from services.job_matcher import rescore_all
 from schemas.resume import LabelRequest, RecommendRequest
-from api.routes.auth import get_current_user
+from api.routes.auth import get_current_user, get_current_user_llm_limited
 
 logger = get_logger(__name__)
 
@@ -170,13 +170,47 @@ async def api_resumes_use_for_matching(
     return JSONResponse({"ok": True, "rescored": rescored, "cached": False})
 
 
+@router.post("/{resume_id}/re-extract")
+async def api_resumes_re_extract(
+    resume_id: str,
+    current_user: dict = Depends(get_current_user_llm_limited),
+) -> JSONResponse:
+    """Re-run structured extraction for a resume whose background extraction failed."""
+    user_id = current_user["id"]
+    row = resume_store.get(user_id, resume_id)
+    if not row or not os.path.exists(row["file_path"]):
+        return JSONResponse({"ok": False, "error": "not found"}, status_code=404)
+
+    def _run() -> bool:
+        text = extract_all_text(row["file_path"])
+        if not text or len(text) < 50:
+            return False
+        extracted = extract_resume(text)
+        if not extracted:
+            return False
+        resume_store.set_extracted(user_id, resume_id, _json.dumps(extracted))
+        return True
+
+    try:
+        done = await run_in_threadpool(_run)
+    except Exception as e:
+        logger.warning("re-extract failed for %s: %s", resume_id, e)
+        done = False
+
+    if not done:
+        return JSONResponse(
+            {"ok": False, "error": "extraction_failed"}, status_code=422
+        )
+    return JSONResponse({"ok": True})
+
+
 @router.post("/recommend")
 async def api_resumes_recommend(
     body: RecommendRequest,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user_llm_limited),
 ) -> JSONResponse:
     """Score all cached resumes against a JD and return ranked results."""
-    jd_text = (body.jd or "").strip()
+    jd_text = (body.jd or "").strip()[:JD_MAX_CHARS]
 
     if len(jd_text) < 100:
         raise HTTPException(status_code=400, detail="jd too short")

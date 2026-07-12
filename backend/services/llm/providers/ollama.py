@@ -36,31 +36,36 @@ def check() -> bool:
         return False
 
 
-def call(prompt: str, model: str | None = None) -> str | None:
+def call(prompt: str, model: str | None = None, json_mode: bool = True) -> str | None:
     """
     Send prompt to Ollama and return response text.
 
     Args:
         prompt (str): Prompt text
         model (str | None): Model id to use; falls back to the config default.
+        json_mode (bool): When True, Ollama's format option forces valid JSON.
 
     Returns:
         str | None: Response text or None if failed
     """
     use_model = model or _MODEL
 
+    payload = {
+        "model": use_model,
+        "prompt": prompt,
+        "stream": False,
+        "options": {
+            "temperature": LLM_TEMPERATURE,
+            "num_predict": LLM_MAX_OUTPUT_TOKENS,
+        },
+    }
+    if json_mode:
+        payload["format"] = "json"
+
     try:
         response = requests.post(
             OLLAMA_URL,
-            json={
-                "model": use_model,
-                "prompt": prompt,
-                "stream": False,
-                "options": {
-                    "temperature": LLM_TEMPERATURE,
-                    "num_predict": LLM_MAX_OUTPUT_TOKENS,
-                },
-            },
+            json=payload,
             timeout=LLM_TIMEOUT,
         )
 

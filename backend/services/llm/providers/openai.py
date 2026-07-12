@@ -30,12 +30,6 @@ _API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
 _MODEL = OPENAI_CONFIG.get("model", "gpt-4o-mini")
 
 
-def set_api_key(key: str) -> None:
-    global _API_KEY
-    _API_KEY = key.strip()
-    os.environ["OPENAI_API_KEY"] = _API_KEY
-
-
 def has_key() -> bool:
     return bool(_API_KEY)
 
@@ -70,13 +64,15 @@ def check() -> bool:
         return False
 
 
-def call(prompt, model: str | None = None):
+def call(prompt, model: str | None = None, json_mode: bool = True):
     """
     Send prompt to OpenAI and return response.
 
     Args:
         prompt (str): Prompt text
         model (str | None): Model id to use; falls back to the config default.
+        json_mode (bool): When True, response_format forces strictly valid
+            JSON output - no fences, no prose, no broken quoting.
 
     Returns:
         str: Response text or None if failed
@@ -92,6 +88,8 @@ def call(prompt, model: str | None = None):
         "temperature": LLM_TEMPERATURE,
         "max_tokens": LLM_MAX_OUTPUT_TOKENS,
     }
+    if json_mode:
+        payload["response_format"] = {"type": "json_object"}
     headers = {
         "Authorization": f"Bearer {_API_KEY}",
         "Content-Type": "application/json",

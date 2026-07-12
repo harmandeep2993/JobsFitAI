@@ -45,23 +45,51 @@ So I built it. The core works and I use it for every role I consider applying to
 ## What It Does
 
 **Resume Analyser** - Upload a PDF or DOCX resume and paste any job description. The AI
-pipeline extracts structured data from both, runs a weighted scoring engine across six dimensions,
-and returns a 0-100 match score with a full breakdown, keyword gap list, and actionable
-recommendations.
+pipeline extracts structured data from both, runs a weighted scoring engine across seven
+dimensions, and returns a 0-100 match score with a full breakdown, keyword gap list, and
+actionable recommendations. Re-running the same pair shows the score delta.
+
+The matcher goes beyond naive keyword comparison: skill aliases resolve spelling variants
+(k8s = kubernetes, js = javascript), an evidence search finds skills used in experience
+bullets but missing from the skills section, related skills earn partial credit and show
+as a separate chip group, and similarity scores are calibrated against the embedding
+model so honest matches read as honest scores. Sections the JD says nothing about are
+excluded from the weighted overall instead of diluting it. Extraction handles academic
+profiles (publications, thesis, research roles) and German vocational qualifications
+(Ausbildung, Meister, Fachinformatiker) alongside standard industry CVs.
+
+**AI Resume Improvement** - After an analysis, one click feeds the identified gaps into a
+rewrite engine that generates improved, JD-aligned bullet points grounded in your real
+experience - shown as before/after pairs with copy buttons.
 
 **Live Job Fetcher** - Pulls fresh listings from Adzuna Germany, Arbeitnow, and the
 Bundesagentur fur Arbeit (up to 200 per search title with pagination), scores each against
-your loaded resume, and presents them ranked by match score. Supports scheduled auto-runs.
+your loaded resume, and presents them ranked by match score. Job roles are managed as
+editable keyword chips; with the entry-level filter on, each role is combined with the
+configured entry keywords (junior ml engineer, intern ml engineer, ...) at search time,
+a free keyword gate blocks seniority and working-student markers before any LLM tokens
+are spent, and an LLM gate scoped to IT & Computer Science roles makes the final call
+with a deterministic seniority override. Runs stream results in live, can be stopped
+mid-flight without losing scored jobs, and auto-fetch runs on a per-user schedule.
+Deleting a job offers undo; application status (applied / interview / offer / rejected)
+is tracked per job and summarised in a day-grouped History timeline. CSV export included.
 
-**ATS Check** - Scans your resume for structural issues that confuse Applicant Tracking Systems:
-missing sections, formatting problems, and keyword coverage against a job description.
+**ATS Check and Optimise** - Scans your resume for structural issues that confuse Applicant
+Tracking Systems (missing sections, formatting problems, keyword coverage), then optionally
+rewrites it for the job description and exports the result as a ready-to-send DOCX.
 
 **Resume Vault** - Store up to 3 resume versions (base + tailored). Switch between them
-instantly when scoring a new job. The system remembers which version you used for each analysis.
+instantly when scoring a new job. Past analyses can be reopened in full from the History tab.
 
-**Multi-provider LLM** - Works with OpenAI GPT-4o, Groq (fast, free tier), or a local Ollama
-model. Switch providers from the Settings tab. Falls back automatically if the primary provider
-fails.
+**LLM Routing** - Analyses run on OpenAI GPT-4o-mini with automatic retry and Groq fallback.
+Providers are forced into native JSON mode so structured extraction can never return
+malformed output. The active provider is an app-wide setting controlled by the admin account.
+
+**Security & Beta Hardening** - Per-IP rate limits on credential endpoints and a per-user
+budget on every LLM-backed endpoint, request body size caps, security headers, constant-time
+invite code checks, clamped user-supplied fetch limits, opaque upload tokens (clients never
+see file paths), and JD length caps on all analysis inputs. All state is scoped per user;
+analysis results are cached (versioned by scoring engine) so repeat runs cost zero tokens.
 
 ---
 
@@ -100,18 +128,20 @@ JobsFitAI/
     main.py                    FastAPI entry point, routers, scheduler
     config.yaml                LLM providers, matcher weights, job search settings
     api/routes/                One file per feature group (auth, resumes, analyzer, matches, ats)
-    core/                      Config, database, security, logger, state
+    core/                      Config, database, security, logger, state, upload tokens
     models/                    User model (DB queries for the users table)
     repositories/              Data access layer for all other tables
     schemas/                   Pydantic request/response shapes
+    tests/                     Frontend-backend contract test suite (pytest)
     services/
       ats.py                   ATS check and optimise logic
-      job_matcher.py           Fetch + score pipeline orchestration
-      job_relevance.py         LLM batch relevance gate
+      job_matcher.py           Fetch + score pipeline orchestration (stoppable runs)
+      job_relevance.py         LLM relevance gate (IT/CS scoped, seniority override)
+      title_expander.py        Entry-keyword search expansion + exclude gate
       fetchers/                Adzuna, Arbeitnow, Bundesagentur fetchers
       extractors/              LLM-based resume and JD extraction
-      llm/                     call_llm() router + provider implementations
-      matcher/                 Scoring engine (engine.py + per-section scorers)
+      llm/                     call_llm() router + providers (native JSON mode)
+      matcher/                 Scoring engine + per-section scorers + skill aliases
       parsers/                 PDF / DOCX text extraction
       prompts/                 LLM prompt builders + JSON schemas
 
@@ -119,9 +149,10 @@ JobsFitAI/
     src/
       pages/                   Landing, Login, About, Pricing, Privacy
       components/tabs/         Analyzer, ATS, JobMatches, Resumes, History, Settings
-      components/              ResumePicker, TopBar, Sidebar, Toast, ui
+      components/              ResumePicker, AnalysisResults, TopBar, Sidebar, Toast, ui
       layouts/AppShell.jsx     Main app shell (sidebar + content)
-      lib/auth.js              apiFetch() - attaches Bearer token to every API call
+      lib/auth.js              apiFetch() - attaches Bearer token, redirects to login on 401
+      lib/errors.js            errMsg() - maps API error codes to human-readable messages
       App.jsx                  React Router config
       index.css                Design tokens + global styles
 ```
@@ -147,6 +178,13 @@ npm run dev
 
 Open `http://localhost:5173` for the React app, or `http://localhost:8080` to hit the API directly.
 
+**Tests** - the contract test suite runs offline against a throwaway database:
+
+```bash
+cd backend
+uv run pytest tests
+```
+
 **Environment variables** - copy `.env.example` to `backend/.env` and fill in your keys:
 
 ```
@@ -155,10 +193,12 @@ OPENAI_API_KEY=sk-...
 GROQ_API_KEY=gsk-...
 ADZUNA_APP_ID=your-app-id
 ADZUNA_APP_KEY=your-app-key
+ADMIN_EMAILS=you@example.com        # admin role (app-wide LLM settings)
+INVITE_CODE=your-beta-code          # optional: makes registration invite-only
 ```
 
-For fully local usage with no cloud API keys, install [Ollama](https://ollama.com) and set
-the provider to `ollama` in the Settings tab.
+Optional: `APP_ENV=production` enforces production requirements (JWT_SECRET must be set),
+and `ALLOWED_ORIGINS` restricts CORS to your real domain.
 
 ---
 
@@ -166,25 +206,33 @@ the provider to `ollama` in the Settings tab.
 
 | Group | Endpoints |
 |-------|-----------|
-| Auth | POST /api/auth/register, /login, GET /me |
-| Resumes | GET/POST/DELETE /api/resumes, /api/resumes/{id}/file, /label, /use-for-matching |
-| Analyzer | POST /api/upload, /resume-preview, /analyze |
-| Job Matches | GET /api/match/run, /state, /export; POST /applied, /filters, /scheduler, /clear |
-| ATS | POST /api/ats/check, /optimise |
-| History | GET /api/history |
-| LLM Settings | GET/POST /api/llm-settings, GET /api/llm-ping |
+| Auth | POST /api/auth/register, /login, /change-password; GET /me |
+| Resumes | GET/POST/DELETE /api/resumes, /{id}/file, /label, /use-for-matching, /re-extract, /recommend |
+| Analyzer | POST /api/upload, /resume-preview, /analyze; POST /api/improve-resume |
+| Job Matches | GET /api/match/run, /state, /detail, /export; POST /applied, /app-status, /filters, /score-jd, /scheduler, /stop, /delete, /restore, /clear |
+| ATS | POST /api/ats/check, /optimise, /docx |
+| History | GET /api/history, /api/history/analysis |
+| LLM Settings | GET/POST /api/llm-settings (POST is admin-only), GET /api/llm-ping |
 
 ---
 
 ## Current Status
 
-Core pipeline works end to end: resume parsing, LLM extraction, semantic scoring, keyword
-gap analysis, ATS check, and live job fetching from three German job boards.
+Core pipeline works end to end: resume parsing, LLM extraction with canonical skill
+normalization, alias- and evidence-aware semantic scoring with calibrated similarities,
+keyword gap analysis with partial-credit related skills, ATS check and optimise with DOCX
+export, AI resume improvement, and live job fetching from three German job boards through
+a two-part entry-level gate (keyword expansion + IT/CS-scoped LLM relevance).
 
-The React frontend is live with full auth, resume vault, analyzer, ATS check, job matches,
-history, and settings tabs.
+The React frontend is live with full auth (invite-only beta), resume vault, analyzer with
+improve flow, ATS tab, job matches with editable role chips, live run progress, stop
+control, undo delete and application tracking, a day-grouped history timeline, and settings
+with account management. The API is hardened for public beta (rate limits, body caps,
+security headers, per-user isolation). A contract + matcher test suite (42 tests) pins
+every frontend-backend interaction and every scoring behaviour.
 
-**In progress:** Pro plan billing, AI-powered ATS optimise, resume improvement suggestions.
+**In progress:** production deployment prep (usage quotas, GDPR account deletion, Docker),
+then Pro plan billing.
 
 ---
 
